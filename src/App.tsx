@@ -24,6 +24,7 @@ import {
   Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Odontogram } from './components/Odontogram';
 
 // Types
 interface Patient {
@@ -52,6 +53,7 @@ interface Patient {
     description: string;
     created_at: string;
   }>;
+  odontogram?: Record<number, { status: string; notes: string }>;
 }
 
 interface Dentist {
@@ -300,6 +302,27 @@ export default function App() {
       if (res.ok) alert('Anamnese salva com sucesso!');
     } catch (error) {
       console.error('Error saving anamnesis:', error);
+    }
+  };
+
+  const saveOdontogram = async (toothNumber: number, toothData: any) => {
+    if (!selectedPatient) return;
+    const updatedOdontogram = {
+      ...(selectedPatient.odontogram || {}),
+      [toothNumber]: toothData
+    };
+    
+    try {
+      const res = await fetch(`/api/patients/${selectedPatient.id}/odontogram`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: updatedOdontogram })
+      });
+      if (res.ok) {
+        setSelectedPatient({ ...selectedPatient, odontogram: updatedOdontogram });
+      }
+    } catch (error) {
+      console.error('Error saving odontogram:', error);
     }
   };
 
@@ -623,7 +646,14 @@ export default function App() {
                     .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.cpf && p.cpf.includes(searchTerm)))
                     .slice(0, 5)
                     .map(p => (
-                      <div key={p.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
+                      <div 
+                        key={p.id} 
+                        onClick={() => {
+                          setSearchTerm('');
+                          openPatientRecord(p.id);
+                        }}
+                        className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100 cursor-pointer"
+                      >
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold">
                             {p.name.charAt(0)}
@@ -634,10 +664,6 @@ export default function App() {
                           </div>
                         </div>
                         <button 
-                          onClick={() => {
-                            setSearchTerm('');
-                            openPatientRecord(p.id);
-                          }}
                           className="text-xs font-bold text-emerald-600 hover:underline"
                         >
                           Ver Prontuário
@@ -692,7 +718,11 @@ export default function App() {
                   </div>
                   <div className="divide-y divide-slate-50">
                     {appointments.length > 0 ? appointments.map((app) => (
-                      <div key={app.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                      <div 
+                        key={app.id} 
+                        onClick={() => openPatientRecord(app.patient_id)}
+                        className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
                             <UserCircle size={28} />
@@ -1021,7 +1051,10 @@ export default function App() {
                                 </div>
                                 
                                 <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl shadow-sm group-hover:border-emerald-200 group-hover:shadow-md transition-all flex justify-between items-center">
-                                  <div className="flex items-center gap-5">
+                                  <div 
+                                    className="flex items-center gap-5 cursor-pointer"
+                                    onClick={() => openPatientRecord(app.patient_id)}
+                                  >
                                     <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
                                       <UserCircle size={32} />
                                     </div>
@@ -1099,7 +1132,11 @@ export default function App() {
                         p.phone.includes(searchTerm)
                       )
                       .map((patient) => (
-                        <tr key={patient.id} className="hover:bg-slate-50 transition-colors group">
+                        <tr 
+                          key={patient.id} 
+                          onClick={() => openPatientRecord(patient.id)}
+                          className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                        >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">
@@ -1401,21 +1438,16 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Odontogram Placeholder */}
-                    <div className="bg-slate-900 text-white p-8 rounded-2xl shadow-xl relative overflow-hidden group">
-                      <div className="relative z-10">
-                        <h4 className="text-xl font-bold mb-2">Odontograma Interativo</h4>
-                        <p className="text-slate-400 text-sm max-w-md">
-                          Esta funcionalidade está em fase de planejamento. Em breve você poderá marcar procedimentos dente a dente com interface visual 3D.
-                        </p>
-                        <div className="mt-6 flex gap-2">
-                          <span className="px-3 py-1 bg-white/10 rounded-full text-[10px] font-bold uppercase tracking-wider">Em breve</span>
-                          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">Versão 2.0</span>
-                        </div>
+                    {/* Odontogram */}
+                    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+                      <div className="flex justify-between items-center mb-6">
+                        <h4 className="text-xl font-bold text-slate-800">Odontograma Interativo</h4>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Clique no dente para alterar o status</span>
                       </div>
-                      <div className="absolute top-1/2 right-0 -translate-y-1/2 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Plus size={200} strokeWidth={1} />
-                      </div>
+                      <Odontogram 
+                        data={selectedPatient.odontogram || {}} 
+                        onChange={saveOdontogram} 
+                      />
                     </div>
                   </div>
                 </div>

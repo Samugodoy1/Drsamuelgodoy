@@ -110,6 +110,14 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (appointment_id) REFERENCES appointments(id)
   );
+
+  CREATE TABLE IF NOT EXISTS odontograms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER UNIQUE NOT NULL,
+    data TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(id)
+  );
 `);
 
 // Inserir usuário admin padrão se não existir (senha: admin123 - em prod usar hash!)
@@ -156,7 +164,8 @@ async function startServer() {
       const anamnesis = db.prepare('SELECT * FROM anamnesis WHERE patient_id = ?').get(req.params.id);
       const evolution = db.prepare('SELECT * FROM clinical_evolution WHERE patient_id = ? ORDER BY date DESC').all(req.params.id);
       const files = db.prepare('SELECT * FROM patient_files WHERE patient_id = ? ORDER BY created_at DESC').all(req.params.id);
-      res.json({ ...patient, anamnesis, evolution, files });
+      const odontogram = db.prepare('SELECT * FROM odontograms WHERE patient_id = ?').get(req.params.id);
+      res.json({ ...patient, anamnesis, evolution, files, odontogram: odontogram ? JSON.parse((odontogram as any).data) : null });
     } else {
       res.status(404).json({ error: 'Paciente não encontrado' });
     }
@@ -184,6 +193,21 @@ async function startServer() {
         VALUES (?, ?, ?, ?)
       `).run(req.params.id, appointment_id, notes, procedure_performed);
       res.status(201).json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/patients/:id/odontogram', (req, res) => {
+    const { data } = req.body;
+    try {
+      const exists = db.prepare('SELECT id FROM odontograms WHERE patient_id = ?').get(req.params.id);
+      if (exists) {
+        db.prepare('UPDATE odontograms SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE patient_id = ?').run(JSON.stringify(data), req.params.id);
+      } else {
+        db.prepare('INSERT INTO odontograms (patient_id, data) VALUES (?, ?)').run(req.params.id, JSON.stringify(data));
+      }
+      res.json({ success: true });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
