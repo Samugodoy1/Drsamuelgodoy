@@ -85,10 +85,10 @@ export const Odontogram: React.FC<OdontogramProps> = ({ data, onChange, readOnly
         {/* Lower Jaw */}
         <div className="flex justify-center gap-1 min-w-max">
           <div className="flex gap-1 border-r-2 border-slate-200 pr-2">
-            {toothNumbers.lowerRight.reverse().map(renderTooth)}
+            {[...toothNumbers.lowerRight].reverse().map(renderTooth)}
           </div>
           <div className="flex gap-1 pl-2">
-            {toothNumbers.lowerLeft.reverse().map(renderTooth)}
+            {[...toothNumbers.lowerLeft].reverse().map(renderTooth)}
           </div>
         </div>
       </div>

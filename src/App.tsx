@@ -76,15 +76,19 @@ interface Appointment {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'prontuario' | 'configuracoes'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'prontuario' | 'configuracoes' | 'admin'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [dentists, setDentists] = useState<Dentist[]>([]);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
   const [activeDentist, setActiveDentist] = useState<{ id: number; name: string } | null>(null);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
+  const [isRegistering, setIsRegistering] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [registerMessage, setRegisterMessage] = useState('');
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedPatientTab, setSelectedPatientTab] = useState<'evolucao' | 'imagens'>('evolucao');
@@ -120,14 +124,21 @@ export default function App() {
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+      if (user.role === 'ADMIN') {
+        fetchAdminUsers();
+      }
+    }
+  }, [user, activeDentist]);
 
   const fetchData = async () => {
+    if (!user) return;
     try {
+      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
       const [pRes, aRes, dRes] = await Promise.all([
-        fetch('/api/patients'),
-        fetch('/api/appointments'),
+        fetch(`/api/patients?dentist_id=${dentistId}`),
+        fetch(`/api/appointments?dentist_id=${dentistId}`),
         fetch('/api/dentists')
       ]);
       const pData = await pRes.json();
@@ -140,6 +151,31 @@ export default function App() {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAdminUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      setAdminUsers(data);
+    } catch (error) {
+      console.error('Error fetching admin users:', error);
+    }
+  };
+
+  const updateUserStatus = async (userId: number, status: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        fetchAdminUsers();
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
     }
   };
 
@@ -168,10 +204,33 @@ export default function App() {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    setRegisterMessage('');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registerData)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRegisterMessage(data.message);
+        setIsRegistering(false);
+      } else {
+        setLoginError(data.error || 'Erro ao fazer cadastro');
+      }
+    } catch (error) {
+      setLoginError('Erro de conexão com o servidor');
+    }
+  };
+
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('token');
     setActiveTab('dashboard');
+    setLoading(true);
   };
 
   const openAppointmentModal = () => {
@@ -212,11 +271,13 @@ export default function App() {
 
   const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     try {
+      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
       const res = await fetch('/api/patients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPatient)
+        body: JSON.stringify({ ...newPatient, dentist_id: dentistId })
       });
       if (res.ok) {
         setIsPatientModalOpen(false);
@@ -280,8 +341,10 @@ export default function App() {
   };
 
   const openPatientRecord = async (id: number) => {
+    if (!user) return;
     try {
-      const res = await fetch(`/api/patients/${id}`);
+      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
+      const res = await fetch(`/api/patients/${id}?dentist_id=${dentistId}`);
       const data = await res.json();
       setSelectedPatient(data);
       setActiveTab('prontuario');
@@ -327,12 +390,13 @@ export default function App() {
   };
 
   const addEvolution = async (notes: string, procedure: string) => {
-    if (!selectedPatient) return;
+    if (!selectedPatient || !user) return;
     try {
+      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
       const res = await fetch(`/api/patients/${selectedPatient.id}/evolution`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes, procedure_performed: procedure })
+        body: JSON.stringify({ notes, procedure_performed: procedure, dentist_id: dentistId })
       });
       if (res.ok) openPatientRecord(selectedPatient.id);
     } catch (error) {
@@ -446,7 +510,23 @@ export default function App() {
               <p className="text-slate-500">Acesse sua conta para gerenciar sua clínica</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-6">
+              {isRegistering && (
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
+                  <div className="relative">
+                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Dr. João Silva"
+                      value={registerData.name}
+                      onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
                 <div className="relative">
@@ -455,8 +535,11 @@ export default function App() {
                     type="email" 
                     required
                     placeholder="exemplo@clinica.com"
-                    value={loginData.email}
-                    onChange={(e) => setLoginData({...loginData, email: e.target.value})}
+                    value={isRegistering ? registerData.email : loginData.email}
+                    onChange={(e) => isRegistering 
+                      ? setRegisterData({...registerData, email: e.target.value})
+                      : setLoginData({...loginData, email: e.target.value})
+                    }
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -469,8 +552,11 @@ export default function App() {
                     type="password" 
                     required
                     placeholder="••••••••"
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                    value={isRegistering ? registerData.password : loginData.password}
+                    onChange={(e) => isRegistering
+                      ? setRegisterData({...registerData, password: e.target.value})
+                      : setLoginData({...loginData, password: e.target.value})
+                    }
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -483,18 +569,32 @@ export default function App() {
                 </div>
               )}
 
+              {registerMessage && (
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm">
+                  <CheckCircle2 size={18} />
+                  {registerMessage}
+                </div>
+              )}
+
               <button 
                 type="submit"
                 className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
               >
-                Entrar no Sistema
+                {isRegistering ? 'Criar Conta' : 'Entrar no Sistema'}
               </button>
             </form>
 
             <div className="mt-8 text-center">
-              <p className="text-xs text-slate-400">
-                Esqueceu sua senha? Entre em contato com o suporte.
-              </p>
+              <button 
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setLoginError('');
+                  setRegisterMessage('');
+                }}
+                className="text-xs text-emerald-600 font-bold hover:underline"
+              >
+                {isRegistering ? 'Já tem uma conta? Faça login' : 'Não tem uma conta? Cadastre-se'}
+              </button>
             </div>
           </div>
         </motion.div>
@@ -539,6 +639,9 @@ export default function App() {
           <SidebarItem id="agenda" icon={Calendar} label="Agenda" />
           <SidebarItem id="pacientes" icon={Users} label="Pacientes" />
           <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" />
+          {user && user.role === 'ADMIN' && (
+            <SidebarItem id="admin" icon={Settings} label="Painel Admin" />
+          )}
           <SidebarItem id="configuracoes" icon={Settings} label="Configurações" />
         </nav>
 
@@ -1453,6 +1556,78 @@ export default function App() {
                 </div>
               </div>
             )}
+            {activeTab === 'admin' && user.role === 'ADMIN' && (
+              <div className="space-y-8">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-bold text-slate-900">Painel de Administração</h3>
+                </div>
+                
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                        <th className="px-6 py-4">Usuário</th>
+                        <th className="px-6 py-4">E-mail</th>
+                        <th className="px-6 py-4">Data Cadastro</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {adminUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold">
+                                {u.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800">{u.name}</p>
+                                <p className="text-[10px] text-slate-400 uppercase font-bold">{u.role}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-slate-500 text-sm">{u.email}</td>
+                          <td className="px-6 py-4 text-slate-500 text-sm">
+                            {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                              u.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                              u.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                              'bg-rose-100 text-rose-700'
+                            }`}>
+                              {u.status === 'active' ? 'Ativo' : u.status === 'pending' ? 'Pendente' : 'Bloqueado'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              {u.status !== 'active' && (
+                                <button 
+                                  onClick={() => updateUserStatus(u.id, 'active')}
+                                  className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                                >
+                                  Ativar
+                                </button>
+                              )}
+                              {u.status !== 'blocked' && u.role !== 'ADMIN' && (
+                                <button 
+                                  onClick={() => updateUserStatus(u.id, 'blocked')}
+                                  className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-700 transition-colors"
+                                >
+                                  Bloquear
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'configuracoes' && (
               <div className="space-y-8">
                 <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
