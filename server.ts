@@ -217,12 +217,24 @@ async function startServer() {
 
   app.post('/api/appointments', (req, res) => {
     const { patient_id, dentist_id, start_time, end_time, notes } = req.body;
+    console.log('Tentativa de agendamento:', { patient_id, dentist_id, start_time, end_time });
+    
+    if (!patient_id || !dentist_id || !start_time || !end_time) {
+      return res.status(400).json({ error: 'Paciente, dentista, início e término são obrigatórios' });
+    }
+
     try {
       const result = db.prepare('INSERT INTO appointments (patient_id, dentist_id, start_time, end_time, notes) VALUES (?, ?, ?, ?, ?)').run(
-        patient_id, dentist_id, start_time, end_time, notes
+        Number(patient_id), 
+        Number(dentist_id), 
+        start_time, 
+        end_time, 
+        notes || ''
       );
+      console.log('Agendamento realizado com sucesso, ID:', result.lastInsertRowid);
       res.status(201).json({ id: result.lastInsertRowid });
     } catch (err: any) {
+      console.error('Erro ao realizar agendamento:', err.message);
       res.status(400).json({ error: err.message });
     }
   });

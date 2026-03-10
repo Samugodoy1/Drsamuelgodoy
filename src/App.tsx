@@ -80,6 +80,7 @@ export default function App() {
   const [dentists, setDentists] = useState<Dentist[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [activeDentist, setActiveDentist] = useState<{ id: number; name: string } | null>(null);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
 
@@ -152,6 +153,7 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         setUser(data.user);
+        setActiveDentist({ id: data.user.id, name: data.user.name });
         localStorage.setItem('token', data.token);
         if (data.user.role === 'DENTIST') {
           setDentistFilter(data.user.id.toString());
@@ -171,7 +173,9 @@ export default function App() {
   };
 
   const openAppointmentModal = () => {
-    if (user && user.role === 'DENTIST') {
+    if (activeDentist) {
+      setNewAppointment(prev => ({ ...prev, dentist_id: activeDentist.id.toString() }));
+    } else if (user && user.role === 'DENTIST') {
       setNewAppointment(prev => ({ ...prev, dentist_id: user.id.toString() }));
     }
     setIsModalOpen(true);
@@ -179,19 +183,28 @@ export default function App() {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newAppointment.patient_id || !newAppointment.dentist_id || !newAppointment.start_time || !newAppointment.end_time) {
+      alert('Por favor, preencha todos os campos obrigatórios.');
+      return;
+    }
     try {
       const res = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAppointment)
       });
+      const data = await res.json();
       if (res.ok) {
         setIsModalOpen(false);
         fetchData();
         setNewAppointment({ patient_id: '', dentist_id: '', start_time: '', end_time: '', notes: '' });
+        alert('Agendamento realizado com sucesso!');
+      } else {
+        alert(data.error || 'Erro ao realizar agendamento');
       }
     } catch (error) {
       console.error('Error creating appointment:', error);
+      alert('Erro de conexão ao realizar agendamento');
     }
   };
 
@@ -551,6 +564,26 @@ export default function App() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
+            {(user?.role === 'ADMIN' || user?.role === 'RECEPTIONIST') && (
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <UserCircle size={18} className="text-emerald-600" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-0.5">Agendando como:</span>
+                  <select 
+                    value={activeDentist?.id || ''}
+                    onChange={(e) => {
+                      const d = dentists.find(dentist => dentist.id.toString() === e.target.value);
+                      if (d) setActiveDentist({ id: d.id, name: d.name });
+                    }}
+                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  >
+                    {dentists.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -774,7 +807,18 @@ export default function App() {
                           ))}
                         </select>
                       </div>
-                      <div className="pt-4 border-t border-slate-50">
+                      <div className="pt-4 border-t border-slate-50 space-y-3">
+                        <button 
+                          onClick={() => setDentistFilter('all')}
+                          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                            dentistFilter === 'all' 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                              : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Users size={16} />
+                          Ver Agenda Geral
+                        </button>
                         <button 
                           onClick={openAppointmentModal}
                           className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
