@@ -1,9 +1,21 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg2-binary
-python-jose[cryptography]
-passlib[bcrypt]
-python-multipart
-python-dotenv
-pydantic
+# Projeto OdontoManager - Requisitos do Sistema
+# Este é um projeto Node.js/TypeScript. As dependências reais estão no package.json.
+
+# Backend
+express
+better-sqlite3
+dotenv
+tsx (para execução em desenvolvimento)
+vite (middleware)
+
+# Frontend
+react
+react-dom
+lucide-react
+motion (framer-motion)
+tailwind-css
+typescript
+
+# Versões recomendadas
+node >= 18.0.0
+npm >= 9.0.0
