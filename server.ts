@@ -5,14 +5,14 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 // Import serverless handlers
-import loginHandler from './api/auth/login';
-import registerHandler from './api/auth/register';
-import patientsHandler from './api/patients/index';
-import dentistsHandler from './api/dentists/index';
-import appointmentsHandler from './api/appointments/index';
-import adminUsersHandler from './api/admin/users';
-import filesHandler from './api/files';
-import healthHandler from './api/health';
+import loginHandler from './api/auth/login.js';
+import registerHandler from './api/auth/register.js';
+import patientsHandler from './api/patients/index.js';
+import dentistsHandler from './api/dentists/index.js';
+import appointmentsHandler from './api/appointments/index.js';
+import adminUsersHandler from './api/admin/users.js';
+import filesHandler from './api/files.js';
+import healthHandler from './api/health.js';
 
 dotenv.config();
 
