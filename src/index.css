@@ -13,9 +13,22 @@
     }
     body {
       background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    main {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+      display: block !important;
+      overflow: visible !important;
     }
     .print-only {
       display: block !important;
+    }
+    /* Hide scrollbars on print */
+    ::-webkit-scrollbar {
+      display: none;
     }
   }
 }

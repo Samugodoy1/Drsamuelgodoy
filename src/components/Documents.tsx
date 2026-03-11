@@ -12,7 +12,8 @@ import {
   FileCheck,
   ClipboardList,
   Send,
-  Calculator
+  Calculator,
+  Info
 } from 'lucide-react';
 
 import { Odontogram } from './Odontogram';
@@ -37,6 +38,14 @@ interface Patient {
     procedure_performed: string;
   }>;
   odontogram?: Record<number, { status: any; notes: string }>;
+  toothHistory?: Array<{
+    id: number;
+    tooth_number: number;
+    procedure: string;
+    notes: string;
+    date: string;
+    dentist_name?: string;
+  }>;
 }
 
 interface Dentist {
@@ -99,7 +108,13 @@ export function Documents({ patients, profile, apiFetch }: DocumentsProps) {
   }, [selectedPatientId, apiFetch]);
 
   const handlePrint = () => {
-    window.print();
+    try {
+      window.focus();
+      window.print();
+    } catch (e) {
+      console.error('Print failed:', e);
+      alert('Se a impressão não abrir, tente abrir o aplicativo em uma nova aba usando o ícone no canto superior direito.');
+    }
   };
 
   const addPrescriptionItem = () => {
@@ -163,6 +178,13 @@ export function Documents({ patients, profile, apiFetch }: DocumentsProps) {
               Imprimir / PDF
             </button>
           </div>
+        </div>
+        
+        <div className="no-print bg-amber-50 border border-amber-100 p-3 rounded-xl flex items-start gap-3 text-amber-800 text-xs">
+          <Info size={16} className="shrink-0 mt-0.5" />
+          <p>
+            <strong>Dica:</strong> Se a janela de impressão não abrir, clique no ícone de "Abrir em nova aba" no canto superior direito do aplicativo e tente novamente. Alguns navegadores bloqueiam a impressão dentro de quadros (iframes).
+          </p>
         </div>
 
         {/* Paper Layout */}
@@ -273,6 +295,7 @@ export function Documents({ patients, profile, apiFetch }: DocumentsProps) {
                       <div className="scale-90 origin-top">
                         <Odontogram 
                           data={selectedPatient?.odontogram || {}} 
+                          history={selectedPatient?.toothHistory || []}
                           onChange={() => {}} 
                           readOnly={true} 
                         />

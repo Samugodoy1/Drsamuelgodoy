@@ -51,6 +51,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ip_address TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS tooth_history (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        tooth_number INTEGER NOT NULL,
+        procedure TEXT NOT NULL,
+        notes TEXT,
+        date DATE NOT NULL DEFAULT CURRENT_DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS odontograms (
+        patient_id INTEGER PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE,
+        data TEXT NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Hash default admin password if it exists and is plain text

@@ -20,11 +20,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         const patient = patientResult.rows[0];
         
-        const [anamnesis, evolution, files, odontogram] = await Promise.all([
+        const [anamnesis, evolution, files, odontogram, toothHistory] = await Promise.all([
           query('SELECT * FROM anamnesis WHERE patient_id = $1', [id]),
           query('SELECT * FROM clinical_evolution WHERE patient_id = $1 ORDER BY date DESC', [id]),
           query('SELECT * FROM patient_files WHERE patient_id = $1 ORDER BY created_at DESC', [id]),
-          query('SELECT * FROM odontograms WHERE patient_id = $1', [id])
+          query('SELECT * FROM odontograms WHERE patient_id = $1', [id]),
+          query(`
+            SELECT th.*, u.name as dentist_name 
+            FROM tooth_history th
+            JOIN users u ON th.dentist_id = u.id
+            WHERE th.patient_id = $1 
+            ORDER BY th.date DESC, th.created_at DESC
+          `, [id])
         ]);
 
         return res.status(200).json({
@@ -32,7 +39,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           anamnesis: anamnesis.rows[0] || { medical_history: '', allergies: '', medications: '' },
           evolution: evolution.rows,
           files: files.rows,
-          odontogram: odontogram.rows[0] ? JSON.parse(odontogram.rows[0].data) : {}
+          odontogram: odontogram.rows[0] ? JSON.parse(odontogram.rows[0].data) : {},
+          toothHistory: toothHistory.rows
         });
       } else {
         // List patients - always filter by dentist_id for isolation
@@ -70,6 +78,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           [id, JSON.stringify(data)]
         );
         return res.status(200).json({ success: true });
+      }
+
+      if (subRoute === 'tooth-history') {
+        const { tooth_number, procedure, notes, date } = req.body;
+        await query(
+          'INSERT INTO tooth_history (patient_id, dentist_id, tooth_number, procedure, notes, date) VALUES ($1, $2, $3, $4, $5, $6)',
+          [id, user.id, tooth_number, procedure, notes, date || new Date()]
+        );
+        return res.status(201).json({ success: true });
       }
 
       if (subRoute === 'files') {

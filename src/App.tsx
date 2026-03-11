@@ -59,6 +59,14 @@ interface Patient {
     created_at: string;
   }>;
   odontogram?: Record<number, { status: string; notes: string }>;
+  toothHistory?: Array<{
+    id: number;
+    tooth_number: number;
+    procedure: string;
+    notes: string;
+    date: string;
+    dentist_name?: string;
+  }>;
 }
 
 interface Dentist {
@@ -712,6 +720,23 @@ export default function App() {
     }
   };
 
+  const addToothHistory = async (record: any) => {
+    if (!selectedPatient) return;
+    try {
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}/tooth-history`, {
+        method: 'POST',
+        body: JSON.stringify(record)
+      });
+      if (res.ok) {
+        // Refresh patient data to show new history
+        openPatientRecord(selectedPatient.id);
+      }
+    } catch (error) {
+      console.error('Error adding tooth history:', error);
+      throw error;
+    }
+  };
+
   const addEvolution = async (notes: string, procedure: string) => {
     if (!selectedPatient || !user) return;
     try {
@@ -939,7 +964,7 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 p-4 md:p-6 flex flex-col transition-all duration-300 ease-in-out tablet-l:static tablet-l:translate-x-0
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 p-4 md:p-6 flex flex-col transition-all duration-300 ease-in-out tablet-l:static tablet-l:translate-x-0 no-print
         ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 tablet-l:w-20 desktop:w-72'}
       `}>
         <div className="flex items-center justify-between mb-10 px-2">
@@ -987,8 +1012,8 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full max-w-full">
-        <header className="flex flex-col desktop:flex-row desktop:justify-between desktop:items-center gap-6 mb-8 md:mb-10">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full max-w-full print:p-0">
+        <header className="flex flex-col desktop:flex-row desktop:justify-between desktop:items-center gap-6 mb-8 md:mb-10 no-print">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button 
@@ -2006,7 +2031,9 @@ export default function App() {
                       </div>
                       <Odontogram 
                         data={selectedPatient.odontogram || {}} 
+                        history={selectedPatient.toothHistory || []}
                         onChange={saveOdontogram} 
+                        onAddHistory={addToothHistory}
                       />
                     </div>
                   </div>
