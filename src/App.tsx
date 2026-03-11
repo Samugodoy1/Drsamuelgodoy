@@ -21,10 +21,15 @@ import {
   FileText,
   UserPlus,
   UserCircle,
-  Menu
+  Menu,
+  Camera,
+  UserCog,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Odontogram } from './components/Odontogram';
+import { Documents } from './components/Documents';
 
 // Types
 interface Patient {
@@ -61,6 +66,13 @@ interface Dentist {
   name: string;
   email: string;
   role: string;
+  phone?: string;
+  cro?: string;
+  specialty?: string;
+  bio?: string;
+  photo_url?: string;
+  clinic_name?: string;
+  clinic_address?: string;
 }
 
 interface Appointment {
@@ -75,15 +87,31 @@ interface Appointment {
   status: 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'IN_PROGRESS' | 'FINISHED';
 }
 
+interface Transaction {
+  id: number;
+  dentist_id: number;
+  type: 'INCOME' | 'EXPENSE';
+  description: string;
+  category: string;
+  amount: number;
+  payment_method: string;
+  date: string;
+  status: string;
+  patient_id?: number;
+  patient_name?: string;
+  procedure?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'prontuario' | 'configuracoes' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [dentists, setDentists] = useState<Dentist[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
-  const [activeDentist, setActiveDentist] = useState<{ id: number; name: string } | null>(null);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
   const [isRegistering, setIsRegistering] = useState(false);
@@ -95,6 +123,8 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isDentistModalOpen, setIsDentistModalOpen] = useState(false);
+  const [isEditDentistModalOpen, setIsEditDentistModalOpen] = useState(false);
+  const [editingDentist, setEditingDentist] = useState<any>(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,7 +132,6 @@ export default function App() {
   const [agendaViewMode, setAgendaViewMode] = useState<'day' | 'week' | 'month'>('day');
   const [statusFilter, setStatusFilter] = useState<string[]>(['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']);
   const [agendaSearchTerm, setAgendaSearchTerm] = useState('');
-  const [dentistFilter, setDentistFilter] = useState<string>('all');
   const [isEvolutionFormOpen, setIsEvolutionFormOpen] = useState(false);
   const [newEvolution, setNewEvolution] = useState({ notes: '', procedure: '' });
   const [newDentist, setNewDentist] = useState({ name: '', email: '', password: '' });
@@ -123,6 +152,30 @@ export default function App() {
     address: ''
   });
 
+  // Finance States
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
+  const [newTransaction, setNewTransaction] = useState({
+    description: '',
+    category: 'Outros',
+    amount: '',
+    payment_method: 'PIX',
+    date: new Date().toISOString().split('T')[0],
+    status: 'PAID',
+    patient_id: '',
+    procedure: '',
+    notes: ''
+  });
+  const [financeFilter, setFinanceFilter] = useState({
+    period: 'month', // 'day', 'week', 'month', 'all'
+    type: 'all', // 'all', 'INCOME', 'EXPENSE'
+    category: 'all'
+  });
+
+  const [profile, setProfile] = useState<Dentist | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profilePassword, setProfilePassword] = useState('');
+
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     const savedToken = localStorage.getItem('token');
@@ -131,9 +184,8 @@ export default function App() {
       try {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
-        setActiveDentist({ id: parsedUser.id, name: parsedUser.name });
         if (parsedUser.role === 'DENTIST') {
-          setDentistFilter(parsedUser.id.toString());
+          // No filter needed
         }
       } catch (e) {
         console.error('Error parsing saved user:', e);
@@ -146,27 +198,84 @@ export default function App() {
   useEffect(() => {
     if (user) {
       fetchData();
-      if (user.role === 'ADMIN') {
+      if (user.role?.toUpperCase() === 'ADMIN') {
         fetchAdminUsers();
       }
+      // Update schema once
+      apiFetch('/api/admin/update-schema').catch(console.error);
     }
-  }, [user, activeDentist]);
+  }, [user]);
+
+  useEffect(() => {
+    if ((activeTab === 'configuracoes' || activeTab === 'documentos') && user) {
+      fetchProfile();
+    }
+  }, [activeTab, user]);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await apiFetch('/api/profile');
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    setIsSavingProfile(true);
+    try {
+      const res = await apiFetch('/api/profile', {
+        method: 'POST',
+        body: JSON.stringify({ ...profile, password: profilePassword })
+      });
+      if (res.ok) {
+        alert('Perfil atualizado com sucesso!');
+        setProfilePassword('');
+        fetchProfile();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Erro ao atualizar perfil');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('Erro de conexão ao salvar perfil');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfile(prev => prev ? { ...prev, photo_url: reader.result as string } : null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const fetchData = async () => {
     if (!user) return;
     try {
-      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
-      const [pRes, aRes, dRes] = await Promise.all([
-        fetch(`/api/patients?dentist_id=${dentistId}`),
-        fetch(`/api/appointments?dentist_id=${dentistId}`),
-        fetch('/api/dentists')
+      const [pRes, aRes, fRes] = await Promise.all([
+        apiFetch('/api/patients'),
+        apiFetch('/api/appointments'),
+        apiFetch('/api/finance')
       ]);
+      
       const pData = await pRes.json();
       const aData = await aRes.json();
-      const dData = await dRes.json();
-      setPatients(pData);
-      setAppointments(aData);
-      setDentists(dData);
+      const fData = await fRes.json();
+      
+      if (Array.isArray(pData)) setPatients(pData);
+      if (Array.isArray(aData)) setAppointments(aData);
+      if (Array.isArray(fData)) setTransactions(fData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -174,9 +283,63 @@ export default function App() {
     }
   };
 
+  const handleSaveTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await apiFetch('/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newTransaction,
+          type: transactionType,
+          amount: parseFloat(newTransaction.amount)
+        })
+      });
+      if (res.ok) {
+        setIsTransactionModalOpen(false);
+        setNewTransaction({
+          description: '',
+          category: 'Outros',
+          amount: '',
+          payment_method: 'PIX',
+          date: new Date().toISOString().split('T')[0],
+          status: 'PAID',
+          patient_id: '',
+          procedure: '',
+          notes: ''
+        });
+        fetchData();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Erro ao salvar transação');
+      }
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      alert('Erro de conexão ao salvar transação');
+    }
+  };
+
+  const handleDeleteTransaction = async (id: number) => {
+    if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
+    try {
+      const res = await apiFetch(`/api/finance/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+    }
+  };
+
   const fetchAdminUsers = async () => {
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await apiFetch('/api/admin/users');
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`Error fetching admin users (${res.status}):`, errorText);
+        return;
+      }
       const data = await res.json();
       setAdminUsers(data);
     } catch (error) {
@@ -186,9 +349,8 @@ export default function App() {
 
   const updateUserStatus = async (userId: number, status: string) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}/status`, {
+      const res = await apiFetch(`/api/admin/users/${userId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
       if (res.ok) {
@@ -211,11 +373,10 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         setUser(data.user);
-        setActiveDentist({ id: data.user.id, name: data.user.name });
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         if (data.user.role === 'DENTIST') {
-          setDentistFilter(data.user.id.toString());
+          // No filter needed
         }
       } else {
         setLoginError(data.error || 'Erro ao fazer login');
@@ -255,10 +416,107 @@ export default function App() {
     setLoading(true);
   };
 
+  const filteredTransactions = transactions.filter(t => {
+    if (financeFilter.type !== 'all' && t.type !== financeFilter.type) return false;
+    if (financeFilter.category !== 'all' && t.category !== financeFilter.category) return false;
+    
+    const tDate = new Date(t.date);
+    const now = new Date();
+    if (financeFilter.period === 'day') {
+      return tDate.toDateString() === now.toDateString();
+    } else if (financeFilter.period === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(now.getDate() - 7);
+      return tDate >= weekAgo;
+    } else if (financeFilter.period === 'month') {
+      return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+    }
+    return true;
+  });
+
+  const currentTotalIncome = filteredTransactions
+    .filter(t => t.type === 'INCOME')
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const currentTotalExpense = filteredTransactions
+    .filter(t => t.type === 'EXPENSE')
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const currentNetProfit = currentTotalIncome - currentTotalExpense;
+  const currentProfitMargin = currentTotalIncome > 0 ? (currentNetProfit / currentTotalIncome) * 100 : 0;
+
+  // Dashboard Stats Calculations
+  const dashboardNow = new Date();
+  const dashboardMonth = dashboardNow.getMonth();
+  const dashboardYear = dashboardNow.getFullYear();
+
+  const monthlyRevenue = transactions
+    .filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'INCOME' && d.getMonth() === dashboardMonth && d.getFullYear() === dashboardYear;
+    })
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const prevMonthDate = new Date(dashboardYear, dashboardMonth - 1, 1);
+  const prevMonth = prevMonthDate.getMonth();
+  const prevMonthYear = prevMonthDate.getFullYear();
+
+  const prevMonthlyRevenue = transactions
+    .filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'INCOME' && d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
+    })
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const revenueVariation = prevMonthlyRevenue > 0 
+    ? ((monthlyRevenue - prevMonthlyRevenue) / prevMonthlyRevenue) * 100 
+    : 0;
+
+  const startOfWeek = new Date(dashboardNow);
+  startOfWeek.setDate(dashboardNow.getDate() - dashboardNow.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const weeklyAppointmentsCount = appointments.filter(a => {
+    const d = new Date(a.start_time);
+    return d >= startOfWeek && d <= endOfWeek;
+  }).length;
+
+  const dailyRevenue = transactions
+    .filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'INCOME' && d.toDateString() === dashboardNow.toDateString();
+    })
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const nextAppointments = appointments
+    .filter(a => new Date(a.start_time) >= dashboardNow)
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+    .slice(0, 5);
+
+  const todayAppointmentsCount = appointments.filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString()).length;
+
+  const apiFetch = async (url: string, options: any = {}) => {
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+    };
+    
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+      handleLogout();
+    }
+    return response;
+  };
+
   const openAppointmentModal = () => {
-    if (activeDentist) {
-      setNewAppointment(prev => ({ ...prev, dentist_id: activeDentist.id.toString() }));
-    } else if (user && user.role === 'DENTIST') {
+    if (user) {
       setNewAppointment(prev => ({ ...prev, dentist_id: user.id.toString() }));
     }
     setIsModalOpen(true);
@@ -271,9 +529,8 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch('/api/appointments', {
+      const res = await apiFetch('/api/appointments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAppointment)
       });
       const data = await res.json();
@@ -295,11 +552,9 @@ export default function App() {
     e.preventDefault();
     if (!user) return;
     try {
-      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
-      const res = await fetch('/api/patients', {
+      const res = await apiFetch('/api/patients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newPatient, dentist_id: dentistId })
+        body: JSON.stringify(newPatient)
       });
       if (res.ok) {
         setIsPatientModalOpen(false);
@@ -313,27 +568,56 @@ export default function App() {
 
   const handleCreateDentist = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Enviando dados do novo dentista:', newDentist);
     try {
-      const res = await fetch('/api/dentists', {
+      const res = await apiFetch('/api/dentists', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newDentist)
       });
-      const data = await res.json();
       if (res.ok) {
-        console.log('Dentista cadastrado com sucesso:', data);
         setIsDentistModalOpen(false);
-        fetchData();
+        fetchAdminUsers();
         setNewDentist({ name: '', email: '', password: '' });
         alert('Dentista cadastrado com sucesso!');
       } else {
-        console.error('Erro retornado pelo servidor:', data.error);
+        const data = await res.json();
         alert(data.error || 'Erro ao cadastrar dentista');
       }
     } catch (error) {
       console.error('Error creating dentist:', error);
       alert('Erro de conexão ao cadastrar dentista');
+    }
+  };
+
+  const handleUpdateDentist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDentist) return;
+    try {
+      const res = await apiFetch(`/api/admin/users/${editingDentist.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: editingDentist.name, email: editingDentist.email })
+      });
+      if (res.ok) {
+        setIsEditDentistModalOpen(false);
+        fetchAdminUsers();
+        alert('Dentista atualizado com sucesso!');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Erro ao atualizar dentista');
+      }
+    } catch (error) {
+      console.error('Error updating dentist:', error);
+      alert('Erro de conexão ao atualizar dentista');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewImage({ ...newImage, url: reader.result as string });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -351,12 +635,32 @@ export default function App() {
 
   const updateStatus = async (id: number, status: Appointment['status']) => {
     try {
-      const res = await fetch(`/api/appointments/${id}/status`, {
+      const res = await apiFetch(`/api/appointments/${id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
-      if (res.ok) fetchData();
+      if (res.ok) {
+        if (status === 'FINISHED') {
+          const app = appointments.find(a => a.id === id);
+          if (app) {
+            setTransactionType('INCOME');
+            setNewTransaction({
+              description: `Atendimento - ${app.patient_name}`,
+              category: 'Procedimentos',
+              amount: '',
+              payment_method: 'PIX',
+              date: new Date().toISOString().split('T')[0],
+              status: 'PAID',
+              patient_id: app.patient_id.toString(),
+              procedure: '',
+              notes: `Referente ao agendamento #${app.id}`
+            });
+            setIsTransactionModalOpen(true);
+            setActiveTab('financeiro');
+          }
+        }
+        fetchData();
+      }
     } catch (error) {
       console.error('Error updating status:', error);
     }
@@ -365,8 +669,7 @@ export default function App() {
   const openPatientRecord = async (id: number) => {
     if (!user) return;
     try {
-      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
-      const res = await fetch(`/api/patients/${id}?dentist_id=${dentistId}`);
+      const res = await apiFetch(`/api/patients/${id}`);
       const data = await res.json();
       setSelectedPatient(data);
       setActiveTab('prontuario');
@@ -379,9 +682,8 @@ export default function App() {
     e.preventDefault();
     if (!selectedPatient) return;
     try {
-      const res = await fetch(`/api/patients/${selectedPatient.id}/anamnesis`, {
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}/anamnesis`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selectedPatient.anamnesis)
       });
       if (res.ok) alert('Anamnese salva com sucesso!');
@@ -398,9 +700,8 @@ export default function App() {
     };
     
     try {
-      const res = await fetch(`/api/patients/${selectedPatient.id}/odontogram`, {
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}/odontogram`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: updatedOdontogram })
       });
       if (res.ok) {
@@ -414,11 +715,9 @@ export default function App() {
   const addEvolution = async (notes: string, procedure: string) => {
     if (!selectedPatient || !user) return;
     try {
-      const dentistId = user.role === 'ADMIN' ? (activeDentist?.id || user.id) : user.id;
-      const res = await fetch(`/api/patients/${selectedPatient.id}/evolution`, {
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}/evolution`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes, procedure_performed: procedure, dentist_id: dentistId })
+        body: JSON.stringify({ notes, procedure_performed: procedure })
       });
       if (res.ok) openPatientRecord(selectedPatient.id);
     } catch (error) {
@@ -433,12 +732,12 @@ export default function App() {
     }
     try {
       // Primeiro chama o backend para registrar (opcional, mas bom para log)
-      await fetch(`/api/appointments/${app.id}/remind`, { method: 'POST' });
+      await apiFetch(`/api/appointments/${app.id}/remind`, { method: 'POST' });
       
       // Formata a mensagem de WhatsApp
       const date = new Date(app.start_time).toLocaleDateString('pt-BR');
       const time = new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const message = `Olá ${app.patient_name}, confirmamos sua consulta na OdontoManager para o dia ${date} às ${time}. Podemos confirmar sua presença?`;
+      const message = `Olá ${app.patient_name}, confirmamos sua consulta com ${app.dentist_name} para o dia ${date} às ${time}. Podemos confirmar sua presença?`;
       
       // Limpa o número de telefone (apenas números)
       const phone = app.patient_phone.replace(/\D/g, '');
@@ -453,9 +752,8 @@ export default function App() {
 
   const uploadFile = async (patientId: number, fileUrl: string, description: string) => {
     try {
-      const res = await fetch(`/api/patients/${patientId}/files`, {
+      const res = await apiFetch(`/api/patients/${patientId}/files`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_url: fileUrl, file_type: 'image', description })
       });
       if (res.ok) openPatientRecord(patientId);
@@ -467,7 +765,7 @@ export default function App() {
   const deleteFile = async (fileId: number) => {
     if (!selectedPatient) return;
     try {
-      const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/files/${fileId}`, { method: 'DELETE' });
       if (res.ok) openPatientRecord(selectedPatient.id);
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -486,8 +784,8 @@ export default function App() {
           : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
       }`}
     >
-      <Icon size={20} />
-      <span className="font-medium">{label}</span>
+      <Icon size={20} className="shrink-0" />
+      <span className="font-medium tablet-l:hidden desktop:block whitespace-nowrap">{label}</span>
     </button>
   );
 
@@ -634,24 +932,24 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 tablet-l:hidden"
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 p-6 flex flex-col transition-transform duration-300 lg:static lg:translate-x-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 p-4 md:p-6 flex flex-col transition-all duration-300 ease-in-out tablet-l:static tablet-l:translate-x-0
+        ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 tablet-l:w-20 desktop:w-72'}
       `}>
         <div className="flex items-center justify-between mb-10 px-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
               <Plus size={24} strokeWidth={3} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800">OdontoManager</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 whitespace-nowrap tablet-l:hidden desktop:block">OdontoManager</h1>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400">
+          <button onClick={() => setIsSidebarOpen(false)} className="tablet-l:hidden text-slate-400">
             <Plus size={24} className="rotate-45" />
           </button>
         </div>
@@ -661,77 +959,72 @@ export default function App() {
           <SidebarItem id="agenda" icon={Calendar} label="Agenda" />
           <SidebarItem id="pacientes" icon={Users} label="Pacientes" />
           <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" />
-          {user && user.role === 'ADMIN' && (
-            <SidebarItem id="admin" icon={Settings} label="Painel Admin" />
+          <SidebarItem id="documentos" icon={FileText} label="Documentos" />
+          {user?.role?.toUpperCase() === 'ADMIN' && (
+            <SidebarItem id="admin" icon={UserCog} label="Gestão de Dentistas" />
           )}
           <SidebarItem id="configuracoes" icon={Settings} label="Configurações" />
         </nav>
 
         <div className="pt-6 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+          <div className="flex items-center gap-3 px-2 mb-4 overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
               <UserCircle size={24} />
             </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-800">{user?.name}</p>
+            <div className="tablet-l:hidden desktop:block whitespace-nowrap">
+              <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
               <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">{user?.role}</p>
             </div>
           </div>
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-rose-600 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-rose-600 transition-colors overflow-hidden"
           >
-            <LogOut size={18} />
-            <span className="text-sm font-medium">Sair do Sistema</span>
+            <LogOut size={18} className="shrink-0" />
+            <span className="text-sm font-medium tablet-l:hidden desktop:block whitespace-nowrap">Sair</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full">
-        <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-10">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full max-w-full">
+        <header className="flex flex-col desktop:flex-row desktop:justify-between desktop:items-center gap-6 mb-8 md:mb-10">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-                {activeTab === 'dashboard' && 'Bem-vindo, Dr.'}
-                {activeTab === 'agenda' && 'Agenda Clínica'}
-                {activeTab === 'pacientes' && 'Gestão de Pacientes'}
-                {activeTab === 'financeiro' && 'Controle Financeiro'}
-                {activeTab === 'configuracoes' && 'Configurações'}
-              </h2>
-              <p className="text-slate-500 text-sm mt-1">
-                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </p>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="tablet-l:hidden p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 shadow-sm active:scale-95 transition-transform"
+              >
+                <Menu size={20} />
+              </button>
+              <div>
+                <h2 className="text-xl md:text-3xl font-bold text-slate-900 tracking-tight">
+                  {activeTab === 'dashboard' && 'Bem-vindo, Dr.'}
+                  {activeTab === 'agenda' && 'Agenda Clínica'}
+                  {activeTab === 'pacientes' && 'Gestão de Pacientes'}
+                  {activeTab === 'financeiro' && 'Controle Financeiro'}
+                  {activeTab === 'admin' && 'Gestão de Dentistas'}
+                  {activeTab === 'documentos' && 'Documentos'}
+                  {activeTab === 'configuracoes' && 'Configurações'}
+                </h2>
+                <p className="text-slate-500 text-[10px] md:text-sm mt-0.5 md:mt-1 font-medium">
+                  {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+              </div>
             </div>
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 bg-white border border-slate-200 rounded-xl text-slate-600"
-            >
-              <Menu size={20} />
-            </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            {(user?.role === 'ADMIN' || user?.role === 'RECEPTIONIST') && (
-              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
-                <UserCircle size={18} className="text-emerald-600" />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-0.5">Agendando como:</span>
-                  <select 
-                    value={activeDentist?.id || ''}
-                    onChange={(e) => {
-                      const d = dentists.find(dentist => dentist.id.toString() === e.target.value);
-                      if (d) setActiveDentist({ id: d.id, name: d.name });
-                    }}
-                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-                  >
-                    {dentists.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+            <div className="hidden sm:flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
+              <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold">
+                {user?.name?.charAt(0)}
               </div>
-            )}
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-0.5">Profissional:</span>
+                <span className="text-sm font-bold text-slate-700">{user?.name}</span>
+              </div>
+            </div>
+            
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -739,12 +1032,12 @@ export default function App() {
                 placeholder="Buscar paciente..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl md:w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl lg:w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
               />
             </div>
             <button 
               onClick={() => setIsPatientModalOpen(true)}
-              className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+              className="hidden sm:flex bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95"
             >
               <Plus size={20} />
               Novo Paciente
@@ -768,7 +1061,7 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   {patients
-                    .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.cpf && p.cpf.includes(searchTerm)))
+                    .filter(p => (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || (p.cpf && p.cpf.includes(searchTerm)))
                     .slice(0, 5)
                     .map(p => (
                       <div 
@@ -781,7 +1074,7 @@ export default function App() {
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold">
-                            {p.name.charAt(0)}
+                            {(p.name || '?').charAt(0)}
                           </div>
                           <div>
                             <p className="text-sm font-bold text-slate-800">{p.name}</p>
@@ -795,10 +1088,10 @@ export default function App() {
                         </button>
                       </div>
                     ))}
-                  {patients.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                  {patients.filter(p => (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).length === 0 && (
                     <p className="text-center py-4 text-slate-400 text-sm">Nenhum paciente encontrado.</p>
                   )}
-                  {patients.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).length > 5 && (
+                  {patients.filter(p => (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).length > 5 && (
                     <button 
                       onClick={() => setActiveTab('pacientes')}
                       className="w-full text-center py-2 text-xs font-bold text-slate-400 hover:text-emerald-600 transition-colors"
@@ -811,73 +1104,111 @@ export default function App() {
             )}
 
             {activeTab === 'dashboard' && !searchTerm && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 {/* Stats */}
-                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="md:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                   {[
                     { label: 'Pacientes Ativos', value: patients.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
                     { label: 'Consultas Hoje', value: appointments.filter(a => new Date(a.start_time).toDateString() === new Date().toDateString()).length, icon: Calendar, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Aguardando', value: 2, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Receita Mensal', value: 'R$ 12.450', icon: DollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Consultas da Semana', value: weeklyAppointmentsCount, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { 
+                      label: 'Receita do Mês', 
+                      value: monthlyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 
+                      icon: DollarSign, 
+                      color: 'text-indigo-600', 
+                      bg: 'bg-indigo-50',
+                      variation: revenueVariation
+                    },
                   ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                      <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
+                    <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 md:block">
+                      <div className={`w-12 h-12 shrink-0 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center md:mb-4`}>
                         <stat.icon size={24} />
                       </div>
-                      <p className="text-slate-500 text-sm font-medium">{stat.label}</p>
-                      <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
+                      <div>
+                        <p className="text-slate-500 text-xs md:text-sm font-medium">{stat.label}</p>
+                        <p className="text-xl md:text-2xl font-bold text-slate-900 md:mt-1">{stat.value}</p>
+                        {stat.variation !== undefined && stat.variation !== 0 && (
+                          <p className={`text-[10px] font-bold mt-1 ${stat.variation >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {stat.variation >= 0 ? '+' : ''}{stat.variation.toFixed(1)}% em relação ao mês anterior
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
 
                 {/* Next Appointments */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-lg">Próximas Consultas</h3>
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                  <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                    <h3 className="font-bold text-sm md:text-base text-slate-800">
+                      Próximas Consultas {nextAppointments.length > 0 && `(${nextAppointments.length})`}
+                      {todayAppointmentsCount > 0 && <span className="ml-2 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Hoje: {todayAppointmentsCount}</span>}
+                    </h3>
                     <button 
                       onClick={() => setActiveTab('agenda')}
-                      className="text-emerald-600 text-sm font-bold hover:underline"
+                      className="text-emerald-600 text-[10px] md:text-xs font-bold hover:underline flex items-center gap-1"
                     >
-                      Ver Agenda Completa
+                      Agenda Completa
+                      <ChevronRight size={14} />
                     </button>
                   </div>
-                  <div className="divide-y divide-slate-50">
-                    {appointments.length > 0 ? appointments.map((app) => (
+                  <div className="divide-y divide-slate-50 overflow-y-auto max-h-[400px]">
+                    {nextAppointments.length > 0 ? nextAppointments.map((app) => (
                       <div 
                         key={app.id} 
                         onClick={() => openPatientRecord(app.patient_id)}
-                        className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer"
+                        className="p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-                            <UserCircle size={28} />
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                            <UserCircle size={24} />
                           </div>
-                          <div>
-                            <p className="font-bold text-slate-800">{app.patient_name}</p>
-                            <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
-                              <Clock size={14} />
-                              {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 text-sm truncate leading-tight">{app.patient_name}</p>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                              <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <Calendar size={10} />
+                                {new Date(app.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                              </p>
+                              <span className="text-slate-300 text-[10px]">•</span>
+                              <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <Clock size={10} />
+                                {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-0.5 italic truncate">Procedimento não especificado</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           <StatusBadge status={app.status} />
-                          <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
-                            <ChevronRight size={20} />
-                          </button>
+                          <ChevronRight size={14} className="text-slate-300 group-hover:text-emerald-600 transition-colors" />
                         </div>
                       </div>
                     )) : (
-                      <div className="p-12 text-center">
-                        <Calendar className="mx-auto text-slate-200 mb-4" size={48} />
-                        <p className="text-slate-500">Nenhuma consulta agendada para hoje.</p>
+                      <div className="p-8 text-center">
+                        <Calendar className="mx-auto text-slate-200 mb-3" size={32} />
+                        <p className="text-slate-500 text-xs">Nenhuma consulta futura agendada.</p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Quick Actions / Alerts */}
+                {/* Quick Actions / Alerts / Daily Revenue */}
                 <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <DollarSign size={80} className="text-emerald-600" />
+                    </div>
+                    <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Faturamento Hoje</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-slate-900 mt-1">
+                      {dailyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase">Atualizado em tempo real</p>
+                    </div>
+                  </div>
+
                   <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg shadow-emerald-200 relative overflow-hidden">
                     <div className="relative z-10">
                       <h3 className="font-bold text-lg mb-2">Dica do Dia</h3>
@@ -921,12 +1252,12 @@ export default function App() {
             )}
 
             {activeTab === 'agenda' && (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              <div className="flex flex-col desktop:grid desktop:grid-cols-4 gap-6 md:gap-8">
                 {/* Mini Calendar / Filters */}
-                <div className="space-y-6">
+                <div className="space-y-6 order-1 desktop:order-1">
                   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <h3 className="font-bold mb-4 text-slate-800">Filtros da Agenda</h3>
-                    <div className="space-y-4">
+                    <div className="space-y-4 tablet-p:grid tablet-p:grid-cols-3 tablet-p:gap-6 tablet-p:space-y-0 desktop:flex desktop:flex-col desktop:space-y-4">
                       <div>
                         <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Buscar Paciente</label>
                         <div className="relative">
@@ -949,31 +1280,7 @@ export default function App() {
                           className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
                         />
                       </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Dentista</label>
-                        <select 
-                          value={dentistFilter}
-                          onChange={(e) => setDentistFilter(e.target.value)}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                        >
-                          <option value="all">Todos os Dentistas</option>
-                          {dentists.map(d => (
-                            <option key={d.id} value={d.id.toString()}>{d.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="pt-4 border-t border-slate-50 space-y-3">
-                        <button 
-                          onClick={() => setDentistFilter('all')}
-                          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                            dentistFilter === 'all' 
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                              : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'
-                          }`}
-                        >
-                          <Users size={16} />
-                          Ver Agenda Geral
-                        </button>
+                      <div className="tablet-p:pt-6 desktop:pt-4 desktop:border-t desktop:border-slate-50 space-y-3">
                         <button 
                           onClick={openAppointmentModal}
                           className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -987,7 +1294,7 @@ export default function App() {
 
                   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <h3 className="font-bold mb-4 text-slate-800">Status</h3>
-                    <div className="space-y-2">
+                    <div className="space-y-2 tablet-p:grid tablet-p:grid-cols-3 tablet-p:gap-4 tablet-p:space-y-0 desktop:flex desktop:flex-col desktop:space-y-2">
                       {[
                         { id: 'SCHEDULED', label: 'Agendado', color: 'bg-blue-400' },
                         { id: 'CONFIRMED', label: 'Confirmado', color: 'bg-emerald-400' },
@@ -1017,45 +1324,63 @@ export default function App() {
                 </div>
 
                 {/* Timeline View */}
-                <div className="lg:col-span-3 space-y-4">
+                <div className="desktop:col-span-3 space-y-4 order-2 desktop:order-2">
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 mr-2">
+                    <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                        <div className="flex items-center gap-2">
                           <button 
-                            onClick={() => {
-                              const newDate = new Date(selectedDate);
-                              if (agendaViewMode === 'day') newDate.setDate(selectedDate.getDate() - 1);
-                              else if (agendaViewMode === 'week') newDate.setDate(selectedDate.getDate() - 7);
-                              else if (agendaViewMode === 'month') newDate.setMonth(selectedDate.getMonth() - 1);
-                              setSelectedDate(newDate);
-                            }}
-                            className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                            onClick={() => setSelectedDate(new Date())}
+                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
                           >
-                            <ChevronRight size={18} className="rotate-180" />
+                            Hoje
                           </button>
-                          <button 
-                            onClick={() => {
-                              const newDate = new Date(selectedDate);
-                              if (agendaViewMode === 'day') newDate.setDate(selectedDate.getDate() + 1);
-                              else if (agendaViewMode === 'week') newDate.setDate(selectedDate.getDate() + 7);
-                              else if (agendaViewMode === 'month') newDate.setMonth(selectedDate.getMonth() + 1);
-                              setSelectedDate(newDate);
-                            }}
-                            className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
-                          >
-                            <ChevronRight size={18} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => {
+                                const newDate = new Date(selectedDate);
+                                if (agendaViewMode === 'day') newDate.setDate(selectedDate.getDate() - 1);
+                                else if (agendaViewMode === 'week') newDate.setDate(selectedDate.getDate() - 7);
+                                else if (agendaViewMode === 'month') newDate.setMonth(selectedDate.getMonth() - 1);
+                                setSelectedDate(newDate);
+                              }}
+                              className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
+                              title="Anterior"
+                            >
+                              <ChevronRight size={20} className="rotate-180" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const newDate = new Date(selectedDate);
+                                if (agendaViewMode === 'day') newDate.setDate(selectedDate.getDate() + 1);
+                                else if (agendaViewMode === 'week') newDate.setDate(selectedDate.getDate() + 7);
+                                else if (agendaViewMode === 'month') newDate.setMonth(selectedDate.getMonth() + 1);
+                                setSelectedDate(newDate);
+                              }}
+                              className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
+                              title="Próximo"
+                            >
+                              <ChevronRight size={20} />
+                            </button>
+                          </div>
                         </div>
-                        <h3 className="font-bold text-lg">
-                          {agendaViewMode === 'day' ? 'Horários de Hoje' : 
-                           agendaViewMode === 'week' ? 'Horários da Semana' : 'Horários do Mês'}
-                        </h3>
-                        <span className="text-xs font-medium text-slate-500">
-                          {agendaViewMode === 'day' ? selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 
-                           agendaViewMode === 'week' ? `Semana de ${new Date(selectedDate.getTime() - selectedDate.getDay() * 86400000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` : 
-                           selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                        </span>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-lg md:text-xl text-slate-800">
+                            {(() => {
+                              const today = new Date();
+                              const isToday = selectedDate.toDateString() === today.toDateString();
+                              if (agendaViewMode === 'day') {
+                                return isToday ? 'Horários de Hoje' : `Horários de ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+                              }
+                              return agendaViewMode === 'week' ? 'Horários da Semana' : 'Horários do Mês';
+                            })()}
+                          </h3>
+                          <p className="text-xs font-medium text-slate-500">
+                            {agendaViewMode === 'day' ? selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : 
+                             agendaViewMode === 'week' ? `Semana de ${new Date(selectedDate.getTime() - selectedDate.getDay() * 86400000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` : 
+                             selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                          </p>
+                        </div>
                         <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">
                           {appointments.filter(a => {
                             const appDate = new Date(a.start_time);
@@ -1072,14 +1397,8 @@ export default function App() {
                             return false;
                           }).length} Consultas
                         </span>
-                        <button 
-                          onClick={() => setSelectedDate(new Date())}
-                          className="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-wider transition-colors"
-                        >
-                          Hoje
-                        </button>
                       </div>
-                      <div className="flex bg-slate-100 p-1 rounded-lg">
+                      <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-auto">
                         <button 
                           onClick={() => setAgendaViewMode('day')}
                           className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${agendaViewMode === 'day' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}
@@ -1127,8 +1446,7 @@ export default function App() {
                             return false;
                           })
                           .filter(a => statusFilter.length === 0 || statusFilter.includes(a.status))
-                          .filter(a => agendaSearchTerm === '' || a.patient_name.toLowerCase().includes(agendaSearchTerm.toLowerCase()))
-                          .filter(a => dentistFilter === 'all' || a.dentist_id.toString() === dentistFilter)
+                          .filter(a => agendaSearchTerm === '' || (a.patient_name || '').toLowerCase().includes((agendaSearchTerm || '').toLowerCase()))
                           .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
                         if (filtered.length === 0) {
@@ -1154,69 +1472,142 @@ export default function App() {
                           grouped[dateKey].push(app);
                         });
 
+                        const renderAppointment = (app: Appointment) => (
+                          <div key={app.id} className="p-4 tablet-l:p-6 desktop:p-8 flex flex-col tablet-l:flex-row gap-4 tablet-l:gap-6 desktop:gap-8 hover:bg-slate-50/50 transition-colors group border-b border-slate-50 last:border-0">
+                            <div className="w-full tablet-l:w-20 desktop:w-24 pt-1 flex flex-row tablet-l:flex-col items-center tablet-l:items-center justify-start tablet-l:justify-start border-b tablet-l:border-b-0 tablet-l:border-r border-slate-100 pb-2 tablet-l:pb-0 tablet-l:pr-4 desktop:pr-6 gap-2 tablet-l:gap-0">
+                              <p className="text-base tablet-l:text-lg font-black text-slate-900 leading-none">
+                                {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <div className="hidden tablet-l:block w-full h-px bg-slate-100 my-2" />
+                              <span className="tablet-l:hidden text-slate-300">•</span>
+                              <p className="text-xs font-bold text-slate-400">
+                                {new Date(app.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            
+                            <div className="flex-1 bg-white border border-slate-100 p-4 tablet-l:p-6 rounded-2xl shadow-sm group-hover:border-emerald-200 group-hover:shadow-md transition-all flex flex-col tablet-l:flex-row justify-between items-start tablet-l:items-center gap-4">
+                              <div 
+                                className="flex items-start tablet-l:items-center gap-4 tablet-l:gap-5 cursor-pointer w-full"
+                                onClick={() => openPatientRecord(app.patient_id)}
+                              >
+                                <div className="w-12 h-12 tablet-l:w-14 tablet-l:h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors shrink-0">
+                                  <UserCircle size={28} className="tablet-l:hidden" />
+                                  <UserCircle size={32} className="hidden tablet-l:block" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-base tablet-l:text-lg font-bold text-slate-800 group-hover:text-emerald-900 transition-colors break-words leading-tight">{app.patient_name}</p>
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                                    <span className="text-xs text-slate-500 italic">Procedimento não especificado</span>
+                                    <span className="hidden tablet-l:block w-1 h-1 bg-slate-300 rounded-full" />
+                                    <span className="text-[10px] tablet-l:text-xs font-bold text-slate-400 uppercase tracking-widest">{app.dentist_name}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between tablet-l:justify-end gap-4 w-full tablet-l:w-auto pt-4 tablet-l:pt-0 border-t tablet-l:border-t-0 border-slate-50">
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => sendReminder(app)}
+                                    className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                    title="Enviar Lembrete"
+                                  >
+                                    <Bell size={20} />
+                                  </button>
+                                  <select 
+                                    value={app.status}
+                                    onChange={(e) => updateStatus(app.id, e.target.value as Appointment['status'])}
+                                    className="text-[10px] tablet-l:text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl px-2 tablet-l:px-3 py-1.5 tablet-l:py-2 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                  >
+                                    <option value="SCHEDULED">Agendado</option>
+                                    <option value="CONFIRMED">Confirmado</option>
+                                    <option value="CANCELLED">Cancelado</option>
+                                    <option value="IN_PROGRESS">Em Atendimento</option>
+                                    <option value="FINISHED">Finalizado</option>
+                                  </select>
+                                </div>
+                                <StatusBadge status={app.status} />
+                              </div>
+                            </div>
+                          </div>
+                        );
+
+                        if (agendaViewMode === 'day') {
+                          const morning = filtered.filter(a => {
+                            const hour = new Date(a.start_time).getHours();
+                            return hour >= 6 && hour < 12;
+                          });
+                          const afternoon = filtered.filter(a => {
+                            const hour = new Date(a.start_time).getHours();
+                            return hour >= 12 && hour < 18;
+                          });
+                          const evening = filtered.filter(a => {
+                            const hour = new Date(a.start_time).getHours();
+                            return hour >= 18 && hour < 22;
+                          });
+                          const others = filtered.filter(a => {
+                            const hour = new Date(a.start_time).getHours();
+                            return hour < 6 || hour >= 22;
+                          });
+
+                          return (
+                            <div className="divide-y divide-slate-100">
+                              {others.filter(a => new Date(a.start_time).getHours() < 6).length > 0 && (
+                                <div>
+                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
+                                    <Clock size={14} className="text-slate-400" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Madrugada (00:00 – 06:00)</span>
+                                  </div>
+                                  {others.filter(a => new Date(a.start_time).getHours() < 6).map(renderAppointment)}
+                                </div>
+                              )}
+                              {morning.length > 0 && (
+                                <div>
+                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
+                                    <Sun size={14} className="text-amber-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Manhã (06:00 – 12:00)</span>
+                                  </div>
+                                  {morning.map(renderAppointment)}
+                                </div>
+                              )}
+                              {afternoon.length > 0 && (
+                                <div>
+                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
+                                    <Sun size={14} className="text-orange-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tarde (12:00 – 18:00)</span>
+                                  </div>
+                                  {afternoon.map(renderAppointment)}
+                                </div>
+                              )}
+                              {evening.length > 0 && (
+                                <div>
+                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
+                                    <Moon size={14} className="text-indigo-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Noite (18:00 – 22:00)</span>
+                                  </div>
+                                  {evening.map(renderAppointment)}
+                                </div>
+                              )}
+                              {others.filter(a => new Date(a.start_time).getHours() >= 22).length > 0 && (
+                                <div>
+                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
+                                    <Moon size={14} className="text-slate-600" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Noite Tardia (22:00 – 00:00)</span>
+                                  </div>
+                                  {others.filter(a => new Date(a.start_time).getHours() >= 22).map(renderAppointment)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
                         return Object.entries(grouped).map(([date, apps]) => (
                           <div key={date}>
-                            {agendaViewMode !== 'day' && (
-                              <div className="bg-slate-50 px-6 py-2 border-y border-slate-100">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                  {new Date(date).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-                                </span>
-                              </div>
-                            )}
-                            {apps.map((app) => (
-                              <div key={app.id} className="p-8 flex gap-8 hover:bg-slate-50/50 transition-colors group border-b border-slate-50 last:border-0">
-                                <div className="w-24 pt-1 flex flex-col items-center justify-start border-r border-slate-100 pr-6">
-                                  <p className="text-lg font-black text-slate-900 leading-none">
-                                    {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                  <div className="w-full h-px bg-slate-100 my-2" />
-                                  <p className="text-xs font-bold text-slate-400">
-                                    {new Date(app.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                </div>
-                                
-                                <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl shadow-sm group-hover:border-emerald-200 group-hover:shadow-md transition-all flex justify-between items-center">
-                                  <div 
-                                    className="flex items-center gap-5 cursor-pointer"
-                                    onClick={() => openPatientRecord(app.patient_id)}
-                                  >
-                                    <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-                                      <UserCircle size={32} />
-                                    </div>
-                                    <div>
-                                      <p className="text-lg font-bold text-slate-800 group-hover:text-emerald-900 transition-colors">{app.patient_name}</p>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-slate-500 italic">Procedimento não especificado</span>
-                                        <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{app.dentist_name}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-4">
-                                    <button 
-                                      onClick={() => sendReminder(app)}
-                                      className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                                      title="Enviar Lembrete"
-                                    >
-                                      <Bell size={20} />
-                                    </button>
-                                    <select 
-                                      value={app.status}
-                                      onChange={(e) => updateStatus(app.id, e.target.value as Appointment['status'])}
-                                      className="text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                                    >
-                                      <option value="SCHEDULED">Agendado</option>
-                                      <option value="CONFIRMED">Confirmado</option>
-                                      <option value="CANCELLED">Cancelado</option>
-                                      <option value="IN_PROGRESS">Em Atendimento</option>
-                                      <option value="FINISHED">Finalizado</option>
-                                    </select>
-                                    <StatusBadge status={app.status} />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                            <div className="bg-slate-50 px-6 py-2 border-y border-slate-100">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                {new Date(date).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                              </span>
+                            </div>
+                            {apps.map(renderAppointment)}
                           </div>
                         ));
                       })()}
@@ -1239,69 +1630,113 @@ export default function App() {
                   </button>
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
-                      <th className="px-6 py-4">Paciente</th>
-                      <th className="px-6 py-4">CPF</th>
-                      <th className="px-6 py-4">Contato</th>
-                      <th className="px-6 py-4">Última Visita</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                          <th className="px-6 py-4">Paciente</th>
+                          <th className="px-6 py-4">CPF</th>
+                          <th className="px-6 py-4">Contato</th>
+                          <th className="px-6 py-4">Última Visita</th>
+                          <th className="px-6 py-4 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {patients
+                          .filter(p => 
+                            (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                            (p.cpf && p.cpf.includes(searchTerm)) ||
+                            p.phone.includes(searchTerm)
+                          )
+                          .map((patient) => (
+                            <tr 
+                              key={patient.id} 
+                              onClick={() => openPatientRecord(patient.id)}
+                              className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                            >
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">
+                                    {(patient.name || '?').charAt(0)}
+                                  </div>
+                                  <span className="font-bold text-slate-800">{patient.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-slate-500 font-mono text-sm">{patient.cpf || '---'}</td>
+                              <td className="px-6 py-4">
+                                <p className="text-sm font-medium text-slate-700">{patient.phone}</p>
+                                <p className="text-xs text-slate-400">{patient.email}</p>
+                              </td>
+                              <td className="px-6 py-4 text-slate-500 text-sm">12/02/2024</td>
+                              <td className="px-6 py-4 text-right">
+                                <button 
+                                  onClick={() => openPatientRecord(patient.id)}
+                                  className="text-emerald-600 font-bold text-sm hover:underline"
+                                >
+                                  Ver Prontuário
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden divide-y divide-slate-100">
                     {patients
                       .filter(p => 
-                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
                         (p.cpf && p.cpf.includes(searchTerm)) ||
                         p.phone.includes(searchTerm)
                       )
                       .map((patient) => (
-                        <tr 
+                        <div 
                           key={patient.id} 
                           onClick={() => openPatientRecord(patient.id)}
-                          className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                          className="p-4 active:bg-slate-50 transition-colors"
                         >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">
-                              {patient.name.charAt(0)}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">
+                                {(patient.name || '?').charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800">{patient.name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{patient.cpf || 'Sem CPF'}</p>
+                              </div>
                             </div>
-                            <span className="font-bold text-slate-800">{patient.name}</span>
+                            <ChevronRight size={18} className="text-slate-300" />
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-500 font-mono text-sm">{patient.cpf || '---'}</td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm font-medium text-slate-700">{patient.phone}</p>
-                          <p className="text-xs text-slate-400">{patient.email}</p>
-                        </td>
-                        <td className="px-6 py-4 text-slate-500 text-sm">12/02/2024</td>
-                        <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => openPatientRecord(patient.id)}
-                            className="text-emerald-600 font-bold text-sm hover:underline"
-                          >
-                            Ver Prontuário
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-slate-50 p-2 rounded-lg">
+                              <p className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">Telefone</p>
+                              <p className="text-slate-700 font-medium">{patient.phone}</p>
+                            </div>
+                            <div className="bg-slate-50 p-2 rounded-lg">
+                              <p className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">Última Visita</p>
+                              <p className="text-slate-700 font-medium">12/02/2024</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
             </div>
           )}
 
             {activeTab === 'prontuario' && selectedPatient && (
               <div className="space-y-8">
-                <div className="flex items-center gap-4 mb-6">
+                <div className="flex items-center gap-3 md:gap-4 mb-6">
                   <button 
                     onClick={() => setActiveTab('pacientes')}
                     className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
                   >
-                    <ChevronRight size={24} className="rotate-180" />
+                    <ChevronRight size={20} className="rotate-180 md:hidden" />
+                    <ChevronRight size={24} className="rotate-180 hidden md:block" />
                   </button>
-                  <h3 className="text-2xl font-bold text-slate-900">Prontuário: {selectedPatient.name}</h3>
+                  <h3 className="text-xl md:text-2xl font-bold text-slate-900 truncate">Prontuário: {selectedPatient.name}</h3>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1564,8 +1999,8 @@ export default function App() {
                     </div>
 
                     {/* Odontogram */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
-                      <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white p-4 md:p-8 rounded-2xl border border-slate-100 shadow-sm">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
                         <h4 className="text-xl font-bold text-slate-800">Odontograma Interativo</h4>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Clique no dente para alterar o status</span>
                       </div>
@@ -1578,152 +2013,527 @@ export default function App() {
                 </div>
               </div>
             )}
-            {activeTab === 'admin' && user.role === 'ADMIN' && (
-              <div className="space-y-8">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-2xl font-bold text-slate-900">Painel de Administração</h3>
+            {activeTab === 'financeiro' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select 
+                      value={financeFilter.period}
+                      onChange={(e) => setFinanceFilter({...financeFilter, period: e.target.value})}
+                      className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option value="day">Hoje</option>
+                      <option value="week">Últimos 7 dias</option>
+                      <option value="month">Este Mês</option>
+                      <option value="all">Tudo</option>
+                    </select>
+                    <select 
+                      value={financeFilter.type}
+                      onChange={(e) => setFinanceFilter({...financeFilter, type: e.target.value})}
+                      className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option value="all">Todos os Tipos</option>
+                      <option value="INCOME">Receitas</option>
+                      <option value="EXPENSE">Despesas</option>
+                    </select>
+                    <select 
+                      value={financeFilter.category}
+                      onChange={(e) => setFinanceFilter({...financeFilter, category: e.target.value})}
+                      className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option value="all">Todas Categorias</option>
+                      <option value="Procedimentos">Procedimentos</option>
+                      <option value="Consultas">Consultas</option>
+                      <option value="Aluguel">Aluguel</option>
+                      <option value="Materiais">Materiais</option>
+                      <option value="Laboratório">Laboratório</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Salários">Salários</option>
+                      <option value="Outros">Outros</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-3 w-full sm:w-auto">
+                    <button 
+                      onClick={() => {
+                        setTransactionType('EXPENSE');
+                        setIsTransactionModalOpen(true);
+                      }}
+                      className="flex-1 sm:flex-none bg-rose-50 text-rose-600 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus size={18} />
+                      Despesa
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setTransactionType('INCOME');
+                        setIsTransactionModalOpen(true);
+                      }}
+                      className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus size={18} />
+                      Receita
+                    </button>
+                  </div>
                 </div>
-                
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-bold text-slate-400 uppercase">Receita Total</p>
+                      <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+                        <DollarSign size={16} />
+                      </div>
+                    </div>
+                    <h4 className="text-2xl font-bold text-slate-800">
+                      {currentTotalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">No período selecionado</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-bold text-slate-400 uppercase">Despesas</p>
+                      <div className="w-8 h-8 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center">
+                        <DollarSign size={16} />
+                      </div>
+                    </div>
+                    <h4 className="text-2xl font-bold text-slate-800">
+                      {currentTotalExpense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">No período selecionado</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-bold text-slate-400 uppercase">Lucro Líquido</p>
+                      <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                        <DollarSign size={16} />
+                      </div>
+                    </div>
+                    <h4 className={`text-2xl font-bold ${currentNetProfit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                      {currentNetProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </h4>
+                    <p className="text-[10px] text-blue-500 font-bold mt-2">Margem de {currentProfitMargin.toFixed(1)}%</p>
+                  </div>
+                </div>
+
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
-                        <th className="px-6 py-4">Usuário</th>
-                        <th className="px-6 py-4">E-mail</th>
-                        <th className="px-6 py-4">Data Cadastro</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4 text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {adminUsers.map((u) => (
-                        <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold">
-                                {u.name.charAt(0)}
-                              </div>
-                              <div>
-                                <p className="font-bold text-slate-800">{u.name}</p>
-                                <p className="text-[10px] text-slate-400 uppercase font-bold">{u.role}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-slate-500 text-sm">{u.email}</td>
-                          <td className="px-6 py-4 text-slate-500 text-sm">
-                            {new Date(u.created_at).toLocaleDateString('pt-BR')}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                              u.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
-                              u.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                              'bg-rose-100 text-rose-700'
-                            }`}>
-                              {u.status === 'active' ? 'Ativo' : u.status === 'pending' ? 'Pendente' : 'Bloqueado'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2">
-                              {u.status !== 'active' && (
-                                <button 
-                                  onClick={() => updateUserStatus(u.id, 'active')}
-                                  className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition-colors"
-                                >
-                                  Ativar
-                                </button>
-                              )}
-                              {u.status !== 'blocked' && u.role !== 'ADMIN' && (
-                                <button 
-                                  onClick={() => updateUserStatus(u.id, 'blocked')}
-                                  className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-700 transition-colors"
-                                >
-                                  Bloquear
-                                </button>
-                              )}
-                            </div>
-                          </td>
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-800">Histórico Financeiro</h3>
+                    <span className="text-xs font-bold text-slate-400 uppercase">{filteredTransactions.length} transações</span>
+                  </div>
+                  
+                  {/* Desktop View */}
+                  <div className="hidden md:block">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                          <th className="px-6 py-4">Data</th>
+                          <th className="px-6 py-4">Descrição</th>
+                          <th className="px-6 py-4">Categoria</th>
+                          <th className="px-6 py-4">Pagamento</th>
+                          <th className="px-6 py-4 text-right">Valor</th>
+                          <th className="px-6 py-4"></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredTransactions.map((t) => (
+                          <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 text-sm text-slate-500">
+                              {new Date(t.date).toLocaleDateString('pt-BR')}
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="font-bold text-slate-800">{t.description}</p>
+                              {t.patient_name && <p className="text-[10px] text-slate-400 uppercase font-bold">Paciente: {t.patient_name}</p>}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase">{t.category}</span>
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                              {t.payment_method}
+                            </td>
+                            <td className={`px-6 py-4 text-right font-bold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button 
+                                onClick={() => handleDeleteTransaction(t.id)}
+                                className="p-2 text-slate-300 hover:text-rose-600 transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {filteredTransactions.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                              Nenhuma transação encontrada no período.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile View */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {filteredTransactions.map((t) => (
+                      <div key={t.id} className="p-4 flex justify-between items-center">
+                        <div className="min-w-0 flex-1 pr-4">
+                          <p className="font-bold text-slate-800 text-sm truncate">{t.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('pt-BR')}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">• {t.category}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-bold text-sm ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          <button 
+                            onClick={() => handleDeleteTransaction(t.id)}
+                            className="text-[10px] text-rose-500 font-bold uppercase mt-1"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {filteredTransactions.length === 0 && (
+                      <div className="p-8 text-center text-slate-400">
+                        Nenhuma transação encontrada.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
 
-            {activeTab === 'configuracoes' && (
-              <div className="space-y-8">
-                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                  <div className="flex justify-between items-center mb-8">
+            {(activeTab === 'admin' && user?.role?.toUpperCase() === 'ADMIN') && (
+              <div className="max-w-6xl mx-auto space-y-8">
+                {/* Painel de Aprovação */}
+                {adminUsers.filter(u => u.status === 'pending').length > 0 && (
+                  <div className="bg-amber-50 p-4 md:p-8 rounded-3xl border border-amber-100 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                        <Clock size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-amber-900">Aprovação de Novos Dentistas</h3>
+                        <p className="text-amber-700 text-sm">Existem solicitações de cadastro pendentes</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {adminUsers.filter(u => u.status === 'pending').map(u => (
+                        <div key={u.id} className="bg-white p-4 rounded-2xl border border-amber-100 flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-slate-800">{u.name}</p>
+                            <p className="text-xs text-slate-500">{u.email}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => updateUserStatus(u.id, 'active')}
+                              className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                              title="Aprovar"
+                            >
+                              <CheckCircle2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => updateUserStatus(u.id, 'blocked')}
+                              className="p-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+                              title="Rejeitar"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Gestão de Dentistas */}
+                <div className="bg-white p-4 md:p-8 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                     <div>
-                      <h3 className="text-2xl font-bold text-slate-900">Gestão de Dentistas</h3>
-                      <p className="text-slate-500">Gerencie os profissionais da sua clínica</p>
+                      <h3 className="text-xl md:text-2xl font-bold text-slate-900">Gestão de Dentistas</h3>
+                      <p className="text-slate-500 text-sm">Gerencie os profissionais da sua clínica</p>
                     </div>
                     <button 
                       onClick={() => setIsDentistModalOpen(true)}
-                      className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100"
+                      className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
                     >
                       <UserPlus size={20} />
                       Adicionar Dentista
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {dentists.map((dentist) => (
-                      <div key={dentist.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex justify-between items-start">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm">
-                            <UserCircle size={28} />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-800">{dentist.name}</p>
-                            <p className="text-xs text-slate-500">{dentist.email}</p>
-                            <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">
-                              {dentist.role}
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                            <th className="px-6 py-4">Usuário</th>
+                            <th className="px-6 py-4">E-mail</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {adminUsers.filter(u => u.status !== 'pending').map((u) => (
+                            <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold">
+                                    {(u.name || '?').charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-slate-800">{u.name}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold">{u.role}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-slate-500 text-sm">{u.email}</td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                  u.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                                  'bg-rose-100 text-rose-700'
+                                }`}>
+                                  {u.status === 'active' ? 'Ativo' : 'Bloqueado'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button 
+                                    onClick={() => {
+                                      setEditingDentist(u);
+                                      setIsEditDentistModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                                  >
+                                    Editar
+                                  </button>
+                                  {u.status !== 'active' && (
+                                    <button 
+                                      onClick={() => updateUserStatus(u.id, 'active')}
+                                      className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                                    >
+                                      Ativar
+                                    </button>
+                                  )}
+                                  {u.status !== 'blocked' && u.role !== 'ADMIN' && (
+                                    <button 
+                                      onClick={() => updateUserStatus(u.id, 'blocked')}
+                                      className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-700 transition-colors"
+                                    >
+                                      Desativar
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                      {adminUsers.filter(u => u.status !== 'pending').map((u) => (
+                        <div key={u.id} className="p-4 space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold">
+                                {(u.name || '?').charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800">{u.name}</p>
+                                <p className="text-[10px] text-slate-400 uppercase font-bold">{u.role}</p>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              u.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                              'bg-rose-100 text-rose-700'
+                            }`}>
+                              {u.status === 'active' ? 'Ativo' : 'Bloqueado'}
                             </span>
                           </div>
+                          <p className="text-xs text-slate-500">{u.email}</p>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => {
+                                setEditingDentist(u);
+                                setIsEditDentistModalOpen(true);
+                              }}
+                              className="flex-1 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                              Editar
+                            </button>
+                            {u.status !== 'active' && (
+                              <button 
+                                onClick={() => updateUserStatus(u.id, 'active')}
+                                className="flex-1 py-2 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                              >
+                                Ativar
+                              </button>
+                            )}
+                            {u.status !== 'blocked' && u.role !== 'ADMIN' && (
+                              <button 
+                                onClick={() => updateUserStatus(u.id, 'blocked')}
+                                className="flex-1 py-2 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-700 transition-colors"
+                              >
+                                Desativar
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        {dentist.role !== 'ADMIN' && (
-                          <button 
-                            onClick={() => {
-                              if (confirm('Deseja remover este dentista?')) {
-                                fetch(`/api/dentists/${dentist.id}`, { method: 'DELETE' }).then(() => fetchData());
-                              }
-                            }}
-                            className="text-slate-300 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                  <div className="relative z-10">
-                    <h3 className="text-2xl font-bold mb-2">Configurações do Sistema</h3>
-                    <p className="text-slate-400 mb-6">Personalize sua experiência no OdontoManager</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Bell size={20} className="text-emerald-400" />
-                          <span className="text-sm font-medium">Notificações por WhatsApp</span>
-                        </div>
-                        <div className="w-10 h-5 bg-emerald-500 rounded-full relative">
-                          <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" />
-                        </div>
-                      </div>
-                      <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Lock size={20} className="text-emerald-400" />
-                          <span className="text-sm font-medium">Backup Automático</span>
-                        </div>
-                        <div className="w-10 h-5 bg-emerald-500 rounded-full relative">
-                          <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" />
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'documentos' && (
+              <Documents patients={patients} profile={profile} apiFetch={apiFetch} />
+            )}
+
+            {activeTab === 'configuracoes' && profile && (
+              <div className="max-w-4xl mx-auto space-y-8">
+                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="flex flex-col items-center mb-10">
+                    <div className="relative group">
+                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-emerald-50 shadow-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                        {profile.photo_url ? (
+                          <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <UserCircle size={80} />
+                        )}
+                      </div>
+                      <label className="absolute bottom-0 right-0 bg-emerald-600 text-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-emerald-700 transition-all">
+                        <Camera size={18} />
+                        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                      </label>
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-900 mt-4">Perfil do Usuário</h3>
+                    <p className="text-slate-500">Mantenha seus dados atualizados</p>
+                  </div>
+
+                  <form onSubmit={handleSaveProfile} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
+                        <input 
+                          required
+                          type="text" 
+                          value={profile.name}
+                          onChange={(e) => setProfile({...profile, name: e.target.value})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
+                        <input 
+                          required
+                          type="email" 
+                          value={profile.email}
+                          onChange={(e) => setProfile({...profile, email: e.target.value})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Telefone</label>
+                        <input 
+                          type="text" 
+                          value={profile.phone || ''}
+                          onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                          placeholder="(00) 00000-0000"
+                        />
+                      </div>
+                      {user.role === 'DENTIST' && (
+                        <>
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">CRO</label>
+                            <input 
+                              type="text" 
+                              value={profile.cro || ''}
+                              onChange={(e) => setProfile({...profile, cro: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                              placeholder="Ex: 12345-SP"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Especialidade</label>
+                            <input 
+                              type="text" 
+                              value={profile.specialty || ''}
+                              onChange={(e) => setProfile({...profile, specialty: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                              placeholder="Ex: Ortodontia"
+                            />
+                          </div>
+                        </>
+                      )}
+                      {user.role === 'DENTIST' && (
+                        <>
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome da Clínica</label>
+                            <input 
+                              type="text" 
+                              value={profile.clinic_name || ''}
+                              onChange={(e) => setProfile({...profile, clinic_name: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                              placeholder="Ex: Clínica Sorriso Perfeito"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Endereço da Clínica</label>
+                            <input 
+                              type="text" 
+                              value={profile.clinic_address || ''}
+                              onChange={(e) => setProfile({...profile, clinic_address: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                              placeholder="Rua Exemplo, 123 - Centro"
+                            />
+                          </div>
+                        </>
+                      )}
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Alterar Senha</label>
+                        <input 
+                          type="password" 
+                          value={profilePassword}
+                          onChange={(e) => setProfilePassword(e.target.value)}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                          placeholder="Deixe em branco para manter a atual"
+                        />
+                      </div>
+                    </div>
+
+                    {user.role === 'DENTIST' && (
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Bio / Descrição Profissional</label>
+                        <textarea 
+                          rows={4}
+                          value={profile.bio || ''}
+                          onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
+                          placeholder="Conte um pouco sobre sua trajetória e formação..."
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-end pt-4">
+                      <button 
+                        type="submit"
+                        disabled={isSavingProfile}
+                        className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}
@@ -1746,46 +2556,30 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-lg rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             >
-              <div className="p-8">
-                <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-2xl font-bold text-slate-900">Novo Agendamento</h3>
+              <div className="p-6 md:p-8">
+                <div className="flex justify-between items-center mb-6 md:mb-8">
+                  <h3 className="text-xl md:text-2xl font-bold text-slate-900">Novo Agendamento</h3>
                   <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={24} className="rotate-45" />
                   </button>
                 </div>
 
                 <form onSubmit={handleCreateAppointment} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
-                      <select 
-                        required
-                        value={newAppointment.patient_id}
-                        onChange={(e) => setNewAppointment({...newAppointment, patient_id: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                      >
-                        <option value="">Selecione um paciente</option>
-                        {patients.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Dentista</label>
-                      <select 
-                        required
-                        value={newAppointment.dentist_id}
-                        onChange={(e) => setNewAppointment({...newAppointment, dentist_id: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                      >
-                        <option value="">Selecione um dentista</option>
-                        {dentists.map(d => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                    <select 
+                      required
+                      value={newAppointment.patient_id}
+                      onChange={(e) => setNewAppointment({...newAppointment, patient_id: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    >
+                      <option value="">Selecione um paciente</option>
+                      {patients.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1858,11 +2652,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-lg rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             >
-              <div className="p-8">
-                <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-2xl font-bold text-slate-900">Cadastrar Paciente</h3>
+              <div className="p-6 md:p-8">
+                <div className="flex justify-between items-center mb-6 md:mb-8">
+                  <h3 className="text-xl md:text-2xl font-bold text-slate-900">Cadastrar Paciente</h3>
                   <button onClick={() => setIsPatientModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={24} className="rotate-45" />
                   </button>
@@ -1946,6 +2740,74 @@ export default function App() {
                       className="flex-1 px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
                     >
                       Cadastrar Paciente
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Editar Dentista */}
+      <AnimatePresence>
+        {isEditDentistModalOpen && editingDentist && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditDentistModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-2xl font-bold text-slate-900">Editar Dentista</h3>
+                  <button onClick={() => setIsEditDentistModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    <Plus size={24} className="rotate-45" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateDentist} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingDentist.name}
+                      onChange={(e) => setEditingDentist({...editingDentist, name: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
+                    <input 
+                      required
+                      type="email" 
+                      value={editingDentist.email}
+                      onChange={(e) => setEditingDentist({...editingDentist, email: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-4 pt-4">
+                    <button 
+                      type="button"
+                      onClick={() => setIsEditDentistModalOpen(false)}
+                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-1 px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
+                    >
+                      Salvar
                     </button>
                   </div>
                 </form>
@@ -2060,15 +2922,36 @@ export default function App() {
 
                 <form onSubmit={handleUploadImage} className="space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">URL da Imagem</label>
-                    <input 
-                      required
-                      type="url" 
-                      placeholder="https://exemplo.com/imagem.jpg"
-                      value={newImage.url}
-                      onChange={(e) => setNewImage({...newImage, url: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                    />
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Arquivo de Imagem</label>
+                    <div className="relative group">
+                      <input 
+                        required={!newImage.url}
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="file-upload"
+                      />
+                      <label 
+                        htmlFor="file-upload"
+                        className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group overflow-hidden"
+                      >
+                        {newImage.url ? (
+                          <div className="relative w-full h-full p-2">
+                            <img src={newImage.url} alt="Preview" className="w-full h-full object-contain rounded-lg" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                              <p className="text-white text-xs font-bold">Alterar Imagem</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-slate-400 group-hover:text-emerald-600">
+                            <Upload size={32} />
+                            <span className="text-xs font-bold uppercase">Clique para selecionar arquivo</span>
+                            <span className="text-[10px] text-slate-400">PNG, JPG ou GIF</span>
+                          </div>
+                        )}
+                      </label>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrição</label>
@@ -2102,6 +2985,187 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modal de Transação Financeira */}
+      <AnimatePresence>
+        {isTransactionModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsTransactionModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-900">
+                      {transactionType === 'INCOME' ? 'Nova Receita' : 'Nova Despesa'}
+                    </h3>
+                    <p className="text-sm text-slate-500">Preencha os dados da transação abaixo</p>
+                  </div>
+                  <button onClick={() => setIsTransactionModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    <Plus size={24} className="rotate-45" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveTransaction} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrição</label>
+                      <input 
+                        required
+                        type="text" 
+                        placeholder={transactionType === 'INCOME' ? 'Ex: Limpeza - João Silva' : 'Ex: Aluguel'}
+                        value={newTransaction.description}
+                        onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Categoria</label>
+                      <select 
+                        value={newTransaction.category}
+                        onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        {transactionType === 'INCOME' ? (
+                          <>
+                            <option value="Procedimentos">Procedimentos</option>
+                            <option value="Consultas">Consultas</option>
+                            <option value="Produtos">Produtos</option>
+                            <option value="Outros">Outros</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Aluguel">Aluguel</option>
+                            <option value="Materiais">Materiais</option>
+                            <option value="Laboratório">Laboratório</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Salários">Salários</option>
+                            <option value="Outros">Outros</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Valor (R$)</label>
+                      <input 
+                        required
+                        type="number" 
+                        step="0.01"
+                        placeholder="0,00"
+                        value={newTransaction.amount}
+                        onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Data</label>
+                      <input 
+                        required
+                        type="date" 
+                        value={newTransaction.date}
+                        onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Forma de Pagamento</label>
+                      <select 
+                        value={newTransaction.payment_method}
+                        onChange={(e) => setNewTransaction({...newTransaction, payment_method: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        <option value="Cartão de Débito">Cartão de Débito</option>
+                        <option value="PIX">PIX</option>
+                        <option value="Transferência">Transferência</option>
+                      </select>
+                    </div>
+                    {transactionType === 'INCOME' && (
+                      <div className="col-span-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Vincular Paciente (Opcional)</label>
+                        <select 
+                          value={newTransaction.patient_id}
+                          onChange={(e) => {
+                            const p = patients.find(p => p.id.toString() === e.target.value);
+                            setNewTransaction({
+                              ...newTransaction, 
+                              patient_id: e.target.value,
+                              patient_name: p?.name || ''
+                            });
+                          }}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                        >
+                          <option value="">Selecione um paciente...</option>
+                          {patients.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Observações</label>
+                      <textarea 
+                        rows={2}
+                        value={newTransaction.notes}
+                        onChange={(e) => setNewTransaction({...newTransaction, notes: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-4 pt-4">
+                    <button 
+                      type="button"
+                      onClick={() => setIsTransactionModalOpen(false)}
+                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      className={`flex-1 px-6 py-3 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 ${
+                        transactionType === 'INCOME' 
+                          ? 'bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700' 
+                          : 'bg-rose-600 shadow-rose-100 hover:bg-rose-700'
+                      }`}
+                    >
+                      Salvar {transactionType === 'INCOME' ? 'Receita' : 'Despesa'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Action Button (Mobile) */}
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden flex flex-col gap-3">
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform"
+          title="Novo Agendamento"
+        >
+          <Calendar size={24} />
+        </button>
+        <button 
+          onClick={() => setIsPatientModalOpen(true)}
+          className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform"
+          title="Novo Paciente"
+        >
+          <Plus size={28} />
+        </button>
+      </div>
     </div>
   );
 }
