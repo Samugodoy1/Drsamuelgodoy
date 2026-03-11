@@ -25,9 +25,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  console.log('Starting server initialization...');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
   const app = express();
+  const PORT = 3000;
   
-  // Security headers - Configured for AI Studio iframe environment
+  console.log('Configuring middleware...');
+  /*
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -41,6 +45,7 @@ async function startServer() {
     crossOriginEmbedderPolicy: false,
     frameguard: false, // Allow iframe embedding
   }));
+  */
 
   app.use(cookieParser());
   app.use(express.json({ limit: '50mb' }));
@@ -103,7 +108,6 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log('Backend converted to Vercel Serverless Functions (Bridge Mode)');
