@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import type { Request, Response } from 'express';
 
 dotenv.config();
 
@@ -20,6 +21,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let db: any;
+
+const VALID_ACCOUNT_STATUS = new Set(['active', 'blocked', 'pending']);
+const VALID_APPOINTMENT_STATUS = new Set(['SCHEDULED', 'CONFIRMED', 'CANCELLED', 'IN_PROGRESS', 'FINISHED']);
+
+const parsePositiveInt = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const getSqliteErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'Erro inesperado no banco de dados';
+};
+
+const requireDentistId = (req: Request, res: Response): number | null => {
+  const dentistId = parsePositiveInt(req.query.dentist_id);
+  if (!dentistId) {
+    res.status(400).json({ error: 'dentist_id deve ser um inteiro positivo' });
+    return null;
+  }
+  return dentistId;
+};
 
 async function startServer() {
   // Inicialização do Banco de Dados (Schema)
@@ -229,36 +254,46 @@ async function startServer() {
 
   app.patch('/api/admin/users/:id/status', (req, res) => {
     const { status } = req.body;
-    if (!['active', 'blocked', 'pending'].includes(status)) {
+    const userId = parsePositiveInt(req.params.id);
+
+    if (!userId) {
+      return res.status(400).json({ error: 'ID de usuário inválido' });
+    }
+
+    if (!VALID_ACCOUNT_STATUS.has(status)) {
       return res.status(400).json({ error: 'Status inválido' });
     }
+
     try {
-      db.prepare('UPDATE users SET status = ? WHERE id = ?').run(status, req.params.id);
+      db.prepare('UPDATE users SET status = ? WHERE id = ?').run(status, userId);
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+    } catch (err) {
+      res.status(400).json({ error: getSqliteErrorMessage(err) });
     }
   });
 
   // Patients (Multi-tenant)
   app.get('/api/patients', (req, res) => {
-    const dentistId = req.query.dentist_id;
-    if (!dentistId) return res.status(400).json({ error: 'dentist_id é obrigatório' });
-    
+    const dentistId = requireDentistId(req, res);
+    if (!dentistId) return;
+
     const patients = db.prepare('SELECT * FROM patients WHERE dentist_id = ? ORDER BY name ASC').all(dentistId);
     res.json(patients);
   });
 
   app.get('/api/patients/:id', (req, res) => {
-    const dentistId = req.query.dentist_id;
-    if (!dentistId) return res.status(400).json({ error: 'dentist_id é obrigatório' });
+    const dentistId = requireDentistId(req, res);
+    if (!dentistId) return;
 
-    const patient = db.prepare('SELECT * FROM patients WHERE id = ? AND dentist_id = ?').get(req.params.id, dentistId);
+    const patientId = parsePositiveInt(req.params.id);
+    if (!patientId) return res.status(400).json({ error: 'ID de paciente inválido' });
+
+    const patient = db.prepare('SELECT * FROM patients WHERE id = ? AND dentist_id = ?').get(patientId, dentistId);
     if (patient) {
-      const anamnesis = db.prepare('SELECT * FROM anamnesis WHERE patient_id = ?').get(req.params.id);
-      const evolution = db.prepare('SELECT * FROM clinical_evolution WHERE patient_id = ? AND dentist_id = ? ORDER BY date DESC').all(req.params.id, dentistId);
-      const files = db.prepare('SELECT * FROM patient_files WHERE patient_id = ? ORDER BY created_at DESC').all(req.params.id);
-      const odontogram = db.prepare('SELECT * FROM odontograms WHERE patient_id = ?').get(req.params.id);
+      const anamnesis = db.prepare('SELECT * FROM anamnesis WHERE patient_id = ?').get(patientId);
+      const evolution = db.prepare('SELECT * FROM clinical_evolution WHERE patient_id = ? AND dentist_id = ? ORDER BY date DESC').all(patientId, dentistId);
+      const files = db.prepare('SELECT * FROM patient_files WHERE patient_id = ? ORDER BY created_at DESC').all(patientId);
+      const odontogram = db.prepare('SELECT * FROM odontograms WHERE patient_id = ?').get(patientId);
       res.json({ ...patient, anamnesis, evolution, files, odontogram: odontogram ? JSON.parse((odontogram as any).data) : null });
     } else {
       res.status(404).json({ error: 'Paciente não encontrado' });
@@ -325,8 +360,8 @@ async function startServer() {
 
   // Appointments (Multi-tenant)
   app.get('/api/appointments', (req, res) => {
-    const dentistId = req.query.dentist_id;
-    if (!dentistId) return res.status(400).json({ error: 'dentist_id é obrigatório' });
+    const dentistId = requireDentistId(req, res);
+    if (!dentistId) return;
 
     const appointments = db.prepare(`
       SELECT a.*, p.name as patient_name, p.phone as patient_phone, u.name as dentist_name
@@ -365,11 +400,21 @@ async function startServer() {
 
   app.patch('/api/appointments/:id/status', (req, res) => {
     const { status } = req.body;
+    const appointmentId = parsePositiveInt(req.params.id);
+
+    if (!appointmentId) {
+      return res.status(400).json({ error: 'ID de agendamento inválido' });
+    }
+
+    if (!VALID_APPOINTMENT_STATUS.has(status)) {
+      return res.status(400).json({ error: 'Status inválido para agendamento' });
+    }
+
     try {
-      db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(status, req.params.id);
+      db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(status, appointmentId);
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+    } catch (err) {
+      res.status(400).json({ error: getSqliteErrorMessage(err) });
     }
   });
 
