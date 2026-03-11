@@ -1,20 +1,39 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Projeto OdontoManager
 
-# Run and deploy your AI Studio app
+Este é um projeto Full-Stack (React + Node.js/TypeScript) para gestão de clínicas odontológicas.
 
-This contains everything you need to run your app locally.
+## Tecnologias Utilizadas
 
-View your app in AI Studio: https://ai.studio/apps/1b7953ec-05b1-48a7-b0e1-0ecb51827597
+### Backend
+- **Express**: Framework web para Node.js.
+- **PostgreSQL (Neon)**: Banco de dados relacional.
+- **Vercel Serverless Functions**: Para execução do backend em produção.
+- **tsx**: Para execução em desenvolvimento.
 
-## Run Locally
+### Frontend
+- **React**: Biblioteca para construção de interfaces.
+- **Vite**: Ferramenta de build e desenvolvimento.
+- **Tailwind CSS**: Framework CSS utilitário.
+- **Lucide React**: Ícones SVG.
+- **Motion**: Biblioteca de animações.
 
-**Prerequisites:**  Node.js
+## Requisitos
+- **Node.js**: >= 18.0.0
+- **npm**: >= 9.0.0
 
+## Como executar localmente
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Instale as dependências:
+   ```bash
+   npm install
+   ```
+
+2. Configure as variáveis de ambiente no arquivo `.env`:
+   ```env
+   DATABASE_URL=seu_url_do_postgres
+   ```
+
+3. Inicie o servidor de desenvolvimento:
+   ```bash
+   npm run dev
+   ```
