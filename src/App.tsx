@@ -124,6 +124,26 @@ export default function App() {
   });
 
   useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem('token');
+    
+    if (savedUser && savedToken) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        setActiveDentist({ id: parsedUser.id, name: parsedUser.name });
+        if (parsedUser.role === 'DENTIST') {
+          setDentistFilter(parsedUser.id.toString());
+        }
+      } catch (e) {
+        console.error('Error parsing saved user:', e);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (user) {
       fetchData();
       if (user.role === 'ADMIN') {
@@ -193,6 +213,7 @@ export default function App() {
         setUser(data.user);
         setActiveDentist({ id: data.user.id, name: data.user.name });
         localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
         if (data.user.role === 'DENTIST') {
           setDentistFilter(data.user.id.toString());
         }
@@ -229,6 +250,7 @@ export default function App() {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setActiveTab('dashboard');
     setLoading(true);
   };
