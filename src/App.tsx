@@ -686,7 +686,7 @@ export default function App() {
 
   const updateUserStatus = async (userId: number, status: string) => {
     try {
-      const res = await apiFetch(`/api/admin/users/${userId}/status`, {
+      const res = await apiFetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status })
       });

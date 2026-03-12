@@ -48,6 +48,7 @@ import {
 import { deleteFile } from '../server/controllers/fileController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
+import { upload } from '../server/utils/cloudinary.js';
 
 import { initDb } from '../server/utils/initDb.js';
 
@@ -91,12 +92,12 @@ app.use(authenticate);
 app.get(['/patients', '/api/patients'], getPatients);
 app.get(['/patients/:id', '/api/patients/:id'], getPatientById);
 app.post(['/patients', '/api/patients'], createPatient);
-app.patch(['/patients/:id', '/api/patients/:id'], updatePatient);
+app.patch(['/patients/:id', '/api/patients/:id'], upload.single('photo'), updatePatient);
 app.put(['/patients/:id/anamnesis', '/api/patients/:id/anamnesis'], updateAnamnesis);
 app.post(['/patients/:id/evolution', '/api/patients/:id/evolution'], addEvolution);
 app.post(['/patients/:id/odontogram', '/api/patients/:id/odontogram'], updateOdontogram);
 app.post(['/patients/:id/tooth-history', '/api/patients/:id/tooth-history'], addToothHistory);
-app.post(['/patients/:id/files', '/api/patients/:id/files'], addPatientFile);
+app.post(['/patients/:id/files', '/api/patients/:id/files'], upload.single('file'), addPatientFile);
 app.get(['/patients/:id/financial', '/api/patients/:id/financial'], getPatientFinancialHistory);
 
 // Appointments
@@ -122,7 +123,7 @@ app.delete(['/dentists/:id', '/api/dentists/:id'], deleteDentist);
 
 // Profile
 app.get(['/profile', '/api/profile'], getProfile);
-app.post(['/profile', '/api/profile'], updateProfile);
+app.post(['/profile', '/api/profile'], upload.single('photo'), updateProfile);
 
 // Files
 app.delete(['/files/:id', '/api/files/:id'], deleteFile);
