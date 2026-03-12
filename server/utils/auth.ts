@@ -52,6 +52,28 @@ export function verifyToken(req: Request): AuthUser | null {
 }
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  // Skip authentication for auth and health routes
+  const path = req.path || '';
+  const url = req.url || '';
+  const originalUrl = req.originalUrl || '';
+  
+  const isPublic = 
+    path.includes('/auth/login') || 
+    path.includes('/auth/register') || 
+    path.includes('/health') ||
+    url.includes('/auth/login') || 
+    url.includes('/auth/register') || 
+    url.includes('/health') ||
+    originalUrl.includes('/auth/login') || 
+    originalUrl.includes('/auth/register') || 
+    originalUrl.includes('/health');
+
+  if (isPublic) {
+    return next();
+  }
+
+  console.log(`Authenticating request: ${req.method} ${path} (Original: ${originalUrl})`);
+
   const user = verifyToken(req);
   if (!user) {
     const isHtml = req.headers.accept && req.headers.accept.includes('text/html');

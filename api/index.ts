@@ -80,54 +80,54 @@ app.get('/health', async (req, res) => {
 });
 
 // Auth
-app.post('/auth/login', login);
-app.post('/auth/register', register);
+app.post(['/auth/login', '/api/auth/login'], login);
+app.post(['/auth/register', '/api/auth/register'], register);
 
 // Protected routes
 app.use(authenticate);
 
 // Patients
-app.get('/patients', getPatients);
-app.get('/patients/:id', getPatientById);
-app.post('/patients', createPatient);
-app.put('/patients/:id/anamnesis', updateAnamnesis);
-app.post('/patients/:id/evolution', addEvolution);
-app.post('/patients/:id/odontogram', updateOdontogram);
-app.post('/patients/:id/tooth-history', addToothHistory);
-app.post('/patients/:id/files', addPatientFile);
-app.get('/patients/:id/financial', getPatientFinancialHistory);
+app.get(['/patients', '/api/patients'], getPatients);
+app.get(['/patients/:id', '/api/patients/:id'], getPatientById);
+app.post(['/patients', '/api/patients'], createPatient);
+app.put(['/patients/:id/anamnesis', '/api/patients/:id/anamnesis'], updateAnamnesis);
+app.post(['/patients/:id/evolution', '/api/patients/:id/evolution'], addEvolution);
+app.post(['/patients/:id/odontogram', '/api/patients/:id/odontogram'], updateOdontogram);
+app.post(['/patients/:id/tooth-history', '/api/patients/:id/tooth-history'], addToothHistory);
+app.post(['/patients/:id/files', '/api/patients/:id/files'], addPatientFile);
+app.get(['/patients/:id/financial', '/api/patients/:id/financial'], getPatientFinancialHistory);
 
 // Appointments
-app.get('/appointments', getAppointments);
-app.post('/appointments', createAppointment);
-app.patch('/appointments/:id', updateAppointmentStatus);
-app.post('/appointments/:id/remind', remindAppointment);
+app.get(['/appointments', '/api/appointments'], getAppointments);
+app.post(['/appointments', '/api/appointments'], createAppointment);
+app.patch(['/appointments/:id', '/api/appointments/:id'], updateAppointmentStatus);
+app.post(['/appointments/:id/remind', '/api/appointments/:id/remind'], remindAppointment);
 
 // Finance
-app.get('/finance', getTransactions);
-app.get('/finance/summary', getFinancialSummary);
-app.get('/finance/payment-plans', getPaymentPlans);
-app.post('/finance/payment-plans', createPaymentPlan);
-app.get('/finance/installments', getInstallments);
-app.patch('/finance/installments/:id/pay', payInstallment);
-app.post('/finance', createTransaction);
-app.delete('/finance/:id', deleteTransaction);
+app.get(['/finance', '/api/finance'], getTransactions);
+app.get(['/finance/summary', '/api/finance/summary'], getFinancialSummary);
+app.get(['/finance/payment-plans', '/api/finance/payment-plans'], getPaymentPlans);
+app.post(['/finance/payment-plans', '/api/finance/payment-plans'], createPaymentPlan);
+app.get(['/finance/installments', '/api/finance/installments'], getInstallments);
+app.patch(['/finance/installments/:id/pay', '/api/finance/installments/:id/pay'], payInstallment);
+app.post(['/finance', '/api/finance'], createTransaction);
+app.delete(['/finance/:id', '/api/finance/:id'], deleteTransaction);
 
 // Dentists
-app.get('/dentists', getDentists);
-app.post('/dentists', createDentist);
-app.delete('/dentists/:id', deleteDentist);
+app.get(['/dentists', '/api/dentists'], getDentists);
+app.post(['/dentists', '/api/dentists'], createDentist);
+app.delete(['/dentists/:id', '/api/dentists/:id'], deleteDentist);
 
 // Profile
-app.get('/profile', getProfile);
-app.post('/profile', updateProfile);
+app.get(['/profile', '/api/profile'], getProfile);
+app.post(['/profile', '/api/profile'], updateProfile);
 
 // Files
-app.delete('/files/:id', deleteFile);
+app.delete(['/files/:id', '/api/files/:id'], deleteFile);
 
 // Admin
-app.get('/admin/users', requireAdmin, getUsers);
-app.patch('/admin/users/:id', requireAdmin, updateUser);
-app.all('/admin/update-schema', updateSchema);
+app.get(['/admin/users', '/api/admin/users'], requireAdmin, getUsers);
+app.patch(['/admin/users/:id', '/api/admin/users/:id'], requireAdmin, updateUser);
+app.all(['/admin/update-schema', '/api/admin/update-schema'], updateSchema);
 
 export default app;
