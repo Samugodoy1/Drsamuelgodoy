@@ -46,10 +46,26 @@ import { deleteFile } from '../server/controllers/fileController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
 
+import { initDb } from '../server/utils/initDb.js';
+
 const app = express();
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
+
+// Database initialization middleware for Vercel
+let isDbInitialized = false;
+app.use(async (req, res, next) => {
+  if (!isDbInitialized && req.path !== '/health') {
+    try {
+      await initDb();
+      isDbInitialized = true;
+    } catch (error) {
+      console.error('Database initialization failed:', error);
+    }
+  }
+  next();
+});
 
 // Health check
 app.get('/health', async (req, res) => {

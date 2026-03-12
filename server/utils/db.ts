@@ -14,17 +14,20 @@ if (!connectionString) {
 
 // Silencing the SSL mode warning by explicitly using verify-full if require is present
 if (connectionString && connectionString.includes('sslmode=require')) {
-  connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
+  connectionString = connectionString.replace('sslmode=require', 'sslmode=no-verify');
 } else if (connectionString && !connectionString.includes('sslmode=')) {
   const separator = connectionString.includes('?') ? '&' : '?';
-  connectionString += `${separator}sslmode=verify-full`;
+  connectionString += `${separator}sslmode=no-verify`;
 }
 
 const pool = new Pool({
   connectionString: connectionString,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  max: 10, // Limit connections for serverless
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 export const query = async (text: string, params?: any[]) => {
