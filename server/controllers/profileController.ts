@@ -21,7 +21,13 @@ export const getProfile = async (req: Request, res: Response) => {
 
 export const updateProfile = async (req: Request, res: Response) => {
   const user = req.user!;
-  const { name, email, phone, cro, specialty, bio, photo_url, clinic_name, clinic_address, password } = req.body;
+  const { name, email, phone, cro, specialty, bio, clinic_name, clinic_address, password } = req.body;
+  let { photo_url } = req.body;
+
+  // If a file was uploaded, use its Cloudinary URL
+  if ((req as any).file) {
+    photo_url = (req as any).file.path;
+  }
   
   try {
     let sql = `

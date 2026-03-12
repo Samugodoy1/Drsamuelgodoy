@@ -23,6 +23,8 @@ import {
   UserPlus,
   UserCircle,
   Menu,
+  CheckCircle,
+  AlertTriangle,
   Camera,
   UserCog,
   Sun,
@@ -45,6 +47,7 @@ interface Patient {
   email: string;
   birth_date?: string;
   address?: string;
+  photo_url?: string;
   anamnesis?: {
     medical_history: string;
     allergies: string;
@@ -155,8 +158,8 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState<'patients' | 'finance'>('patients');
   const [exportFilters, setExportFilters] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA'),
+    endDate: new Date().toLocaleDateString('en-CA'),
     patientId: 'all',
     category: 'all',
   });
@@ -189,7 +192,7 @@ export default function App() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pacientes");
-    XLSX.writeFile(wb, `Pacientes_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Pacientes_${new Date().toLocaleDateString('en-CA')}.xlsx`);
     setIsExportModalOpen(false);
   };
 
@@ -263,7 +266,7 @@ export default function App() {
     const ws = XLSX.utils.json_to_sheet(combinedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Financeiro");
-    XLSX.writeFile(wb, `Financeiro_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Financeiro_${new Date().toLocaleDateString('en-CA')}.xlsx`);
     setIsExportModalOpen(false);
   };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -297,6 +300,7 @@ export default function App() {
   const [newEvolution, setNewEvolution] = useState({ notes: '', procedure: '' });
   const [newDentist, setNewDentist] = useState({ name: '', email: '', password: '' });
   const [newImage, setNewImage] = useState({ url: '', description: '' });
+  const [patientFile, setPatientFile] = useState<File | null>(null);
   const [newAppointment, setNewAppointment] = useState({
     patient_id: '',
     dentist_id: '',
@@ -310,7 +314,7 @@ export default function App() {
     procedure: '',
     total_amount: '',
     installments_count: '1',
-    first_due_date: new Date().toISOString().split('T')[0]
+    first_due_date: new Date().toLocaleDateString('en-CA')
   });
 
   const [isPaymentPlanModalOpen, setIsPaymentPlanModalOpen] = useState(false);
@@ -338,7 +342,7 @@ export default function App() {
     category: 'Outros',
     amount: '',
     payment_method: 'PIX',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     status: 'PAID',
     patient_id: '',
     procedure: '',
@@ -354,6 +358,14 @@ export default function App() {
   const [profile, setProfile] = useState<Dentist | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ message: string, onConfirm: () => void } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -377,6 +389,7 @@ export default function App() {
   useEffect(() => {
     if (user) {
       fetchData();
+      fetchProfile();
       if (user.role?.toUpperCase() === 'ADMIN') {
         fetchAdminUsers();
       }
@@ -408,21 +421,38 @@ export default function App() {
     if (!profile) return;
     setIsSavingProfile(true);
     try {
+      const formData = new FormData();
+      formData.append('name', profile.name);
+      formData.append('email', profile.email);
+      if (profile.phone) formData.append('phone', profile.phone);
+      if (profile.cro) formData.append('cro', profile.cro);
+      if (profile.specialty) formData.append('specialty', profile.specialty);
+      if (profile.bio) formData.append('bio', profile.bio);
+      if (profile.clinic_name) formData.append('clinic_name', profile.clinic_name);
+      if (profile.clinic_address) formData.append('clinic_address', profile.clinic_address);
+      if (profilePassword) formData.append('password', profilePassword);
+      if (profilePhotoFile) {
+        formData.append('photo', profilePhotoFile);
+      } else if (profile.photo_url) {
+        formData.append('photo_url', profile.photo_url);
+      }
+
       const res = await apiFetch('/api/profile', {
         method: 'POST',
-        body: JSON.stringify({ ...profile, password: profilePassword })
+        body: formData
       });
       if (res.ok) {
-        alert('Perfil atualizado com sucesso!');
+        showNotification('Perfil atualizado com sucesso!');
         setProfilePassword('');
+        setProfilePhotoFile(null);
         fetchProfile();
       } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao atualizar perfil');
+        showNotification(data.error || 'Erro ao atualizar perfil', 'error');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Erro de conexão ao salvar perfil');
+      showNotification('Erro de conexão ao salvar perfil', 'error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -431,11 +461,47 @@ export default function App() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setProfilePhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfile(prev => prev ? { ...prev, photo_url: reader.result as string } : null);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePatientPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedPatient) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      // Append other patient fields to ensure they are not lost if the backend expects them
+      formData.append('name', selectedPatient.name);
+      formData.append('cpf', selectedPatient.cpf);
+      if (selectedPatient.phone) formData.append('phone', selectedPatient.phone);
+      if (selectedPatient.email) formData.append('email', selectedPatient.email);
+      if (selectedPatient.birth_date) formData.append('birth_date', selectedPatient.birth_date);
+      if (selectedPatient.address) formData.append('address', selectedPatient.address);
+
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}`, {
+        method: 'PATCH',
+        body: formData
+      });
+      
+      if (res.ok) {
+        // Refresh patient data
+        openPatientRecord(selectedPatient.id);
+        fetchData(); // Refresh list
+        showNotification('Foto do paciente atualizada!');
+      } else {
+        const data = await res.json();
+        showNotification(data.error || 'Erro ao carregar foto do paciente.', 'error');
+      }
+    } catch (error) {
+      console.error('Error uploading patient photo:', error);
+      showNotification('Erro ao carregar foto do paciente.', 'error');
     }
   };
 
@@ -496,7 +562,7 @@ export default function App() {
           procedure: '',
           total_amount: '',
           installments_count: '1',
-          first_due_date: new Date().toISOString().split('T')[0]
+          first_due_date: new Date().toLocaleDateString('en-CA')
         });
         fetchData();
         if (selectedPatient) {
@@ -517,7 +583,7 @@ export default function App() {
         method: 'PATCH',
         body: JSON.stringify({
           payment_method: method,
-          payment_date: new Date().toISOString().split('T')[0]
+          payment_date: new Date().toLocaleDateString('en-CA')
         })
       });
       if (res.ok) {
@@ -589,7 +655,7 @@ export default function App() {
           category: 'Outros',
           amount: '',
           payment_method: 'PIX',
-          date: new Date().toISOString().split('T')[0],
+          date: new Date().toLocaleDateString('en-CA'),
           status: 'PAID',
           patient_id: '',
           procedure: '',
@@ -607,17 +673,23 @@ export default function App() {
   };
 
   const handleDeleteTransaction = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
-    try {
-      const res = await apiFetch(`/api/finance/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchData();
+    setConfirmation({
+      message: 'Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          const res = await apiFetch(`/api/finance/${id}`, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            fetchData();
+            showNotification('Transação excluída com sucesso!');
+          }
+        } catch (error) {
+          console.error('Error deleting transaction:', error);
+          showNotification('Erro ao excluir transação', 'error');
+        }
       }
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-    }
+    });
   };
 
   const fetchAdminUsers = async () => {
@@ -774,7 +846,7 @@ export default function App() {
     return d >= startOfWeek && d <= endOfWeek;
   }).length;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toLocaleDateString('en-CA');
   const dailyRevenue = financialSummary?.todayRevenue !== undefined 
     ? financialSummary.todayRevenue 
     : transactions
@@ -795,9 +867,13 @@ export default function App() {
     const token = options.explicitToken || localStorage.getItem('token');
     const headers: any = {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
       ...options.headers,
     };
+
+    // Only set Content-Type to application/json if body is not FormData
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -831,22 +907,28 @@ export default function App() {
       return;
     }
     try {
+      const body = {
+        ...newAppointment,
+        start_time: new Date(newAppointment.start_time).toISOString(),
+        end_time: new Date(newAppointment.end_time).toISOString()
+      };
+      
       const res = await apiFetch('/api/appointments', {
         method: 'POST',
-        body: JSON.stringify(newAppointment)
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (res.ok) {
         setIsModalOpen(false);
         fetchData();
         setNewAppointment({ patient_id: '', dentist_id: '', start_time: '', end_time: '', notes: '' });
-        alert('Agendamento realizado com sucesso!');
+        showNotification('Agendamento realizado com sucesso!');
       } else {
-        alert(data.error || 'Erro ao realizar agendamento');
+        showNotification(data.error || 'Erro ao realizar agendamento', 'error');
       }
     } catch (error) {
       console.error('Error creating appointment:', error);
-      alert('Erro de conexão ao realizar agendamento');
+      showNotification('Erro de conexão ao realizar agendamento', 'error');
     }
   };
 
@@ -862,9 +944,14 @@ export default function App() {
         setIsPatientModalOpen(false);
         fetchData();
         setNewPatient({ name: '', cpf: '', birth_date: '', phone: '', email: '', address: '' });
+        showNotification('Paciente cadastrado com sucesso!');
+      } else {
+        const data = await res.json();
+        showNotification(data.error || 'Erro ao cadastrar paciente', 'error');
       }
     } catch (error) {
       console.error('Error creating patient:', error);
+      showNotification('Erro de conexão ao cadastrar paciente', 'error');
     }
   };
 
@@ -915,6 +1002,7 @@ export default function App() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setPatientFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewImage({ ...newImage, url: reader.result as string });
@@ -927,9 +1015,25 @@ export default function App() {
     e.preventDefault();
     if (!selectedPatient) return;
     try {
-      await uploadFile(selectedPatient.id, newImage.url, newImage.description);
-      setIsImageModalOpen(false);
-      setNewImage({ url: '', description: '' });
+      const formData = new FormData();
+      if (patientFile) {
+        formData.append('file', patientFile);
+      } else if (newImage.url) {
+        formData.append('file_url', newImage.url);
+      }
+      formData.append('description', newImage.description);
+      formData.append('file_type', 'image');
+
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}/files`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        openPatientRecord(selectedPatient.id);
+        setIsImageModalOpen(false);
+        setNewImage({ url: '', description: '' });
+        setPatientFile(null);
+      }
     } catch (error) {
       console.error('Error uploading image:', error);
     }
@@ -951,7 +1055,7 @@ export default function App() {
               category: 'Procedimentos',
               amount: '',
               payment_method: 'PIX',
-              date: new Date().toISOString().split('T')[0],
+              date: new Date().toLocaleDateString('en-CA'),
               status: 'PAID',
               patient_id: app.patient_id.toString(),
               procedure: '',
@@ -1069,26 +1173,23 @@ export default function App() {
     }
   };
 
-  const uploadFile = async (patientId: number, fileUrl: string, description: string) => {
-    try {
-      const res = await apiFetch(`/api/patients/${patientId}/files`, {
-        method: 'POST',
-        body: JSON.stringify({ file_url: fileUrl, file_type: 'image', description })
-      });
-      if (res.ok) openPatientRecord(patientId);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-    }
-  };
-
   const deleteFile = async (fileId: number) => {
     if (!selectedPatient) return;
-    try {
-      const res = await apiFetch(`/api/files/${fileId}`, { method: 'DELETE' });
-      if (res.ok) openPatientRecord(selectedPatient.id);
-    } catch (error) {
-      console.error('Error deleting file:', error);
-    }
+    setConfirmation({
+      message: 'Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          const res = await apiFetch(`/api/files/${fileId}`, { method: 'DELETE' });
+          if (res.ok) {
+            openPatientRecord(selectedPatient.id);
+            showNotification('Arquivo excluído com sucesso!');
+          }
+        } catch (error) {
+          console.error('Error deleting file:', error);
+          showNotification('Erro ao excluir arquivo', 'error');
+        }
+      }
+    });
   };
 
   const SidebarItem = ({ id, icon: Icon, label }: { id: typeof activeTab, icon: any, label: string }) => (
@@ -1302,8 +1403,17 @@ export default function App() {
 
         <div className="pt-6 border-t border-slate-100">
           <div className="flex items-center gap-3 px-2 mb-4 overflow-hidden">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-              <UserCircle size={24} />
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0 overflow-hidden border border-slate-200">
+              {profile?.photo_url ? (
+                <img 
+                  src={profile.photo_url} 
+                  alt={profile.name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <UserCircle size={24} />
+              )}
             </div>
             <div className="tablet-l:hidden desktop:block whitespace-nowrap">
               <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
@@ -1408,8 +1518,12 @@ export default function App() {
                         className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100 cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold">
-                            {(p.name || '?').charAt(0)}
+                          <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden border border-emerald-200">
+                            {p.photo_url ? (
+                              <img src={p.photo_url} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              (p.name || '?').charAt(0)
+                            )}
                           </div>
                           <div>
                             <p className="text-sm font-bold text-slate-800">{p.name}</p>
@@ -1495,8 +1609,15 @@ export default function App() {
                         className="p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-                            <UserCircle size={24} />
+                          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors overflow-hidden border border-slate-200">
+                            {(() => {
+                              const patient = patients.find(p => p.id === app.patient_id);
+                              return patient?.photo_url ? (
+                                <img src={patient.photo_url} alt={app.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <UserCircle size={24} />
+                              );
+                            })()}
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-slate-800 text-sm truncate leading-tight">{app.patient_name}</p>
@@ -1610,8 +1731,11 @@ export default function App() {
                         <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Data</label>
                         <input 
                           type="date" 
-                          value={selectedDate.toISOString().split('T')[0]}
-                          onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                          value={selectedDate.toLocaleDateString('en-CA')}
+                          onChange={(e) => {
+                            const [year, month, day] = e.target.value.split('-').map(Number);
+                            setSelectedDate(new Date(year, month - 1, day));
+                          }}
                           className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
                         />
                       </div>
@@ -1825,9 +1949,18 @@ export default function App() {
                                 className="flex items-start tablet-l:items-center gap-4 tablet-l:gap-5 cursor-pointer w-full"
                                 onClick={() => openPatientRecord(app.patient_id)}
                               >
-                                <div className="w-12 h-12 tablet-l:w-14 tablet-l:h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors shrink-0">
-                                  <UserCircle size={28} className="tablet-l:hidden" />
-                                  <UserCircle size={32} className="hidden tablet-l:block" />
+                                <div className="w-12 h-12 tablet-l:w-14 tablet-l:h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors shrink-0 overflow-hidden border border-slate-200">
+                                  {(() => {
+                                    const patient = patients.find(p => p.id === app.patient_id);
+                                    return patient?.photo_url ? (
+                                      <img src={patient.photo_url} alt={app.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      <>
+                                        <UserCircle size={28} className="tablet-l:hidden" />
+                                        <UserCircle size={32} className="hidden tablet-l:block" />
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="text-base tablet-l:text-lg font-bold text-slate-800 group-hover:text-emerald-900 transition-colors break-words leading-tight">{app.patient_name}</p>
@@ -2004,8 +2137,12 @@ export default function App() {
                             >
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">
-                                    {(patient.name || '?').charAt(0)}
+                                  <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold overflow-hidden border border-emerald-200">
+                                    {patient.photo_url ? (
+                                      <img src={patient.photo_url} alt={patient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      (patient.name || '?').charAt(0)
+                                    )}
                                   </div>
                                   <span className="font-bold text-slate-800">{patient.name}</span>
                                 </div>
@@ -2090,6 +2227,31 @@ export default function App() {
                   {/* Sidebar: Patient Info & Anamnesis */}
                   <div className="space-y-8">
                     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <div className="flex flex-col items-center mb-6">
+                        <div className="relative group">
+                          <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden border-2 border-slate-200 group-hover:border-emerald-500 transition-all">
+                            {selectedPatient.photo_url ? (
+                              <img 
+                                src={selectedPatient.photo_url} 
+                                alt={selectedPatient.name} 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <UserCircle size={48} />
+                            )}
+                          </div>
+                          <label className="absolute -bottom-2 -right-2 p-2 bg-emerald-600 text-white rounded-xl shadow-lg cursor-pointer hover:bg-emerald-700 transition-all">
+                            <Camera size={16} />
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*"
+                              onChange={handlePatientPhotoUpload}
+                            />
+                          </label>
+                        </div>
+                      </div>
                       <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <UserCircle size={18} className="text-emerald-600" />
                         Dados Pessoais
@@ -4385,6 +4547,63 @@ export default function App() {
           <Plus size={28} />
         </button>
       </div>
+      {/* Notifications */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className={`fixed bottom-8 right-8 z-[100] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${
+              notification.type === 'success' 
+                ? 'bg-emerald-600 border-emerald-500 text-white' 
+                : 'bg-rose-600 border-rose-500 text-white'
+            }`}
+          >
+            {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+            <span className="font-bold text-sm">{notification.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmation && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmar Ação</h3>
+                <p className="text-slate-600">{confirmation.message}</p>
+              </div>
+              <div className="p-6 bg-slate-50 flex gap-3">
+                <button 
+                  onClick={() => setConfirmation(null)}
+                  className="flex-1 px-6 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    confirmation.onConfirm();
+                    setConfirmation(null);
+                  }}
+                  className="flex-1 px-6 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
