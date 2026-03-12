@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Users, 
   Calendar, 
@@ -25,7 +26,9 @@ import {
   Camera,
   UserCog,
   Sun,
-  Moon
+  Moon,
+  Printer,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -67,6 +70,37 @@ interface Patient {
     date: string;
     dentist_name?: string;
   }>;
+  financial?: {
+    transactions: Transaction[];
+    paymentPlans: PaymentPlan[];
+    installments: Installment[];
+  };
+  created_at?: string;
+}
+
+interface PaymentPlan {
+  id: number;
+  dentist_id: number;
+  patient_id: number;
+  procedure: string;
+  total_amount: number;
+  installments_count: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  created_at: string;
+}
+
+interface Installment {
+  id: number;
+  payment_plan_id: number;
+  dentist_id: number;
+  patient_id: number;
+  number: number;
+  amount: number;
+  due_date: string;
+  status: 'PENDING' | 'PAID' | 'OVERDUE';
+  payment_date?: string;
+  transaction_id?: number;
+  procedure?: string;
 }
 
 interface Dentist {
@@ -116,7 +150,124 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportType, setExportType] = useState<'patients' | 'finance'>('patients');
+  const [exportFilters, setExportFilters] = useState({
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    patientId: 'all',
+    category: 'all',
+  });
+
+  const exportPatients = () => {
+    let filteredP = patients;
+    if (exportFilters.patientId !== 'all') {
+      filteredP = filteredP.filter(p => p.id.toString() === exportFilters.patientId);
+    }
+    if (exportFilters.startDate) {
+      filteredP = filteredP.filter(p => p.created_at && p.created_at.split('T')[0] >= exportFilters.startDate);
+    }
+    if (exportFilters.endDate) {
+      filteredP = filteredP.filter(p => p.created_at && p.created_at.split('T')[0] <= exportFilters.endDate);
+    }
+
+    const data = filteredP.map(p => ({
+      'ID': p.id,
+      'Nome Completo': p.name,
+      'Telefone': p.phone,
+      'Email': p.email,
+      'Data de Nascimento': p.birth_date || '',
+      'CPF': p.cpf || '',
+      'Endereço': p.address || '',
+      'Observações': p.anamnesis?.medical_history || '',
+      'Data de Cadastro': p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '',
+      'Dentista Responsável': profile?.name || user?.name
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pacientes");
+    XLSX.writeFile(wb, `Pacientes_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setIsExportModalOpen(false);
+  };
+
+  const exportFinance = () => {
+    let filteredT = transactions;
+    if (exportFilters.startDate) {
+      filteredT = filteredT.filter(t => t.date >= exportFilters.startDate);
+    }
+    if (exportFilters.endDate) {
+      filteredT = filteredT.filter(t => t.date <= exportFilters.endDate);
+    }
+    if (exportFilters.patientId !== 'all') {
+      filteredT = filteredT.filter(t => t.patient_id?.toString() === exportFilters.patientId);
+    }
+    if (exportFilters.category === 'income') {
+      filteredT = filteredT.filter(t => t.type === 'INCOME');
+    } else if (exportFilters.category === 'expense') {
+      filteredT = filteredT.filter(t => t.type === 'EXPENSE');
+    }
+
+    const transactionData = filteredT.map(t => ({
+      'Data': new Date(t.date).toLocaleDateString('pt-BR'),
+      'Paciente': t.patient_name || 'N/A',
+      'Procedimento': t.procedure || t.description,
+      'Categoria': t.type === 'INCOME' ? 'Receita' : 'Despesa',
+      'Valor': t.amount,
+      'Forma de Pagamento': t.payment_method,
+      'Status': 'Pago',
+      'Dentista Responsável': profile?.name || user?.name,
+      'Observações': t.notes || '',
+      'Valor Total do Tratamento': '',
+      'Número de Parcelas': '',
+      'Número da Parcela': '',
+      'Valor da Parcela': '',
+      'Data de Vencimento': '',
+      'Status da Parcela': '',
+      'Data de Pagamento': ''
+    }));
+
+    const installmentData = installments.filter(inst => {
+      if (exportFilters.startDate && inst.due_date < exportFilters.startDate) return false;
+      if (exportFilters.endDate && inst.due_date > exportFilters.endDate) return false;
+      if (exportFilters.patientId !== 'all' && inst.patient_id?.toString() !== exportFilters.patientId) return false;
+      if (exportFilters.category === 'expense') return false; // Installments are income
+      return true;
+    }).map(inst => {
+      const plan = paymentPlans.find(p => p.id === inst.payment_plan_id);
+      const patient = patients.find(p => p.id === inst.patient_id);
+      return {
+        'Data': new Date(inst.due_date).toLocaleDateString('pt-BR'),
+        'Paciente': patient?.name || 'N/A',
+        'Procedimento': inst.procedure || plan?.procedure || 'Parcelamento',
+        'Categoria': 'Receita (Parcela)',
+        'Valor': inst.amount,
+        'Forma de Pagamento': inst.status === 'PAID' ? 'N/A' : 'Pendente',
+        'Status': inst.status === 'PAID' ? 'Pago' : (new Date(inst.due_date) < new Date() ? 'Atrasado' : 'Pendente'),
+        'Dentista Responsável': profile?.name || user?.name,
+        'Observações': `Parcela ${inst.number}/${plan?.installments_count || '?'}`,
+        'Valor Total do Tratamento': plan?.total_amount || 0,
+        'Número de Parcelas': plan?.installments_count || 0,
+        'Número da Parcela': inst.number,
+        'Valor da Parcela': inst.amount,
+        'Data de Vencimento': new Date(inst.due_date).toLocaleDateString('pt-BR'),
+        'Status da Parcela': inst.status,
+        'Data de Pagamento': inst.payment_date ? new Date(inst.payment_date).toLocaleDateString('pt-BR') : ''
+      };
+    });
+
+    const combinedData = [...transactionData, ...installmentData];
+
+    const ws = XLSX.utils.json_to_sheet(combinedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Financeiro");
+    XLSX.writeFile(wb, `Financeiro_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setIsExportModalOpen(false);
+  };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
@@ -127,7 +278,7 @@ export default function App() {
   const [registerMessage, setRegisterMessage] = useState('');
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [selectedPatientTab, setSelectedPatientTab] = useState<'evolucao' | 'imagens'>('evolucao');
+  const [selectedPatientTab, setSelectedPatientTab] = useState<'evolucao' | 'imagens' | 'financeiro'>('evolucao');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isDentistModalOpen, setIsDentistModalOpen] = useState(false);
@@ -151,6 +302,18 @@ export default function App() {
     end_time: '',
     notes: ''
   });
+
+  const [newPaymentPlan, setNewPaymentPlan] = useState({
+    patient_id: '',
+    procedure: '',
+    total_amount: '',
+    installments_count: '1',
+    first_due_date: new Date().toISOString().split('T')[0]
+  });
+
+  const [isPaymentPlanModalOpen, setIsPaymentPlanModalOpen] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({
     name: '',
     cpf: '',
@@ -179,6 +342,7 @@ export default function App() {
     type: 'all', // 'all', 'INCOME', 'EXPENSE'
     category: 'all'
   });
+  const [financeSubTab, setFinanceSubTab] = useState<'transacoes' | 'parcelamentos'>('transacoes');
 
   const [profile, setProfile] = useState<Dentist | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -271,24 +435,123 @@ export default function App() {
   const fetchData = async () => {
     if (!user) return;
     try {
-      const [pRes, aRes, fRes] = await Promise.all([
+      const [pRes, aRes, fRes, sRes, plRes, iRes] = await Promise.all([
         apiFetch('/api/patients'),
         apiFetch('/api/appointments'),
-        apiFetch('/api/finance')
+        apiFetch('/api/finance'),
+        apiFetch('/api/finance/summary'),
+        apiFetch('/api/finance/payment-plans'),
+        apiFetch('/api/finance/installments')
       ]);
       
       const pData = await pRes.json();
       const aData = await aRes.json();
       const fData = await fRes.json();
+      const sData = await sRes.json();
+      const plData = await plRes.json();
+      const iData = await iRes.json();
       
       if (Array.isArray(pData)) setPatients(pData);
       if (Array.isArray(aData)) setAppointments(aData);
       if (Array.isArray(fData)) setTransactions(fData);
+      if (sData && !sData.error) setFinancialSummary(sData);
+      if (Array.isArray(plData)) setPaymentPlans(plData);
+      if (Array.isArray(iData)) setInstallments(iData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreatePaymentPlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await apiFetch('/api/finance/payment-plans', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newPaymentPlan,
+          total_amount: parseFloat(newPaymentPlan.total_amount),
+          installments_count: parseInt(newPaymentPlan.installments_count)
+        })
+      });
+      if (res.ok) {
+        setIsPaymentPlanModalOpen(false);
+        setNewPaymentPlan({
+          patient_id: '',
+          procedure: '',
+          total_amount: '',
+          installments_count: '1',
+          first_due_date: new Date().toISOString().split('T')[0]
+        });
+        fetchData();
+        if (selectedPatient) {
+          fetchPatientFinancialHistory(selectedPatient.id);
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Erro ao criar plano de pagamento');
+      }
+    } catch (error) {
+      console.error('Error creating payment plan:', error);
+    }
+  };
+
+  const handlePayInstallment = async (id: number, method: string) => {
+    try {
+      const res = await apiFetch(`/api/finance/installments/${id}/pay`, {
+        method: 'POST',
+        body: JSON.stringify({
+          payment_method: method,
+          payment_date: new Date().toISOString().split('T')[0]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fetchData();
+        if (selectedPatient) {
+          fetchPatientFinancialHistory(selectedPatient.id);
+        }
+        // Automatically show receipt
+        if (data.transaction) {
+          generateReceipt(data.transaction);
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Erro ao registrar pagamento');
+      }
+    } catch (error) {
+      console.error('Error paying installment:', error);
+    }
+  };
+
+  const fetchPatientFinancialHistory = async (patientId: number) => {
+    try {
+      const res = await apiFetch(`/api/patients/${patientId}/financial`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedPatient(prev => prev ? { ...prev, financial: data } : null);
+      }
+    } catch (error) {
+      console.error('Error fetching patient financial history:', error);
+    }
+  };
+
+  const generateReceipt = (transaction: Transaction) => {
+    const dentist = adminUsers.find(u => u.id === transaction.dentist_id) || profile;
+    setSelectedReceipt({
+      patientName: transaction.patient_name || 'Paciente não identificado',
+      amount: transaction.amount,
+      amountFormatted: Number(transaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      procedure: transaction.procedure || transaction.description,
+      date: new Date(transaction.date).toLocaleDateString('pt-BR'),
+      paymentMethod: transaction.payment_method,
+      dentistName: dentist?.name || user?.name,
+      dentistCro: dentist?.cro || profile?.cro,
+      clinicName: profile?.clinic_name || 'OdontoHub',
+      clinicAddress: profile?.clinic_address || ''
+    });
+    setIsReceiptModalOpen(true);
   };
 
   const handleSaveTransaction = async (e: React.FormEvent) => {
@@ -851,7 +1114,7 @@ export default function App() {
               </div>
             </div>
             <div className="text-center mb-10">
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">OdontoManager</h1>
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">OdontoHub</h1>
               <p className="text-slate-500">Acesse sua conta para gerenciar sua clínica</p>
             </div>
 
@@ -972,7 +1235,7 @@ export default function App() {
             <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
               <Plus size={24} strokeWidth={3} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 whitespace-nowrap tablet-l:hidden desktop:block">OdontoManager</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 whitespace-nowrap tablet-l:hidden desktop:block">OdontoHub</h1>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="tablet-l:hidden text-slate-400">
             <Plus size={24} className="rotate-45" />
@@ -1646,13 +1909,25 @@ export default function App() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-2xl font-bold text-slate-900">Gestão de Pacientes</h3>
-                  <button 
-                    onClick={() => setIsPatientModalOpen(true)}
-                    className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
-                  >
-                    <Plus size={18} />
-                    Novo Paciente
-                  </button>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => {
+                        setExportType('patients');
+                        setIsExportModalOpen(true);
+                      }}
+                      className="bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center gap-2"
+                    >
+                      <Download size={18} />
+                      Exportar
+                    </button>
+                    <button 
+                      onClick={() => setIsPatientModalOpen(true)}
+                      className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      <Plus size={18} />
+                      Novo Paciente
+                    </button>
+                  </div>
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   {/* Desktop Table View */}
@@ -1850,7 +2125,7 @@ export default function App() {
                     {/* Tabs for Patient Record */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                       <div className="flex border-b border-slate-100">
-                        {['evolucao', 'imagens'].map((tab) => (
+                        {['evolucao', 'imagens', 'financeiro'].map((tab) => (
                           <button
                             key={tab}
                             onClick={() => setSelectedPatientTab(tab as any)}
@@ -1860,7 +2135,7 @@ export default function App() {
                                 : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
                             }`}
                           >
-                            {tab === 'evolucao' ? 'Evolução Clínica' : 'Imagens & RX'}
+                            {tab === 'evolucao' ? 'Evolução Clínica' : tab === 'imagens' ? 'Imagens & RX' : 'Financeiro'}
                           </button>
                         ))}
                       </div>
@@ -1966,7 +2241,7 @@ export default function App() {
                               )}
                             </div>
                           </>
-                        ) : (
+                        ) : selectedPatientTab === 'imagens' ? (
                           <div className="space-y-6">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                               <h4 className="font-bold text-slate-800 flex items-center gap-2">
@@ -2019,6 +2294,144 @@ export default function App() {
                               )}
                             </div>
                           </div>
+                        ) : (
+                          <div className="space-y-8">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                <DollarSign size={18} className="text-emerald-600" />
+                                Histórico Financeiro do Paciente
+                              </h4>
+                              <button 
+                                onClick={() => {
+                                  setNewPaymentPlan({...newPaymentPlan, patient_id: selectedPatient.id.toString()});
+                                  setIsPaymentPlanModalOpen(true);
+                                }}
+                                className="text-xs font-bold text-emerald-600 flex items-center gap-1 hover:underline"
+                              >
+                                <Plus size={14} /> 
+                                Novo Plano de Pagamento
+                              </button>
+                            </div>
+
+                            {/* Payment Plans */}
+                            <div className="space-y-4">
+                              <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Planos de Pagamento</h5>
+                              {selectedPatient.financial?.paymentPlans && selectedPatient.financial.paymentPlans.length > 0 ? (
+                                selectedPatient.financial.paymentPlans.map(plan => (
+                                  <div key={plan.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                                    <div className="flex justify-between items-start mb-4">
+                                      <div>
+                                        <p className="font-bold text-slate-800">{plan.procedure}</p>
+                                        <p className="text-xs text-slate-500">
+                                          Total: {Number(plan.total_amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} • {plan.installments_count} parcelas
+                                        </p>
+                                      </div>
+                                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                        plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 
+                                        plan.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600' : 
+                                        'bg-blue-100 text-blue-700'
+                                      }`}>
+                                        {plan.status === 'COMPLETED' ? 'Concluído' : plan.status === 'CANCELLED' ? 'Cancelado' : 'Em Aberto'}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                      {selectedPatient.financial?.installments
+                                        .filter(i => i.payment_plan_id === plan.id)
+                                        .map(inst => (
+                                          <div key={inst.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-100 text-sm">
+                                            <div className="flex items-center gap-3">
+                                              <span className="w-6 h-6 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center text-[10px] font-bold">
+                                                {inst.number}
+                                              </span>
+                                              <div>
+                                                <p className="font-medium text-slate-700">{Number(inst.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase">Vencimento: {new Date(inst.due_date).toLocaleDateString('pt-BR')}</p>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                inst.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 
+                                                new Date(inst.due_date) < new Date() ? 'bg-rose-100 text-rose-700' : 
+                                                'bg-amber-100 text-amber-700'
+                                              }`}>
+                                                {inst.status === 'PAID' ? 'Pago' : new Date(inst.due_date) < new Date() ? 'Atrasado' : 'Pendente'}
+                                              </span>
+                                              {inst.status === 'PENDING' && (
+                                                <button 
+                                                  onClick={() => handlePayInstallment(inst.id, 'Dinheiro')}
+                                                  className="text-[10px] font-bold text-emerald-600 hover:underline"
+                                                >
+                                                  Pagar
+                                                </button>
+                                              )}
+                                              {inst.status === 'PAID' && inst.transaction_id && (
+                                                <button 
+                                                  onClick={() => {
+                                                    const trans = selectedPatient.financial?.transactions.find(t => t.id === inst.transaction_id);
+                                                    if (trans) generateReceipt(trans);
+                                                  }}
+                                                  className="text-[10px] font-bold text-blue-600 hover:underline"
+                                                >
+                                                  Recibo
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                  <DollarSign size={32} className="mx-auto mb-2 opacity-20" />
+                                  <p className="text-sm">Nenhum plano de parcelamento ativo.</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Recent Transactions */}
+                            <div className="space-y-4">
+                              <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pagamentos Recentes</h5>
+                              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                  <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">
+                                    <tr>
+                                      <th className="px-4 py-3">Data</th>
+                                      <th className="px-4 py-3">Descrição</th>
+                                      <th className="px-4 py-3 text-right">Valor</th>
+                                      <th className="px-4 py-3"></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {selectedPatient.financial?.transactions.map(t => (
+                                      <tr key={t.id} className="hover:bg-slate-50">
+                                        <td className="px-4 py-3 text-slate-500">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-700">{t.description}</td>
+                                        <td className={`px-4 py-3 text-right font-bold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                          {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                          <button 
+                                            onClick={() => generateReceipt(t)}
+                                            className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                                            title="Gerar Recibo"
+                                          >
+                                            <FileText size={16} />
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    {(!selectedPatient.financial?.transactions || selectedPatient.financial.transactions.length === 0) && (
+                                      <tr>
+                                        <td colSpan={4} className="px-4 py-8 text-center text-slate-400">Nenhuma transação registrada.</td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -2042,196 +2455,330 @@ export default function App() {
             )}
             {activeTab === 'financeiro' && (
               <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <select 
-                      value={financeFilter.period}
-                      onChange={(e) => setFinanceFilter({...financeFilter, period: e.target.value})}
-                      className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                <div className="flex border-b border-slate-100 mb-6">
+                  {['transacoes', 'parcelamentos'].map((subTab) => (
+                    <button
+                      key={subTab}
+                      onClick={() => setFinanceSubTab(subTab as any)}
+                      className={`px-6 py-4 text-sm font-bold transition-all border-b-2 ${
+                        financeSubTab === subTab 
+                          ? 'border-emerald-600 text-emerald-600 bg-emerald-50/30' 
+                          : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                      }`}
                     >
-                      <option value="day">Hoje</option>
-                      <option value="week">Últimos 7 dias</option>
-                      <option value="month">Este Mês</option>
-                      <option value="all">Tudo</option>
-                    </select>
-                    <select 
-                      value={financeFilter.type}
-                      onChange={(e) => setFinanceFilter({...financeFilter, type: e.target.value})}
-                      className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                      <option value="all">Todos os Tipos</option>
-                      <option value="INCOME">Receitas</option>
-                      <option value="EXPENSE">Despesas</option>
-                    </select>
-                    <select 
-                      value={financeFilter.category}
-                      onChange={(e) => setFinanceFilter({...financeFilter, category: e.target.value})}
-                      className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                      <option value="all">Todas Categorias</option>
-                      <option value="Procedimentos">Procedimentos</option>
-                      <option value="Consultas">Consultas</option>
-                      <option value="Aluguel">Aluguel</option>
-                      <option value="Materiais">Materiais</option>
-                      <option value="Laboratório">Laboratório</option>
-                      <option value="Marketing">Marketing</option>
-                      <option value="Salários">Salários</option>
-                      <option value="Outros">Outros</option>
-                    </select>
-                  </div>
-                  <div className="flex gap-3 w-full sm:w-auto">
-                    <button 
-                      onClick={() => {
-                        setTransactionType('EXPENSE');
-                        setIsTransactionModalOpen(true);
-                      }}
-                      className="flex-1 sm:flex-none bg-rose-50 text-rose-600 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Plus size={18} />
-                      Despesa
+                      {subTab === 'transacoes' ? 'Transações' : 'Parcelamentos'}
                     </button>
-                    <button 
-                      onClick={() => {
-                        setTransactionType('INCOME');
-                        setIsTransactionModalOpen(true);
-                      }}
-                      className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Plus size={18} />
-                      Receita
-                    </button>
-                  </div>
+                  ))}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-xs font-bold text-slate-400 uppercase">Receita Total</p>
-                      <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
-                        <DollarSign size={16} />
+                {financeSubTab === 'transacoes' ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <select 
+                          value={financeFilter.period}
+                          onChange={(e) => setFinanceFilter({...financeFilter, period: e.target.value})}
+                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                          <option value="day">Hoje</option>
+                          <option value="week">Últimos 7 dias</option>
+                          <option value="month">Este Mês</option>
+                          <option value="all">Tudo</option>
+                        </select>
+                        <select 
+                          value={financeFilter.type}
+                          onChange={(e) => setFinanceFilter({...financeFilter, type: e.target.value})}
+                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                          <option value="all">Todos os Tipos</option>
+                          <option value="INCOME">Receitas</option>
+                          <option value="EXPENSE">Despesas</option>
+                        </select>
+                        <select 
+                          value={financeFilter.category}
+                          onChange={(e) => setFinanceFilter({...financeFilter, category: e.target.value})}
+                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                          <option value="all">Todas Categorias</option>
+                          <option value="Procedimentos">Procedimentos</option>
+                          <option value="Consultas">Consultas</option>
+                          <option value="Aluguel">Aluguel</option>
+                          <option value="Materiais">Materiais</option>
+                          <option value="Laboratório">Laboratório</option>
+                          <option value="Marketing">Marketing</option>
+                          <option value="Salários">Salários</option>
+                          <option value="Outros">Outros</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-3 w-full sm:w-auto">
+                        <button 
+                          onClick={() => {
+                            setExportType('finance');
+                            setIsExportModalOpen(true);
+                          }}
+                          className="flex-1 sm:flex-none bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Download size={18} />
+                          Exportar
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setTransactionType('EXPENSE');
+                            setIsTransactionModalOpen(true);
+                          }}
+                          className="flex-1 sm:flex-none bg-rose-50 text-rose-600 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Plus size={18} />
+                          Despesa
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setTransactionType('INCOME');
+                            setIsTransactionModalOpen(true);
+                          }}
+                          className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Plus size={18} />
+                          Receita
+                        </button>
                       </div>
                     </div>
-                    <h4 className="text-2xl font-bold text-slate-800">
-                      {currentTotalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">No período selecionado</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-xs font-bold text-slate-400 uppercase">Despesas</p>
-                      <div className="w-8 h-8 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center">
-                        <DollarSign size={16} />
-                      </div>
-                    </div>
-                    <h4 className="text-2xl font-bold text-slate-800">
-                      {currentTotalExpense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">No período selecionado</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-xs font-bold text-slate-400 uppercase">Lucro Líquido</p>
-                      <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
-                        <DollarSign size={16} />
-                      </div>
-                    </div>
-                    <h4 className={`text-2xl font-bold ${currentNetProfit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
-                      {currentNetProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </h4>
-                    <p className="text-[10px] text-blue-500 font-bold mt-2">Margem de {currentProfitMargin.toFixed(1)}%</p>
-                  </div>
-                </div>
 
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800">Histórico Financeiro</h3>
-                    <span className="text-xs font-bold text-slate-400 uppercase">{filteredTransactions.length} transações</span>
-                  </div>
-                  
-                  {/* Desktop View */}
-                  <div className="hidden md:block">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
-                          <th className="px-6 py-4">Data</th>
-                          <th className="px-6 py-4">Descrição</th>
-                          <th className="px-6 py-4">Categoria</th>
-                          <th className="px-6 py-4">Pagamento</th>
-                          <th className="px-6 py-4 text-right">Valor</th>
-                          <th className="px-6 py-4"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {filteredTransactions.map((t) => (
-                          <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 text-sm text-slate-500">
-                              {new Date(t.date).toLocaleDateString('pt-BR')}
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="font-bold text-slate-800">{t.description}</p>
-                              {t.patient_name && <p className="text-[10px] text-slate-400 uppercase font-bold">Paciente: {t.patient_name}</p>}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase">{t.category}</span>
-                            </td>
-                            <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                              {t.payment_method}
-                            </td>
-                            <td className={`px-6 py-4 text-right font-bold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <button 
-                                onClick={() => handleDeleteTransaction(t.id)}
-                                className="p-2 text-slate-300 hover:text-rose-600 transition-colors"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {filteredTransactions.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                              Nenhuma transação encontrada no período.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile View */}
-                  <div className="md:hidden divide-y divide-slate-100">
-                    {filteredTransactions.map((t) => (
-                      <div key={t.id} className="p-4 flex justify-between items-center">
-                        <div className="min-w-0 flex-1 pr-4">
-                          <p className="font-bold text-slate-800 text-sm truncate">{t.description}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('pt-BR')}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">• {t.category}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-xs font-bold text-slate-400 uppercase">Receita Total</p>
+                          <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+                            <DollarSign size={16} />
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className={`font-bold text-sm ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                          <button 
-                            onClick={() => handleDeleteTransaction(t.id)}
-                            className="text-[10px] text-rose-500 font-bold uppercase mt-1"
-                          >
-                            Excluir
-                          </button>
+                        <h4 className="text-2xl font-bold text-slate-800">
+                          {currentTotalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">No período selecionado</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-xs font-bold text-slate-400 uppercase">Despesas</p>
+                          <div className="w-8 h-8 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center">
+                            <DollarSign size={16} />
+                          </div>
                         </div>
+                        <h4 className="text-2xl font-bold text-slate-800">
+                          {currentTotalExpense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">No período selecionado</p>
                       </div>
-                    ))}
-                    {filteredTransactions.length === 0 && (
-                      <div className="p-8 text-center text-slate-400">
-                        Nenhuma transação encontrada.
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-xs font-bold text-slate-400 uppercase">Lucro Líquido</p>
+                          <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                            <DollarSign size={16} />
+                          </div>
+                        </div>
+                        <h4 className={`text-2xl font-bold ${currentNetProfit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                          {currentNetProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-blue-500 font-bold mt-2">Margem de {currentProfitMargin.toFixed(1)}%</p>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-800">Histórico Financeiro</h3>
+                        <span className="text-xs font-bold text-slate-400 uppercase">{filteredTransactions.length} transações</span>
+                      </div>
+                      
+                      {/* Desktop View */}
+                      <div className="hidden md:block">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                              <th className="px-6 py-4">Data</th>
+                              <th className="px-6 py-4">Descrição</th>
+                              <th className="px-6 py-4">Categoria</th>
+                              <th className="px-6 py-4">Pagamento</th>
+                              <th className="px-6 py-4 text-right">Valor</th>
+                              <th className="px-6 py-4"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filteredTransactions.map((t) => (
+                              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-4 text-sm text-slate-500">
+                                  {new Date(t.date).toLocaleDateString('pt-BR')}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-slate-800">{t.description}</p>
+                                  {t.patient_name && <p className="text-[10px] text-slate-400 uppercase font-bold">Paciente: {t.patient_name}</p>}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase">{t.category}</span>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                                  {t.payment_method}
+                                </td>
+                                <td className={`px-6 py-4 text-right font-bold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <button 
+                                      onClick={() => generateReceipt(t)}
+                                      className="p-2 text-slate-300 hover:text-emerald-600 transition-colors"
+                                      title="Gerar Recibo"
+                                    >
+                                      <FileText size={16} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteTransaction(t.id)}
+                                      className="p-2 text-slate-300 hover:text-rose-600 transition-colors"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                            {filteredTransactions.length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                  Nenhuma transação encontrada no período.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile View */}
+                      <div className="md:hidden divide-y divide-slate-100">
+                        {filteredTransactions.map((t) => (
+                          <div key={t.id} className="p-4 flex justify-between items-center">
+                            <div className="min-w-0 flex-1 pr-4">
+                              <p className="font-bold text-slate-800 text-sm truncate">{t.description}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('pt-BR')}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">• {t.category}</span>
+                              </div>
+                            </div>
+                            <div className="text-right flex items-center gap-3">
+                              <div>
+                                <p className={`font-bold text-sm ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </p>
+                                <div className="flex justify-end gap-2 mt-1">
+                                  <button onClick={() => generateReceipt(t)} className="text-[10px] text-emerald-600 font-bold uppercase">Recibo</button>
+                                  <button onClick={() => handleDeleteTransaction(t.id)} className="text-[10px] text-rose-500 font-bold uppercase">Excluir</button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {filteredTransactions.length === 0 && (
+                          <div className="p-8 text-center text-slate-400">
+                            Nenhuma transação encontrada.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-2">Total a Receber</p>
+                        <h4 className="text-xl font-bold text-slate-800">
+                          {financialSummary.pendingInstallmentsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase">{financialSummary.pendingInstallmentsCount} parcelas pendentes</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-2">Total em Atraso</p>
+                        <h4 className="text-xl font-bold text-rose-600">
+                          {financialSummary.overdueInstallmentsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-rose-500 font-bold mt-1 uppercase">{financialSummary.overdueInstallmentsCount} parcelas atrasadas</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-2">Recebido Hoje</p>
+                        <h4 className="text-xl font-bold text-emerald-600">
+                          {financialSummary.todayPayments.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-emerald-500 font-bold mt-1 uppercase">Pagamentos confirmados</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-2">Receita Mensal</p>
+                        <h4 className="text-xl font-bold text-blue-600">
+                          {financialSummary.monthlyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </h4>
+                        <p className="text-[10px] text-blue-500 font-bold mt-1 uppercase">Mês atual</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-800">Planos de Parcelamento Ativos</h3>
+                        <button 
+                          onClick={() => setIsPaymentPlanModalOpen(true)}
+                          className="text-xs font-bold text-emerald-600 flex items-center gap-1 hover:underline"
+                        >
+                          <Plus size={14} /> Novo Plano
+                        </button>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                              <th className="px-6 py-4">Paciente</th>
+                              <th className="px-6 py-4">Procedimento</th>
+                              <th className="px-6 py-4">Progresso</th>
+                              <th className="px-6 py-4 text-right">Valor Total</th>
+                              <th className="px-6 py-4">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {paymentPlans.map(plan => {
+                              const planInstallments = installments.filter(i => i.payment_plan_id === plan.id);
+                              const paidCount = planInstallments.filter(i => i.status === 'PAID').length;
+                              const progress = (paidCount / plan.installments_count) * 100;
+                              
+                              return (
+                                <tr key={plan.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-6 py-4 font-bold text-slate-800">{plan.patient_name}</td>
+                                  <td className="px-6 py-4 text-sm text-slate-600">{plan.procedure}</td>
+                                  <td className="px-6 py-4">
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                      <div className="bg-emerald-500 h-full transition-all" style={{ width: `${progress}%` }} />
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{paidCount}/{plan.installments_count} parcelas pagas</p>
+                                  </td>
+                                  <td className="px-6 py-4 text-right font-bold text-slate-700">
+                                    {Number(plan.total_amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                      plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {plan.status === 'COMPLETED' ? 'Concluído' : 'Em Aberto'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {paymentPlans.length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">Nenhum plano de parcelamento encontrado.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -2568,6 +3115,115 @@ export default function App() {
         </AnimatePresence>
       </main>
 
+      {/* Modal de Exportação */}
+      <AnimatePresence>
+        {isExportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsExportModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Download className="text-emerald-600" size={24} />
+                  Exportar Dados
+                </h3>
+                <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <Plus size={24} className="rotate-45" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <p className="text-sm text-slate-500">
+                  Selecione os filtros para exportar os dados em formato Excel (.xlsx).
+                </p>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
+                        {exportType === 'patients' ? 'Cadastrados desde' : 'Data Inicial'}
+                      </label>
+                      <input 
+                        type="date" 
+                        value={exportFilters.startDate}
+                        onChange={(e) => setExportFilters({...exportFilters, startDate: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
+                        {exportType === 'patients' ? 'Cadastrados até' : 'Data Final'}
+                      </label>
+                      <input 
+                        type="date" 
+                        value={exportFilters.endDate}
+                        onChange={(e) => setExportFilters({...exportFilters, endDate: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                    <select 
+                      value={exportFilters.patientId}
+                      onChange={(e) => setExportFilters({...exportFilters, patientId: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    >
+                      <option value="all">Todos os Pacientes</option>
+                      {patients.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {exportType === 'finance' && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Tipo de Transação</label>
+                      <select 
+                        value={exportFilters.category}
+                        onChange={(e) => setExportFilters({...exportFilters, category: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        <option value="all">Receitas + Despesas</option>
+                        <option value="income">Apenas Receitas</option>
+                        <option value="expense">Apenas Despesas</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setIsExportModalOpen(false)}
+                    className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={exportType === 'patients' ? exportPatients : exportFinance}
+                    className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <Download size={20} />
+                    Exportar Agora
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Modal de Novo Agendamento */}
       <AnimatePresence>
         {isModalOpen && (
@@ -2844,6 +3500,197 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Modal de Plano de Parcelamento */}
+      <AnimatePresence>
+        {isPaymentPlanModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPaymentPlanModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 md:p-8">
+                <div className="flex justify-between items-center mb-6 md:mb-8">
+                  <h3 className="text-xl md:text-2xl font-bold text-slate-900">Novo Plano de Pagamento</h3>
+                  <button onClick={() => setIsPaymentPlanModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    <Plus size={24} className="rotate-45" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreatePaymentPlan} className="space-y-4">
+                  {!newPaymentPlan.patient_id && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                      <select 
+                        required
+                        value={newPaymentPlan.patient_id}
+                        onChange={(e) => setNewPaymentPlan({...newPaymentPlan, patient_id: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        <option value="">Selecione um paciente</option>
+                        {patients.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Procedimento / Tratamento</label>
+                    <input 
+                      required
+                      type="text" 
+                      placeholder="Ex: Tratamento de Canal, Implante..."
+                      value={newPaymentPlan.procedure}
+                      onChange={(e) => setNewPaymentPlan({...newPaymentPlan, procedure: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Valor Total (R$)</label>
+                      <input 
+                        required
+                        type="number" 
+                        step="0.01"
+                        placeholder="0,00"
+                        value={newPaymentPlan.total_amount}
+                        onChange={(e) => setNewPaymentPlan({...newPaymentPlan, total_amount: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nº de Parcelas</label>
+                      <select 
+                        required
+                        value={newPaymentPlan.installments_count}
+                        onChange={(e) => setNewPaymentPlan({...newPaymentPlan, installments_count: e.target.value})}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 10, 12, 18, 24].map(n => (
+                          <option key={n} value={n}>{n}x</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Data do Primeiro Vencimento</label>
+                    <input 
+                      required
+                      type="date" 
+                      value={newPaymentPlan.first_due_date}
+                      onChange={(e) => setNewPaymentPlan({...newPaymentPlan, first_due_date: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
+                    <button 
+                      type="button"
+                      onClick={() => setIsPaymentPlanModalOpen(false)}
+                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-1 px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
+                    >
+                      Criar Plano
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Recibo */}
+      <AnimatePresence>
+        {isReceiptModalOpen && selectedReceipt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsReceiptModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm no-print"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-2xl rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            >
+              <div className="p-8 md:p-12 bg-white text-slate-800 font-serif">
+                <div className="flex justify-between items-start mb-12 no-print">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+                      <Plus size={24} strokeWidth={3} />
+                    </div>
+                    <h1 className="text-xl font-bold tracking-tight text-slate-800">OdontoHub</h1>
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => window.print()}
+                      className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                      title="Imprimir"
+                    >
+                      <Printer size={20} />
+                    </button>
+                    <button 
+                      onClick={() => setIsReceiptModalOpen(false)}
+                      className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                      <Plus size={24} className="rotate-45" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-center mb-12">
+                  <h2 className="text-3xl font-bold uppercase tracking-widest border-b-2 border-slate-200 pb-4 inline-block px-12">Recibo</h2>
+                </div>
+
+                <div className="space-y-8 text-lg leading-relaxed">
+                  <p>
+                    Recebi de <span className="font-bold border-b border-slate-300 px-2">{selectedReceipt.patientName}</span>, 
+                    a importância de <span className="font-bold border-b border-slate-300 px-2">{selectedReceipt.amountFormatted}</span>, 
+                    referente ao procedimento de <span className="font-bold border-b border-slate-300 px-2">{selectedReceipt.procedure}</span>.
+                  </p>
+
+                  <div className="flex justify-between items-center py-4">
+                    <p>Forma de Pagamento: <span className="font-bold">{selectedReceipt.paymentMethod}</span></p>
+                    <p>Data: <span className="font-bold">{selectedReceipt.date}</span></p>
+                  </div>
+
+                  <div className="pt-16 flex flex-col items-center">
+                    <div className="w-64 border-t border-slate-400 mb-2"></div>
+                    <p className="font-bold text-xl">{selectedReceipt.dentistName}</p>
+                    <p className="text-slate-500 uppercase tracking-widest text-sm">CRO: {selectedReceipt.dentistCro || 'XXXXX'}</p>
+                  </div>
+
+                  <div className="pt-12 text-sm text-slate-400 text-center italic">
+                    <p>{selectedReceipt.clinicName}</p>
+                    <p>{selectedReceipt.clinicAddress}</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Modal de Novo Dentista */}
       <AnimatePresence>
         {isDentistModalOpen && (
@@ -3112,33 +3959,39 @@ export default function App() {
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
                       >
                         <option value="Dinheiro">Dinheiro</option>
+                        <option value="PIX">PIX</option>
                         <option value="Cartão de Crédito">Cartão de Crédito</option>
                         <option value="Cartão de Débito">Cartão de Débito</option>
-                        <option value="PIX">PIX</option>
                         <option value="Transferência">Transferência</option>
                       </select>
                     </div>
+
                     {transactionType === 'INCOME' && (
-                      <div className="col-span-2">
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Vincular Paciente (Opcional)</label>
-                        <select 
-                          value={newTransaction.patient_id}
-                          onChange={(e) => {
-                            const p = patients.find(p => p.id.toString() === e.target.value);
-                            setNewTransaction({
-                              ...newTransaction, 
-                              patient_id: e.target.value,
-                              patient_name: p?.name || ''
-                            });
-                          }}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                        >
-                          <option value="">Selecione um paciente...</option>
-                          {patients.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <>
+                        <div className="col-span-2">
+                          <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente (Opcional)</label>
+                          <select 
+                            value={newTransaction.patient_id}
+                            onChange={(e) => setNewTransaction({...newTransaction, patient_id: e.target.value})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                          >
+                            <option value="">Selecione um paciente</option>
+                            {patients.map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Procedimento (Opcional)</label>
+                          <input 
+                            type="text" 
+                            placeholder="Ex: Limpeza, Canal..."
+                            value={newTransaction.procedure}
+                            onChange={(e) => setNewTransaction({...newTransaction, procedure: e.target.value})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                          />
+                        </div>
+                      </>
                     )}
                     <div className="col-span-2">
                       <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Observações</label>

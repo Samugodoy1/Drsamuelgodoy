@@ -1,8 +1,36 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { query } from '../db.js';
-import bcrypt from 'bcryptjs';
+import { Request, Response } from 'express';
+import { query } from '../utils/db.js';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const getUsers = async (req: Request, res: Response) => {
+  try {
+    const result = await query('SELECT id, name, email, role, status FROM users ORDER BY id DESC');
+    return res.status(200).json(result.rows);
+  } catch (error: any) {
+    console.error('getUsers error:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+};
+
+export const updateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status, name, email } = req.body;
+  const adminUser = req.user!;
+
+  try {
+    if (status) {
+      await query('UPDATE users SET status = $1 WHERE id = $2', [status, id]);
+    } else if (name && email) {
+      await query('UPDATE users SET name = $1, email = $2 WHERE id = $3', [name, email, id]);
+    }
+    
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('updateUser error:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+};
+
+export const updateSchema = async (req: Request, res: Response) => {
   try {
     await query(`
       ALTER TABLE users 
@@ -68,6 +96,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         data TEXT NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS payment_plans (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        procedure TEXT NOT NULL,
+        total_amount DECIMAL(12, 2) NOT NULL,
+        installments_count INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS installments (
+        id SERIAL PRIMARY KEY,
+        payment_plan_id INTEGER NOT NULL REFERENCES payment_plans(id) ON DELETE CASCADE,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        number INTEGER NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        due_date DATE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        payment_date DATE,
+        transaction_id INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS installment_id INTEGER;
     `);
 
     // Hash default admin password if it exists and is plain text
@@ -75,7 +130,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (adminResult.rows.length > 0) {
       const admin = adminResult.rows[0];
       if (admin.password === 'admin123') {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const bcrypt = await import('bcryptjs');
+        const hashedPassword = await bcrypt.default.hash('admin123', 10);
         await query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, admin.id]);
       }
     }
@@ -85,4 +141,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Schema update error:', error);
     return res.status(500).json({ error: error.message });
   }
-}
+};

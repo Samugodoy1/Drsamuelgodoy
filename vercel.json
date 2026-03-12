@@ -1,11 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/auth/login", "destination": "/api/auth/login.ts" },
-    { "source": "/api/auth/register", "destination": "/api/auth/register.ts" },
-    { "source": "/api/patients/:id*", "destination": "/api/patients/index.ts" },
-    { "source": "/api/dentists/:id*", "destination": "/api/dentists/index.ts" },
-    { "source": "/api/appointments/:id*", "destination": "/api/appointments/index.ts" },
-    { "source": "/api/admin/users/:id*", "destination": "/api/admin/users.ts" },
-    { "source": "/api/files/:id*", "destination": "/api/files.ts" }
+    { "source": "/api/(.*)", "destination": "/api/index.ts" }
   ]
 }

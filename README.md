@@ -1,4 +1,4 @@
-# Projeto OdontoManager
+# Projeto OdontoHub
 
 Este é um projeto Full-Stack (React + Node.js/TypeScript) para gestão de clínicas odontológicas.
 
