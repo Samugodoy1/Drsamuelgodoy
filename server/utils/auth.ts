@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev-only';
+import { getJwtSecret } from './config.js';
 
 export interface AuthUser {
   id: number;
@@ -31,10 +30,14 @@ export function verifyToken(req: Request): AuthUser | null {
   if (!token || token === 'null' || token === 'undefined') return null;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
-    if (!decoded || !decoded.id) return null;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
+    if (!decoded || !decoded.id) {
+      console.warn('Token verification failed: Invalid payload');
+      return null;
+    }
     return decoded;
-  } catch (error) {
+  } catch (error: any) {
+    console.warn('Token verification failed:', error.message);
     return null;
   }
 }

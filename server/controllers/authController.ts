@@ -2,16 +2,7 @@ import { Request, Response } from 'express';
 import { query } from '../utils/db.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev-only';
-
-export const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: true, // Always secure for SameSite=None
-  sameSite: 'none' as const,
-  maxAge: 24 * 60 * 60 * 1000, // 24 hours
-  path: '/'
-};
+import { getJwtSecret, COOKIE_OPTIONS } from '../utils/config.js';
 
 async function logSecurityEvent(userId: number | null, eventType: string, description: string, req: Request) {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -73,12 +64,12 @@ export const login = async (req: Request, res: Response) => {
 
         const token = jwt.sign(
           { id: user.id, name: user.name, role: user.role },
-          JWT_SECRET,
+          getJwtSecret(),
           { expiresIn }
         );
 
         // Set secure cookie
-        res.setHeader('Set-Cookie', `auth_token=${token}; HttpOnly; ${COOKIE_OPTIONS.secure ? 'Secure;' : ''} SameSite=Strict; Max-Age=${maxAge / 1000}; Path=/`);
+        res.setHeader('Set-Cookie', `auth_token=${token}; HttpOnly; ${COOKIE_OPTIONS.secure ? 'Secure;' : ''} SameSite=${COOKIE_OPTIONS.sameSite}; Max-Age=${maxAge / 1000}; Path=/`);
 
         // Don't send password back
         const { password: _, ...userWithoutPassword } = user;

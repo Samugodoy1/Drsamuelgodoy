@@ -439,16 +439,16 @@ export default function App() {
     }
   };
 
-  const fetchData = async () => {
-    if (!user) return;
+  const fetchData = async (explicitToken?: string) => {
+    if (!user && !explicitToken) return;
     try {
       const [pRes, aRes, fRes, sRes, plRes, iRes] = await Promise.all([
-        apiFetch('/api/patients'),
-        apiFetch('/api/appointments'),
-        apiFetch('/api/finance'),
-        apiFetch('/api/finance/summary'),
-        apiFetch('/api/finance/payment-plans'),
-        apiFetch('/api/finance/installments')
+        apiFetch('/api/patients', { explicitToken }),
+        apiFetch('/api/appointments', { explicitToken }),
+        apiFetch('/api/finance', { explicitToken }),
+        apiFetch('/api/finance/summary', { explicitToken }),
+        apiFetch('/api/finance/payment-plans', { explicitToken }),
+        apiFetch('/api/finance/installments', { explicitToken })
       ]);
       
       const pData = await pRes.json();
@@ -663,6 +663,7 @@ export default function App() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
+        fetchData(data.token);
         if (data.user.role === 'DENTIST') {
           // No filter needed
         }
@@ -791,13 +792,16 @@ export default function App() {
   const todayAppointmentsCount = appointments.filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString()).length;
 
   const apiFetch = async (url: string, options: any = {}) => {
-    const token = localStorage.getItem('token');
-    const headers = {
+    const token = options.explicitToken || localStorage.getItem('token');
+    const headers: any = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       ...options.headers,
-      'Authorization': `Bearer ${token}`,
     };
+    
+    if (token && token !== 'null' && token !== 'undefined') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     
     const response = await fetch(url, { ...options, headers });
     if (response.status === 401) {
