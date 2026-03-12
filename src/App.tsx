@@ -300,7 +300,6 @@ export default function App() {
   const [newEvolution, setNewEvolution] = useState({ notes: '', procedure: '' });
   const [newDentist, setNewDentist] = useState({ name: '', email: '', password: '' });
   const [newImage, setNewImage] = useState({ url: '', description: '' });
-  const [patientFile, setPatientFile] = useState<File | null>(null);
   const [newAppointment, setNewAppointment] = useState({
     patient_id: '',
     dentist_id: '',
@@ -358,7 +357,6 @@ export default function App() {
   const [profile, setProfile] = useState<Dentist | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
-  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [confirmation, setConfirmation] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
@@ -421,30 +419,13 @@ export default function App() {
     if (!profile) return;
     setIsSavingProfile(true);
     try {
-      const formData = new FormData();
-      formData.append('name', profile.name);
-      formData.append('email', profile.email);
-      if (profile.phone) formData.append('phone', profile.phone);
-      if (profile.cro) formData.append('cro', profile.cro);
-      if (profile.specialty) formData.append('specialty', profile.specialty);
-      if (profile.bio) formData.append('bio', profile.bio);
-      if (profile.clinic_name) formData.append('clinic_name', profile.clinic_name);
-      if (profile.clinic_address) formData.append('clinic_address', profile.clinic_address);
-      if (profilePassword) formData.append('password', profilePassword);
-      if (profilePhotoFile) {
-        formData.append('photo', profilePhotoFile);
-      } else if (profile.photo_url) {
-        formData.append('photo_url', profile.photo_url);
-      }
-
       const res = await apiFetch('/api/profile', {
         method: 'POST',
-        body: formData
+        body: JSON.stringify({ ...profile, password: profilePassword })
       });
       if (res.ok) {
         showNotification('Perfil atualizado com sucesso!');
         setProfilePassword('');
-        setProfilePhotoFile(null);
         fetchProfile();
       } else {
         const data = await res.json();
@@ -461,7 +442,6 @@ export default function App() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setProfilePhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfile(prev => prev ? { ...prev, photo_url: reader.result as string } : null);
@@ -475,33 +455,30 @@ export default function App() {
     if (!file || !selectedPatient) return;
 
     try {
-      const formData = new FormData();
-      formData.append('photo', file);
-      // Append other patient fields to ensure they are not lost if the backend expects them
-      formData.append('name', selectedPatient.name);
-      formData.append('cpf', selectedPatient.cpf);
-      if (selectedPatient.phone) formData.append('phone', selectedPatient.phone);
-      if (selectedPatient.email) formData.append('email', selectedPatient.email);
-      if (selectedPatient.birth_date) formData.append('birth_date', selectedPatient.birth_date);
-      if (selectedPatient.address) formData.append('address', selectedPatient.address);
-
-      const res = await apiFetch(`/api/patients/${selectedPatient.id}`, {
-        method: 'PATCH',
-        body: formData
-      });
-      
-      if (res.ok) {
-        // Refresh patient data
-        openPatientRecord(selectedPatient.id);
-        fetchData(); // Refresh list
-        showNotification('Foto do paciente atualizada!');
-      } else {
-        const data = await res.json();
-        showNotification(data.error || 'Erro ao carregar foto do paciente.', 'error');
-      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        try {
+          await apiFetch(`/api/patients/${selectedPatient.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              ...selectedPatient,
+              photo_url: base64String
+            })
+          });
+          
+          // Refresh patient data
+          openPatientRecord(selectedPatient.id);
+          fetchData(); // Refresh list
+          showNotification('Foto do paciente atualizada!');
+        } catch (error) {
+          console.error('Error uploading patient photo:', error);
+          showNotification('Erro ao carregar foto do paciente.', 'error');
+        }
+      };
+      reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Error uploading patient photo:', error);
-      showNotification('Erro ao carregar foto do paciente.', 'error');
+      console.error('Error reading file:', error);
     }
   };
 
@@ -867,13 +844,9 @@ export default function App() {
     const token = options.explicitToken || localStorage.getItem('token');
     const headers: any = {
       'Accept': 'application/json',
+      'Content-Type': 'application/json',
       ...options.headers,
     };
-
-    // Only set Content-Type to application/json if body is not FormData
-    if (!(options.body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-    }
     
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -1002,7 +975,6 @@ export default function App() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPatientFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewImage({ ...newImage, url: reader.result as string });
@@ -1015,25 +987,9 @@ export default function App() {
     e.preventDefault();
     if (!selectedPatient) return;
     try {
-      const formData = new FormData();
-      if (patientFile) {
-        formData.append('file', patientFile);
-      } else if (newImage.url) {
-        formData.append('file_url', newImage.url);
-      }
-      formData.append('description', newImage.description);
-      formData.append('file_type', 'image');
-
-      const res = await apiFetch(`/api/patients/${selectedPatient.id}/files`, {
-        method: 'POST',
-        body: formData
-      });
-      if (res.ok) {
-        openPatientRecord(selectedPatient.id);
-        setIsImageModalOpen(false);
-        setNewImage({ url: '', description: '' });
-        setPatientFile(null);
-      }
+      await uploadFile(selectedPatient.id, newImage.url, newImage.description);
+      setIsImageModalOpen(false);
+      setNewImage({ url: '', description: '' });
     } catch (error) {
       console.error('Error uploading image:', error);
     }
@@ -1170,6 +1126,18 @@ export default function App() {
       window.open(url, '_blank');
     } catch (error) {
       console.error('Error sending reminder:', error);
+    }
+  };
+
+  const uploadFile = async (patientId: number, fileUrl: string, description: string) => {
+    try {
+      const res = await apiFetch(`/api/patients/${patientId}/files`, {
+        method: 'POST',
+        body: JSON.stringify({ file_url: fileUrl, file_type: 'image', description })
+      });
+      if (res.ok) openPatientRecord(patientId);
+    } catch (error) {
+      console.error('Error uploading file:', error);
     }
   };
 
