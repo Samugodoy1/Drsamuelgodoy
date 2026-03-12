@@ -52,7 +52,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
 // Health check
-app.get('/api/health', async (req, res) => {
+app.get('/health', async (req, res) => {
   try {
     const result = await query('SELECT NOW()');
     res.status(200).json({ status: 'ok', database: 'connected', time: result.rows[0].now });
@@ -62,54 +62,54 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Auth
-app.post('/api/auth/login', login);
-app.post('/api/auth/register', register);
+app.post('/auth/login', login);
+app.post('/auth/register', register);
 
 // Protected routes
 app.use(authenticate);
 
 // Patients
-app.get('/api/patients', getPatients);
-app.get('/api/patients/:id', getPatientById);
-app.post('/api/patients', createPatient);
-app.put('/api/patients/:id/anamnesis', updateAnamnesis);
-app.post('/api/patients/:id/evolution', addEvolution);
-app.post('/api/patients/:id/odontogram', updateOdontogram);
-app.post('/api/patients/:id/tooth-history', addToothHistory);
-app.post('/api/patients/:id/files', addPatientFile);
-app.get('/api/patients/:id/financial', getPatientFinancialHistory);
+app.get('/patients', getPatients);
+app.get('/patients/:id', getPatientById);
+app.post('/patients', createPatient);
+app.put('/patients/:id/anamnesis', updateAnamnesis);
+app.post('/patients/:id/evolution', addEvolution);
+app.post('/patients/:id/odontogram', updateOdontogram);
+app.post('/patients/:id/tooth-history', addToothHistory);
+app.post('/patients/:id/files', addPatientFile);
+app.get('/patients/:id/financial', getPatientFinancialHistory);
 
 // Appointments
-app.get('/api/appointments', getAppointments);
-app.post('/api/appointments', createAppointment);
-app.patch('/api/appointments/:id', updateAppointmentStatus);
-app.post('/api/appointments/:id/remind', remindAppointment);
+app.get('/appointments', getAppointments);
+app.post('/appointments', createAppointment);
+app.patch('/appointments/:id', updateAppointmentStatus);
+app.post('/appointments/:id/remind', remindAppointment);
 
 // Finance
-app.get('/api/finance', getTransactions);
-app.get('/api/finance/summary', getFinancialSummary);
-app.get('/api/finance/payment-plans', getPaymentPlans);
-app.post('/api/finance/payment-plans', createPaymentPlan);
-app.get('/api/finance/installments', getInstallments);
-app.post('/api/finance/installments/:id/pay', payInstallment);
-app.post('/api/finance', createTransaction);
-app.delete('/api/finance/:id', deleteTransaction);
+app.get('/finance', getTransactions);
+app.get('/finance/summary', getFinancialSummary);
+app.get('/finance/payment-plans', getPaymentPlans);
+app.post('/finance/payment-plans', createPaymentPlan);
+app.get('/finance/installments', getInstallments);
+app.patch('/finance/installments/:id/pay', payInstallment);
+app.post('/finance', createTransaction);
+app.delete('/finance/:id', deleteTransaction);
 
 // Dentists
-app.get('/api/dentists', getDentists);
-app.post('/api/dentists', createDentist);
-app.delete('/api/dentists/:id', deleteDentist);
+app.get('/dentists', getDentists);
+app.post('/dentists', createDentist);
+app.delete('/dentists/:id', deleteDentist);
 
 // Profile
-app.get('/api/profile', getProfile);
-app.post('/api/profile', updateProfile);
+app.get('/profile', getProfile);
+app.post('/profile', updateProfile);
 
 // Files
-app.delete('/api/files/:id', deleteFile);
+app.delete('/files/:id', deleteFile);
 
 // Admin
-app.get('/api/admin/users', requireAdmin, getUsers);
-app.patch('/api/admin/users/:id', requireAdmin, updateUser);
-app.all('/api/admin/update-schema', updateSchema);
+app.get('/admin/users', requireAdmin, getUsers);
+app.patch('/admin/users/:id', requireAdmin, updateUser);
+app.all('/admin/update-schema', updateSchema);
 
 export default app;

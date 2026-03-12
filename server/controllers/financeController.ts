@@ -5,10 +5,21 @@ export const getTransactions = async (req: Request, res: Response) => {
   const user = req.user!;
   try {
     const result = await query(
-      'SELECT * FROM transactions WHERE dentist_id = $1 ORDER BY date DESC, created_at DESC',
+      `SELECT t.*, p.name as patient_name_from_join 
+       FROM transactions t 
+       LEFT JOIN patients p ON t.patient_id = p.id 
+       WHERE t.dentist_id = $1 
+       ORDER BY t.date DESC, t.created_at DESC`,
       [user.id]
     );
-    return res.status(200).json(result.rows);
+    
+    // Map to ensure patient_name is populated from join if the column is null
+    const rows = result.rows.map(row => ({
+      ...row,
+      patient_name: row.patient_name || row.patient_name_from_join
+    }));
+    
+    return res.status(200).json(rows);
   } catch (error: any) {
     console.error('getTransactions error:', error);
     return res.status(500).json({ error: error.message });
@@ -17,7 +28,7 @@ export const getTransactions = async (req: Request, res: Response) => {
 
 export const createTransaction = async (req: Request, res: Response) => {
   const user = req.user!;
-  const { 
+  let { 
     type, 
     description, 
     category, 
@@ -32,6 +43,14 @@ export const createTransaction = async (req: Request, res: Response) => {
   } = req.body;
 
   try {
+    // If patient_id is provided but patient_name is not, fetch it
+    if (patient_id && !patient_name) {
+      const patientResult = await query('SELECT name FROM patients WHERE id = $1', [patient_id]);
+      if (patientResult.rows.length > 0) {
+        patient_name = patientResult.rows[0].name;
+      }
+    }
+
     const result = await query(
       `INSERT INTO transactions 
       (dentist_id, type, description, category, amount, payment_method, date, status, patient_id, patient_name, procedure, notes) 
@@ -88,7 +107,7 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
     );
 
     // Pagamentos recebidos hoje
-    const todayPayments = await query(
+    const todayRevenue = await query(
       "SELECT SUM(amount) as total FROM transactions WHERE dentist_id = $1 AND type = 'INCOME' AND date = $2",
       [user.id, today]
     );
@@ -107,11 +126,11 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       monthlyRevenue: parseFloat(monthlyRevenue.rows[0].total || 0),
-      todayPayments: parseFloat(todayPayments.rows[0].total || 0),
-      pendingCount: parseInt(pendingInstallments.rows[0].count || 0),
-      pendingTotal: parseFloat(pendingInstallments.rows[0].total || 0),
-      overdueCount: parseInt(overdueInstallments.rows[0].count || 0),
-      overdueTotal: parseFloat(overdueInstallments.rows[0].total || 0)
+      todayRevenue: parseFloat(todayRevenue.rows[0].total || 0),
+      pendingInstallmentsCount: parseInt(pendingInstallments.rows[0].count || 0),
+      pendingInstallmentsTotal: parseFloat(pendingInstallments.rows[0].total || 0),
+      overdueInstallmentsCount: parseInt(overdueInstallments.rows[0].count || 0),
+      overdueInstallmentsTotal: parseFloat(overdueInstallments.rows[0].total || 0)
     });
   } catch (error: any) {
     console.error('getFinancialSummary error:', error);
@@ -165,15 +184,20 @@ export const getPaymentPlans = async (req: Request, res: Response) => {
   const { patient_id } = req.query;
 
   try {
-    let sql = 'SELECT * FROM payment_plans WHERE dentist_id = $1';
+    let sql = `
+      SELECT pp.*, p.name as patient_name 
+      FROM payment_plans pp 
+      LEFT JOIN patients p ON pp.patient_id = p.id 
+      WHERE pp.dentist_id = $1
+    `;
     const params = [user.id];
 
     if (patient_id) {
-      sql += ' AND patient_id = $2';
+      sql += ' AND pp.patient_id = $2';
       params.push(patient_id as any);
     }
 
-    sql += ' ORDER BY created_at DESC';
+    sql += ' ORDER BY pp.created_at DESC';
     const result = await query(sql, params);
     return res.status(200).json(result.rows);
   } catch (error: any) {
@@ -187,7 +211,13 @@ export const getInstallments = async (req: Request, res: Response) => {
   const { patient_id, plan_id, status } = req.query;
 
   try {
-    let sql = 'SELECT i.*, p.procedure FROM installments i JOIN payment_plans p ON i.payment_plan_id = p.id WHERE i.dentist_id = $1';
+    let sql = `
+      SELECT i.*, i.number as installment_number, p.procedure, pt.name as patient_name 
+      FROM installments i 
+      JOIN payment_plans p ON i.payment_plan_id = p.id 
+      LEFT JOIN patients pt ON i.patient_id = pt.id
+      WHERE i.dentist_id = $1
+    `;
     const params = [user.id];
 
     if (patient_id) {

@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser';
 
 // Import the unified API app
 import apiApp from './api/index.js';
+import { initDb } from './server/utils/initDb.js';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  await initDb();
   const app = express();
   const PORT = 3000;
   
@@ -40,7 +42,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Mount the unified API
-  app.use(apiApp);
+  app.use('/api', apiApp);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {

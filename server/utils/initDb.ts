@@ -1,0 +1,122 @@
+import { query } from './db.js';
+
+export async function initDb() {
+  console.log('Initializing database schema...');
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'DENTIST',
+        status TEXT NOT NULL DEFAULT 'pending',
+        phone TEXT,
+        cro TEXT,
+        specialty TEXT,
+        bio TEXT,
+        photo_url TEXT,
+        clinic_name TEXT,
+        clinic_address TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS patients (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        cpf TEXT UNIQUE,
+        birth_date DATE,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        type TEXT NOT NULL CHECK (type IN ('INCOME', 'EXPENSE')),
+        description TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        payment_method TEXT NOT NULL,
+        date DATE NOT NULL DEFAULT CURRENT_DATE,
+        status TEXT NOT NULL DEFAULT 'PAID',
+        patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+        patient_name TEXT,
+        procedure TEXT,
+        notes TEXT,
+        installment_id INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        ip_address TEXT,
+        attempted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        success BOOLEAN DEFAULT FALSE
+      );
+
+      CREATE TABLE IF NOT EXISTS security_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        event_type TEXT NOT NULL,
+        description TEXT,
+        ip_address TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS tooth_history (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        tooth_number INTEGER NOT NULL,
+        procedure TEXT NOT NULL,
+        notes TEXT,
+        date DATE NOT NULL DEFAULT CURRENT_DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS odontograms (
+        patient_id INTEGER PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE,
+        data TEXT NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS payment_plans (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        procedure TEXT NOT NULL,
+        total_amount DECIMAL(12, 2) NOT NULL,
+        installments_count INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS installments (
+        id SERIAL PRIMARY KEY,
+        payment_plan_id INTEGER NOT NULL REFERENCES payment_plans(id) ON DELETE CASCADE,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        number INTEGER NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        due_date DATE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        payment_date DATE,
+        transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Bootstrap default admin if not exists
+      -- Password is 'admin123' hashed
+      INSERT INTO users (name, email, password, role, status)
+      SELECT 'Administrador', 'admin@clinica.com', '$2a$10$X/Vl/Xz6f9m1n9n9n9n9n9n9n9n9n9n9n9n9n9n9n9n9n9n9n9n9', 'ADMIN', 'active'
+      WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@clinica.com');
+    `);
+    console.log('Database schema initialized successfully.');
+  } catch (error) {
+    console.error('Failed to initialize database schema:', error);
+  }
+}

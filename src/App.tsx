@@ -28,7 +28,9 @@ import {
   Sun,
   Moon,
   Printer,
-  Download
+  Download,
+  X,
+  List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -271,7 +273,7 @@ export default function App() {
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [loginData, setLoginData] = useState({ email: '', password: '', rememberMe: false });
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
   const [isRegistering, setIsRegistering] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -312,6 +314,11 @@ export default function App() {
   });
 
   const [isPaymentPlanModalOpen, setIsPaymentPlanModalOpen] = useState(false);
+  const [isReceiveInstallmentModalOpen, setIsReceiveInstallmentModalOpen] = useState(false);
+  const [isViewInstallmentsModalOpen, setIsViewInstallmentsModalOpen] = useState(false);
+  const [selectedInstallment, setSelectedInstallment] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({
@@ -467,10 +474,17 @@ export default function App() {
   const handleCreatePaymentPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const patientId = selectedPatient ? selectedPatient.id : newPaymentPlan.patient_id;
+      if (!patientId) {
+        alert('Selecione um paciente');
+        return;
+      }
+
       const res = await apiFetch('/api/finance/payment-plans', {
         method: 'POST',
         body: JSON.stringify({
           ...newPaymentPlan,
+          patient_id: patientId,
           total_amount: parseFloat(newPaymentPlan.total_amount),
           installments_count: parseInt(newPaymentPlan.installments_count)
         })
@@ -500,7 +514,7 @@ export default function App() {
   const handlePayInstallment = async (id: number, method: string) => {
     try {
       const res = await apiFetch(`/api/finance/installments/${id}/pay`, {
-        method: 'POST',
+        method: 'PATCH',
         body: JSON.stringify({
           payment_method: method,
           payment_date: new Date().toISOString().split('T')[0]
@@ -508,6 +522,8 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        setIsReceiveInstallmentModalOpen(false);
+        setIsViewInstallmentsModalOpen(false);
         fetchData();
         if (selectedPatient) {
           fetchPatientFinancialHistory(selectedPatient.id);
@@ -537,10 +553,10 @@ export default function App() {
     }
   };
 
-  const generateReceipt = (transaction: Transaction) => {
+  const generateReceipt = (transaction: any) => {
     const dentist = adminUsers.find(u => u.id === transaction.dentist_id) || profile;
     setSelectedReceipt({
-      patientName: transaction.patient_name || 'Paciente não identificado',
+      patientName: transaction.patient_name || transaction.patientName || (transaction.patient && transaction.patient.name) || 'Paciente não identificado',
       amount: transaction.amount,
       amountFormatted: Number(transaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
       procedure: transaction.procedure || transaction.description,
@@ -562,7 +578,8 @@ export default function App() {
         body: JSON.stringify({
           ...newTransaction,
           type: transactionType,
-          amount: parseFloat(newTransaction.amount)
+          amount: parseFloat(newTransaction.amount),
+          patient_id: newTransaction.patient_id ? parseInt(newTransaction.patient_id) : null
         })
       });
       if (res.ok) {
@@ -756,12 +773,15 @@ export default function App() {
     return d >= startOfWeek && d <= endOfWeek;
   }).length;
 
-  const dailyRevenue = transactions
-    .filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'INCOME' && d.toDateString() === dashboardNow.toDateString();
-    })
-    .reduce((acc, t) => acc + Number(t.amount), 0);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dailyRevenue = financialSummary?.todayRevenue !== undefined 
+    ? financialSummary.todayRevenue 
+    : transactions
+        .filter(t => {
+          const tDate = t.date?.split('T')[0];
+          return t.type === 'INCOME' && tDate === todayStr;
+        })
+        .reduce((acc, t) => acc + Number(t.amount), 0);
 
   const nextAppointments = appointments
     .filter(a => new Date(a.start_time) >= dashboardNow)
@@ -1170,6 +1190,21 @@ export default function App() {
                 </div>
               </div>
 
+              {!isRegistering && (
+                <div className="flex items-center">
+                  <input 
+                    id="remember-me"
+                    type="checkbox" 
+                    checked={loginData.rememberMe}
+                    onChange={(e) => setLoginData({...loginData, rememberMe: e.target.checked})}
+                    className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 font-medium cursor-pointer">
+                    Lembrar de mim
+                  </label>
+                </div>
+              )}
+
               {loginError && (
                 <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
                   <AlertCircle size={18} />
@@ -1211,7 +1246,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative">
+    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -1276,7 +1311,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full max-w-full print:p-0">
-        <header className="flex flex-col desktop:flex-row desktop:justify-between desktop:items-center gap-6 mb-8 md:mb-10 no-print">
+        <header className="w-full max-w-screen-xl mx-auto px-0 md:px-4 flex flex-col desktop:flex-row desktop:justify-between desktop:items-center gap-6 mb-8 md:mb-10 no-print">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button 
@@ -1302,7 +1337,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full desktop:w-auto">
             <div className="hidden sm:flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
               <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold">
                 {user?.name?.charAt(0)}
@@ -1325,7 +1360,7 @@ export default function App() {
             </div>
             <button 
               onClick={() => setIsPatientModalOpen(true)}
-              className="hidden sm:flex bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+              className="flex bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95 w-full sm:w-auto"
             >
               <Plus size={20} />
               Novo Paciente
@@ -1340,6 +1375,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
+            className="w-full max-w-screen-xl mx-auto px-0 md:px-4"
           >
             {searchTerm && activeTab !== 'pacientes' && (
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
@@ -1907,22 +1943,22 @@ export default function App() {
 
             {activeTab === 'pacientes' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <h3 className="text-2xl font-bold text-slate-900">Gestão de Pacientes</h3>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <button 
                       onClick={() => {
                         setExportType('patients');
                         setIsExportModalOpen(true);
                       }}
-                      className="bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center gap-2"
+                      className="bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                       <Download size={18} />
                       Exportar
                     </button>
                     <button 
                       onClick={() => setIsPatientModalOpen(true)}
-                      className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+                      className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                       <Plus size={18} />
                       Novo Paciente
@@ -2393,8 +2429,8 @@ export default function App() {
                             {/* Recent Transactions */}
                             <div className="space-y-4">
                               <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pagamentos Recentes</h5>
-                              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-                                <table className="w-full text-left text-sm">
+                              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden overflow-x-auto">
+                                <table className="w-full text-left text-sm min-w-[500px]">
                                   <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">
                                     <tr>
                                       <th className="px-4 py-3">Data</th>
@@ -2474,11 +2510,11 @@ export default function App() {
                 {financeSubTab === 'transacoes' ? (
                   <>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                         <select 
                           value={financeFilter.period}
                           onChange={(e) => setFinanceFilter({...financeFilter, period: e.target.value})}
-                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20 w-full sm:w-auto"
                         >
                           <option value="day">Hoje</option>
                           <option value="week">Últimos 7 dias</option>
@@ -2488,7 +2524,7 @@ export default function App() {
                         <select 
                           value={financeFilter.type}
                           onChange={(e) => setFinanceFilter({...financeFilter, type: e.target.value})}
-                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20 w-full sm:w-auto"
                         >
                           <option value="all">Todos os Tipos</option>
                           <option value="INCOME">Receitas</option>
@@ -2497,7 +2533,7 @@ export default function App() {
                         <select 
                           value={financeFilter.category}
                           onChange={(e) => setFinanceFilter({...financeFilter, category: e.target.value})}
-                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-500/20 w-full sm:w-auto"
                         >
                           <option value="all">Todas Categorias</option>
                           <option value="Procedimentos">Procedimentos</option>
@@ -2510,13 +2546,13 @@ export default function App() {
                           <option value="Outros">Outros</option>
                         </select>
                       </div>
-                      <div className="flex gap-3 w-full sm:w-auto">
+                      <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                         <button 
                           onClick={() => {
                             setExportType('finance');
                             setIsExportModalOpen(true);
                           }}
-                          className="flex-1 sm:flex-none bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                          className="flex-1 sm:flex-none bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
                         >
                           <Download size={18} />
                           Exportar
@@ -2526,7 +2562,7 @@ export default function App() {
                             setTransactionType('EXPENSE');
                             setIsTransactionModalOpen(true);
                           }}
-                          className="flex-1 sm:flex-none bg-rose-50 text-rose-600 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
+                          className="flex-1 sm:flex-none bg-rose-50 text-rose-600 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
                         >
                           <Plus size={18} />
                           Despesa
@@ -2536,7 +2572,7 @@ export default function App() {
                             setTransactionType('INCOME');
                             setIsTransactionModalOpen(true);
                           }}
-                          className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+                          className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
                         >
                           <Plus size={18} />
                           Receita
@@ -2686,57 +2722,58 @@ export default function App() {
                   </>
                 ) : (
                   <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                         <p className="text-xs font-bold text-slate-400 uppercase mb-2">Total a Receber</p>
                         <h4 className="text-xl font-bold text-slate-800">
-                          {financialSummary.pendingInstallmentsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {(financialSummary?.pendingInstallmentsTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </h4>
-                        <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase">{financialSummary.pendingInstallmentsCount} parcelas pendentes</p>
+                        <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase">{financialSummary?.pendingInstallmentsCount || 0} parcelas pendentes</p>
                       </div>
                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                         <p className="text-xs font-bold text-slate-400 uppercase mb-2">Total em Atraso</p>
                         <h4 className="text-xl font-bold text-rose-600">
-                          {financialSummary.overdueInstallmentsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {(financialSummary?.overdueInstallmentsTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </h4>
-                        <p className="text-[10px] text-rose-500 font-bold mt-1 uppercase">{financialSummary.overdueInstallmentsCount} parcelas atrasadas</p>
+                        <p className="text-[10px] text-rose-500 font-bold mt-1 uppercase">{financialSummary?.overdueInstallmentsCount || 0} parcelas atrasadas</p>
                       </div>
                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                         <p className="text-xs font-bold text-slate-400 uppercase mb-2">Recebido Hoje</p>
                         <h4 className="text-xl font-bold text-emerald-600">
-                          {financialSummary.todayPayments.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {(financialSummary?.todayRevenue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </h4>
                         <p className="text-[10px] text-emerald-500 font-bold mt-1 uppercase">Pagamentos confirmados</p>
                       </div>
                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                         <p className="text-xs font-bold text-slate-400 uppercase mb-2">Receita Mensal</p>
                         <h4 className="text-xl font-bold text-blue-600">
-                          {financialSummary.monthlyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {(financialSummary?.monthlyRevenue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </h4>
                         <p className="text-[10px] text-blue-500 font-bold mt-1 uppercase">Mês atual</p>
                       </div>
                     </div>
 
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                      <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h3 className="font-bold text-slate-800">Planos de Parcelamento Ativos</h3>
                         <button 
                           onClick={() => setIsPaymentPlanModalOpen(true)}
-                          className="text-xs font-bold text-emerald-600 flex items-center gap-1 hover:underline"
+                          className="text-xs font-bold text-emerald-600 flex items-center gap-1 hover:underline w-full sm:w-auto justify-center sm:justify-start py-2 sm:py-0 border sm:border-0 border-emerald-100 rounded-lg sm:rounded-none"
                         >
                           <Plus size={14} /> Novo Plano
                         </button>
                       </div>
                       
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                      <div className="hidden md:block w-full overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[700px]">
                           <thead>
                             <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
                               <th className="px-6 py-4">Paciente</th>
-                              <th className="px-6 py-4">Procedimento</th>
-                              <th className="px-6 py-4">Progresso</th>
+                              <th className="px-6 py-4 hidden md:table-cell">Procedimento</th>
+                              <th className="px-6 py-4 hidden sm:table-cell">Progresso</th>
                               <th className="px-6 py-4 text-right">Valor Total</th>
-                              <th className="px-6 py-4">Status</th>
+                              <th className="px-6 py-4 hidden md:table-cell">Status</th>
+                              <th className="px-6 py-4 text-center">Ações</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -2746,10 +2783,12 @@ export default function App() {
                               const progress = (paidCount / plan.installments_count) * 100;
                               
                               return (
-                                <tr key={plan.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-6 py-4 font-bold text-slate-800">{plan.patient_name}</td>
-                                  <td className="px-6 py-4 text-sm text-slate-600">{plan.procedure}</td>
-                                  <td className="px-6 py-4">
+                                  <tr key={plan.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-4 font-bold text-slate-800 break-words">
+                                      {plan.patient?.name || plan.patient_name || "Paciente não identificado"}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-slate-600 break-words hidden md:table-cell">{plan.procedure}</td>
+                                  <td className="px-6 py-4 hidden sm:table-cell">
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                       <div className="bg-emerald-500 h-full transition-all" style={{ width: `${progress}%` }} />
                                     </div>
@@ -2758,23 +2797,127 @@ export default function App() {
                                   <td className="px-6 py-4 text-right font-bold text-slate-700">
                                     {Number(plan.total_amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                   </td>
-                                  <td className="px-6 py-4">
+                                  <td className="px-6 py-4 hidden md:table-cell">
                                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                                       plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
                                     }`}>
                                       {plan.status === 'COMPLETED' ? 'Concluído' : 'Em Aberto'}
                                     </span>
                                   </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <div className="flex justify-center gap-2">
+                                      <button 
+                                        onClick={() => {
+                                          const nextInstallment = planInstallments.find(i => i.status === 'PENDING');
+                                          if (nextInstallment) {
+                                            setSelectedInstallment({...nextInstallment, procedure: plan.procedure, patient_name: plan.patient_name});
+                                            setIsReceiveInstallmentModalOpen(true);
+                                          } else {
+                                            alert('Todas as parcelas deste plano já foram pagas.');
+                                          }
+                                        }}
+                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                        title="Receber Parcela"
+                                      >
+                                        <DollarSign size={16} />
+                                      </button>
+                                      <button 
+                                        onClick={() => {
+                                          setSelectedPlan(plan);
+                                          setIsViewInstallmentsModalOpen(true);
+                                        }}
+                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Ver Parcelas"
+                                      >
+                                        <ClipboardList size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
                                 </tr>
                               );
                             })}
                             {paymentPlans.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">Nenhum plano de parcelamento encontrado.</td>
+                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">Nenhum plano de parcelamento encontrado.</td>
                               </tr>
                             )}
                           </tbody>
                         </table>
+                      </div>
+
+                      {/* Mobile Card View */}
+                      <div className="md:hidden p-4 space-y-3 bg-slate-50/50">
+                        {paymentPlans.map(plan => {
+                          const planInstallments = installments.filter(i => i.payment_plan_id === plan.id);
+                          const paidCount = planInstallments.filter(i => i.status === 'PAID').length;
+                          const progress = (paidCount / plan.installments_count) * 100;
+                          
+                          return (
+                            <div key={plan.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="max-w-[70%]">
+                                  <p className="font-bold text-slate-800 leading-tight mb-1">{plan.patient?.name || plan.patient_name || "Paciente não identificado"}</p>
+                                  <p className="text-xs text-slate-500 truncate">{plan.procedure}</p>
+                                </div>
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap ${
+                                  plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {plan.status === 'COMPLETED' ? 'Concluído' : 'Em Aberto'}
+                                </span>
+                              </div>
+                              
+                              <div className="mb-4">
+                                <div className="flex justify-between items-center mb-1">
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase">Progresso</p>
+                                  <p className="text-[10px] font-bold text-slate-600">{paidCount}/{plan.installments_count} parcelas</p>
+                                </div>
+                                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                  <div className="bg-emerald-500 h-full transition-all" style={{ width: `${progress}%` }} />
+                                </div>
+                              </div>
+                              
+                              <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                                <div>
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold">Valor Total</p>
+                                  <p className="font-bold text-slate-700">
+                                    {Number(plan.total_amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => {
+                                      const nextInstallment = planInstallments.find(i => i.status === 'PENDING');
+                                      if (nextInstallment) {
+                                        setSelectedInstallment({...nextInstallment, procedure: plan.procedure, patient_name: plan.patient_name});
+                                        setIsReceiveInstallmentModalOpen(true);
+                                      } else {
+                                        alert('Todas as parcelas deste plano já foram pagas.');
+                                      }
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors"
+                                  >
+                                    <DollarSign size={14} />
+                                    Receber
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedPlan(plan);
+                                      setIsViewInstallmentsModalOpen(true);
+                                    }}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
+                                  >
+                                    <ClipboardList size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {paymentPlans.length === 0 && (
+                          <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-200">
+                            <p className="text-slate-400 text-sm italic">Nenhum plano de parcelamento encontrado.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2783,7 +2926,7 @@ export default function App() {
             )}
 
             {(activeTab === 'admin' && user?.role?.toUpperCase() === 'ADMIN') && (
-              <div className="max-w-6xl mx-auto space-y-8">
+              <div className="max-w-screen-xl mx-auto space-y-8">
                 {/* Painel de Aprovação */}
                 {adminUsers.filter(u => u.status === 'pending').length > 0 && (
                   <div className="bg-amber-50 p-4 md:p-8 rounded-3xl border border-amber-100 shadow-sm">
@@ -2973,7 +3116,7 @@ export default function App() {
             )}
 
             {activeTab === 'configuracoes' && profile && (
-              <div className="max-w-4xl mx-auto space-y-8">
+              <div className="max-w-screen-xl mx-auto space-y-8">
                 <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
                   <div className="flex flex-col items-center mb-10">
                     <div className="relative group">
@@ -3526,9 +3669,16 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleCreatePaymentPlan} className="space-y-4">
-                  {!newPaymentPlan.patient_id && (
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                    {selectedPatient ? (
+                      <input 
+                        readOnly
+                        type="text"
+                        value={selectedPatient.name}
+                        className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed"
+                      />
+                    ) : (
                       <select 
                         required
                         value={newPaymentPlan.patient_id}
@@ -3540,8 +3690,8 @@ export default function App() {
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Procedimento / Tratamento</label>
@@ -3875,9 +4025,9 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="p-8">
+              <div className="p-8 overflow-y-auto">
                 <div className="flex justify-between items-center mb-8">
                   <div>
                     <h3 className="text-2xl font-bold text-slate-900">
@@ -4029,8 +4179,186 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Modal: Receber Parcela */}
+      <AnimatePresence>
+        {isReceiveInstallmentModalOpen && selectedInstallment && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                    <DollarSign size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Receber Parcela</h3>
+                    <p className="text-xs text-slate-500">Confirme o recebimento do pagamento</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsReceiveInstallmentModalOpen(false)}
+                  className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6 overflow-y-auto">
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">Paciente</span>
+                    <span className="text-sm font-semibold text-slate-700">{selectedPatient?.name || selectedInstallment.patient_name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">Procedimento</span>
+                    <span className="text-sm font-semibold text-slate-700">{selectedInstallment.procedure || selectedInstallment.procedure_name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">Parcela</span>
+                    <span className="text-sm font-semibold text-slate-700">{selectedInstallment.installment_number}</span>
+                  </div>
+                  <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                    <span className="text-sm font-bold text-slate-800">Valor</span>
+                    <span className="text-lg font-bold text-emerald-600">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedInstallment.amount)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Forma de Pagamento</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Dinheiro', 'Pix', 'Cartão de Crédito', 'Cartão de Débito'].map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setPaymentMethod(method)}
+                        className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                          paymentMethod === method
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setIsReceiveInstallmentModalOpen(false)}
+                    className="flex-1 py-3 px-4 text-slate-600 font-bold hover:bg-slate-50 rounded-xl transition-colors border border-slate-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handlePayInstallment(selectedInstallment.id, paymentMethod)}
+                    className="flex-1 py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Ver Parcelas */}
+      <AnimatePresence>
+        {isViewInstallmentsModalOpen && selectedPlan && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                    <List size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Parcelas do Plano</h3>
+                    <p className="text-xs text-slate-500">{selectedPlan.procedure} - {selectedPatient?.name || selectedPlan.patient_name}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsViewInstallmentsModalOpen(false)}
+                  className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left py-3 text-xs font-bold text-slate-400 uppercase">Parcela</th>
+                        <th className="text-left py-3 text-xs font-bold text-slate-400 uppercase">Valor</th>
+                        <th className="text-left py-3 text-xs font-bold text-slate-400 uppercase">Vencimento</th>
+                        <th className="text-left py-3 text-xs font-bold text-slate-400 uppercase">Status</th>
+                        <th className="text-right py-3 text-xs font-bold text-slate-400 uppercase">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {installments
+                        .filter(inst => inst.payment_plan_id === selectedPlan.id)
+                        .sort((a, b) => a.installment_number - b.installment_number)
+                        .map((inst) => (
+                          <tr key={inst.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-4 text-sm font-medium text-slate-700">{inst.installment_number}ª</td>
+                            <td className="py-4 text-sm font-bold text-slate-900">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(inst.amount)}
+                            </td>
+                            <td className="py-4 text-sm text-slate-500">
+                              {new Date(inst.due_date).toLocaleDateString('pt-BR')}
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                inst.status === 'PAID'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : new Date(inst.due_date) < new Date()
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {inst.status === 'PAID' ? 'Pago' : new Date(inst.due_date) < new Date() ? 'Atrasado' : 'Pendente'}
+                              </span>
+                            </td>
+                            <td className="py-4 text-right">
+                              {inst.status === 'PENDING' && (
+                                  <button
+                                    onClick={() => {
+                                      setIsViewInstallmentsModalOpen(false);
+                                      setSelectedInstallment(inst);
+                                      setIsReceiveInstallmentModalOpen(true);
+                                    }}
+                                    className="text-emerald-600 hover:text-emerald-700 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
+                                  >
+                                  Receber
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Floating Action Button (Mobile) */}
-      <div className="fixed bottom-6 right-6 z-40 lg:hidden flex flex-col gap-3">
+      <div className="fixed bottom-20 md:bottom-8 right-6 z-40 lg:hidden hidden md:flex flex-col gap-3">
         <button 
           onClick={() => setIsModalOpen(true)}
           className="w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform"

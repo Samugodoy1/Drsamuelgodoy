@@ -26,7 +26,7 @@ async function logSecurityEvent(userId: number | null, eventType: string, descri
 }
 
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, rememberMe } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email e senha são obrigatórios' });
@@ -67,14 +67,18 @@ export const login = async (req: Request, res: Response) => {
         await query('INSERT INTO login_attempts (email, ip_address, success) VALUES ($1, $2, TRUE)', [email, ip]);
         await logSecurityEvent(user.id, 'LOGIN_SUCCESS', `Login bem-sucedido: ${email}`, req);
 
+        // Adjust expiration based on rememberMe
+        const expiresIn = rememberMe ? '30d' : '24h';
+        const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
         const token = jwt.sign(
           { id: user.id, name: user.name, role: user.role },
           JWT_SECRET,
-          { expiresIn: '24h' }
+          { expiresIn }
         );
 
         // Set secure cookie
-        res.setHeader('Set-Cookie', `auth_token=${token}; HttpOnly; ${COOKIE_OPTIONS.secure ? 'Secure;' : ''} SameSite=Strict; Max-Age=${COOKIE_OPTIONS.maxAge / 1000}; Path=/`);
+        res.setHeader('Set-Cookie', `auth_token=${token}; HttpOnly; ${COOKIE_OPTIONS.secure ? 'Secure;' : ''} SameSite=Strict; Max-Age=${maxAge / 1000}; Path=/`);
 
         // Don't send password back
         const { password: _, ...userWithoutPassword } = user;
