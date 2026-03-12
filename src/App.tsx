@@ -660,9 +660,9 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        setUser(data.user);
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
         if (data.user.role === 'DENTIST') {
           // No filter needed
         }

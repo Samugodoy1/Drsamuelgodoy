@@ -28,10 +28,11 @@ export function verifyToken(req: Request): AuthUser | null {
     token = req.cookies.auth_token;
   }
 
-  if (!token) return null;
+  if (!token || token === 'null' || token === 'undefined') return null;
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    if (!decoded || !decoded.id) return null;
     return decoded;
   } catch (error) {
     return null;

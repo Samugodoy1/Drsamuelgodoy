@@ -7,8 +7,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev-only';
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  secure: true, // Always secure for SameSite=None
+  sameSite: 'none' as const,
   maxAge: 24 * 60 * 60 * 1000, // 24 hours
   path: '/'
 };

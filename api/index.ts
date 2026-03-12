@@ -1,5 +1,9 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 import { login, register } from '../server/controllers/authController.js';
 import { 
   getPatients, 
