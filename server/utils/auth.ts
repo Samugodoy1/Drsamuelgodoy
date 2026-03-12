@@ -19,15 +19,24 @@ declare global {
 
 export function verifyToken(req: Request): AuthUser | null {
   const authHeader = req.headers.authorization;
+  const customHeader = req.headers['x-auth-token'];
   let token = null;
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.split(' ')[1];
+  if (authHeader) {
+    if (authHeader.toLowerCase().startsWith('bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else {
+      token = authHeader;
+    }
+  } else if (customHeader) {
+    token = customHeader as string;
   } else if (req.cookies && req.cookies.auth_token) {
     token = req.cookies.auth_token;
   }
 
-  if (!token || token === 'null' || token === 'undefined') return null;
+  if (!token || token === 'null' || token === 'undefined' || token === '[object Object]') {
+    return null;
+  }
 
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
@@ -45,7 +54,9 @@ export function verifyToken(req: Request): AuthUser | null {
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const user = verifyToken(req);
   if (!user) {
-    if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    const isHtml = req.headers.accept && req.headers.accept.includes('text/html');
+    
+    if (isHtml) {
       return res.status(401).send(`
         <html>
           <head>
@@ -67,7 +78,17 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
         </html>
       `);
     }
-    return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
+    
+    // Check why it failed for debugging
+    const authHeader = req.headers.authorization;
+    const customHeader = req.headers['x-auth-token'];
+    const hasCookie = !!(req.cookies && req.cookies.auth_token);
+    const reason = (!authHeader && !customHeader && !hasCookie) ? 'no_token' : 'invalid_token';
+
+    return res.status(401).json({ 
+      error: 'Não autorizado. Faça login novamente.',
+      debug: reason
+    });
   }
   req.user = user;
   next();

@@ -801,10 +801,17 @@ export default function App() {
     
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
+      headers['x-auth-token'] = token;
     }
     
     const response = await fetch(url, { ...options, headers });
     if (response.status === 401) {
+      try {
+        const errorData = await response.json();
+        console.warn('Auth error details:', errorData);
+      } catch (e) {
+        // Not JSON
+      }
       handleLogout();
     }
     return response;
