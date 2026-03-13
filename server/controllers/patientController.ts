@@ -154,7 +154,7 @@ export const addToothHistory = async (req: Request, res: Response) => {
 
     await query(
       'INSERT INTO tooth_history (patient_id, dentist_id, tooth_number, procedure, notes, date) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, user.id, tooth_number, procedure, notes, date || new Date()]
+      [id, user.id, tooth_number, procedure, notes, date || new Date().toISOString().split('T')[0]]
     );
     return res.status(201).json({ success: true });
   } catch (error: any) {

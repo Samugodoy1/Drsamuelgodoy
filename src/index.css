@@ -8,27 +8,67 @@
 
 @layer utilities {
   @media print {
+    /* Force colors and backgrounds */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
     .no-print {
       display: none !important;
     }
+    
     body {
       background: white !important;
       margin: 0 !important;
       padding: 0 !important;
     }
-    main {
-      padding: 0 !important;
-      margin: 0 !important;
+
+    /* Hide all elements by default using visibility to allow selective showing */
+    body * {
+      visibility: hidden;
+    }
+
+    /* Show only the receipt content and its children */
+    .receipt-content, .receipt-content * {
+      visibility: visible;
+    }
+
+    /* Position and style the receipt content for a clean print */
+    .receipt-content {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
       width: 100% !important;
-      display: block !important;
-      overflow: visible !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 40px !important;
+      box-shadow: none !important;
+      border: none !important;
+      background: white !important;
+      visibility: visible !important;
     }
-    .print-only {
+
+    /* Ensure the modal overlay doesn't interfere with printing */
+    .receipt-modal-overlay {
+      position: static !important;
       display: block !important;
+      padding: 0 !important;
+      background: none !important;
+      backdrop-filter: none !important;
+      visibility: visible !important;
     }
+
     /* Hide scrollbars on print */
     ::-webkit-scrollbar {
       display: none;
+    }
+
+    /* Page breaks */
+    .receipt-content {
+      page-break-after: avoid;
+      page-break-before: avoid;
     }
   }
 }

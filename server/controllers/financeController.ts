@@ -156,7 +156,8 @@ export const createPaymentPlan = async (req: Request, res: Response) => {
     const installmentAmount = (total_amount / installments_count).toFixed(2);
     
     const installments = [];
-    let currentDate = new Date(first_due_date);
+    // Parse date as UTC to avoid timezone shifts
+    let currentDate = new Date(first_due_date + 'T12:00:00Z');
 
     for (let i = 1; i <= installments_count; i++) {
       const result = await query(
@@ -166,8 +167,8 @@ export const createPaymentPlan = async (req: Request, res: Response) => {
       );
       installments.push(result.rows[0]);
       
-      // Add one month for next installment
-      currentDate.setMonth(currentDate.getMonth() + 1);
+      // Add one month for next installment using UTC methods
+      currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
     }
 
     await query('COMMIT');

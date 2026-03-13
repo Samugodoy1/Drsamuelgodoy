@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, History, Save, X, Info } from 'lucide-react';
+import { formatDate } from '../utils/dateUtils';
 
 export type ToothStatus = 
   | 'healthy' 
@@ -261,7 +262,7 @@ export const Odontogram: React.FC<OdontogramProps> = ({
                           <p className="text-[10px] text-slate-400 mt-2 uppercase font-bold">Dentista: {record.dentist_name || 'Não informado'}</p>
                         </div>
                         <span className="text-xs font-mono text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
-                          {new Date(record.date).toLocaleDateString('pt-BR')}
+                          {formatDate(record.date)}
                         </span>
                       </div>
                     ))}

@@ -57,7 +57,7 @@ export async function initDb() {
         id SERIAL PRIMARY KEY,
         patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
         dentist_id INTEGER NOT NULL REFERENCES users(id),
-        date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        date DATE DEFAULT CURRENT_DATE,
         notes TEXT,
         procedure_performed TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

@@ -37,6 +37,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
+import { formatDate, isOverdue } from './utils/dateUtils';
 
 // Types
 interface Patient {
@@ -181,11 +182,11 @@ export default function App() {
       'Nome Completo': p.name,
       'Telefone': p.phone,
       'Email': p.email,
-      'Data de Nascimento': p.birth_date || '',
+      'Data de Nascimento': p.birth_date ? formatDate(p.birth_date) : '',
       'CPF': p.cpf || '',
       'Endereço': p.address || '',
       'Observações': p.anamnesis?.medical_history || '',
-      'Data de Cadastro': p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '',
+      'Data de Cadastro': p.created_at ? formatDate(p.created_at) : '',
       'Dentista Responsável': profile?.name || user?.name
     }));
 
@@ -214,7 +215,7 @@ export default function App() {
     }
 
     const transactionData = filteredT.map(t => ({
-      'Data': new Date(t.date).toLocaleDateString('pt-BR'),
+      'Data': formatDate(t.date),
       'Paciente': t.patient_name || 'N/A',
       'Procedimento': t.procedure || t.description,
       'Categoria': t.type === 'INCOME' ? 'Receita' : 'Despesa',
@@ -242,22 +243,22 @@ export default function App() {
       const plan = paymentPlans.find(p => p.id === inst.payment_plan_id);
       const patient = patients.find(p => p.id === inst.patient_id);
       return {
-        'Data': new Date(inst.due_date).toLocaleDateString('pt-BR'),
+        'Data': formatDate(inst.due_date),
         'Paciente': patient?.name || 'N/A',
         'Procedimento': inst.procedure || plan?.procedure || 'Parcelamento',
         'Categoria': 'Receita (Parcela)',
         'Valor': inst.amount,
         'Forma de Pagamento': inst.status === 'PAID' ? 'N/A' : 'Pendente',
-        'Status': inst.status === 'PAID' ? 'Pago' : (new Date(inst.due_date) < new Date() ? 'Atrasado' : 'Pendente'),
+        'Status': inst.status === 'PAID' ? 'Pago' : (isOverdue(inst.due_date) ? 'Atrasado' : 'Pendente'),
         'Dentista Responsável': profile?.name || user?.name,
         'Observações': `Parcela ${inst.number}/${plan?.installments_count || '?'}`,
         'Valor Total do Tratamento': plan?.total_amount || 0,
         'Número de Parcelas': plan?.installments_count || 0,
         'Número da Parcela': inst.number,
         'Valor da Parcela': inst.amount,
-        'Data de Vencimento': new Date(inst.due_date).toLocaleDateString('pt-BR'),
+        'Data de Vencimento': formatDate(inst.due_date),
         'Status da Parcela': inst.status,
-        'Data de Pagamento': inst.payment_date ? new Date(inst.payment_date).toLocaleDateString('pt-BR') : ''
+        'Data de Pagamento': inst.payment_date ? formatDate(inst.payment_date) : ''
       };
     });
 
@@ -292,6 +293,8 @@ export default function App() {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dentistSearchTerm, setDentistSearchTerm] = useState('');
+  const [dentistStatusFilter, setDentistStatusFilter] = useState<'all' | 'active' | 'blocked'>('all');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [agendaViewMode, setAgendaViewMode] = useState<'day' | 'week' | 'month'>('day');
   const [statusFilter, setStatusFilter] = useState<string[]>(['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']);
@@ -603,7 +606,7 @@ export default function App() {
       amount: transaction.amount,
       amountFormatted: Number(transaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
       procedure: transaction.procedure || transaction.description,
-      date: new Date(transaction.date).toLocaleDateString('pt-BR'),
+      date: formatDate(transaction.date),
       paymentMethod: transaction.payment_method,
       dentistName: dentist?.name || user?.name,
       dentistCro: dentist?.cro || profile?.cro,
@@ -758,16 +761,21 @@ export default function App() {
     if (financeFilter.type !== 'all' && t.type !== financeFilter.type) return false;
     if (financeFilter.category !== 'all' && t.category !== financeFilter.category) return false;
     
-    const tDate = new Date(t.date);
-    const now = new Date();
+    const tDateStr = t.date?.split('T')[0];
+    const nowLocalStr = new Date().toLocaleDateString('en-CA');
+    
     if (financeFilter.period === 'day') {
-      return tDate.toDateString() === now.toDateString();
+      return tDateStr === nowLocalStr;
     } else if (financeFilter.period === 'week') {
+      const tDate = new Date(tDateStr + 'T12:00:00'); // Use mid-day local to avoid shifts
+      const now = new Date();
       const weekAgo = new Date();
       weekAgo.setDate(now.getDate() - 7);
       return tDate >= weekAgo;
     } else if (financeFilter.period === 'month') {
-      return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      const [year, month] = tDateStr.split('-');
+      const now = new Date();
+      return parseInt(month) === (now.getMonth() + 1) && parseInt(year) === now.getFullYear();
     }
     return true;
   });
@@ -790,8 +798,10 @@ export default function App() {
 
   const monthlyRevenue = transactions
     .filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'INCOME' && d.getMonth() === dashboardMonth && d.getFullYear() === dashboardYear;
+      const tDateStr = t.date?.split('T')[0];
+      if (!tDateStr) return false;
+      const [year, month] = tDateStr.split('-');
+      return t.type === 'INCOME' && parseInt(month) === (dashboardMonth + 1) && parseInt(year) === dashboardYear;
     })
     .reduce((acc, t) => acc + Number(t.amount), 0);
 
@@ -801,8 +811,10 @@ export default function App() {
 
   const prevMonthlyRevenue = transactions
     .filter(t => {
-      const d = new Date(t.date);
-      return t.type === 'INCOME' && d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
+      const tDateStr = t.date?.split('T')[0];
+      if (!tDateStr) return false;
+      const [year, month] = tDateStr.split('-');
+      return t.type === 'INCOME' && parseInt(month) === (prevMonth + 1) && parseInt(year) === prevMonthYear;
     })
     .reduce((acc, t) => acc + Number(t.amount), 0);
 
@@ -1109,23 +1121,35 @@ export default function App() {
       alert('Este paciente não possui telefone cadastrado.');
       return;
     }
+
+    // Formata a mensagem de WhatsApp conforme solicitado
+    const date = new Date(app.start_time).toLocaleDateString('pt-BR');
+    const time = new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const message = `Olá ${app.patient_name}, este é um lembrete da sua consulta dia ${date} às ${time} com ${app.dentist_name}.`;
+    
+    // Limpa o número de telefone (apenas números)
+    let phone = app.patient_phone.replace(/\D/g, '');
+    
+    // Garante o formato internacional (55 + DDD + número)
+    if (phone.length === 10 || phone.length === 11) {
+      phone = '55' + phone;
+    } else if (phone.length > 11 && !phone.startsWith('55')) {
+      // Se tiver mais de 11 dígitos e não começar com 55, assume que falta o DDI
+      phone = '55' + phone;
+    }
+    
+    // Abre o WhatsApp usando wa.me (melhor compatibilidade mobile/desktop)
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    
+    // No mobile, window.open pode ser bloqueado se houver um await antes.
+    // Abrimos primeiro e depois fazemos a chamada de log no backend.
+    window.open(url, '_blank');
+
     try {
-      // Primeiro chama o backend para registrar (opcional, mas bom para log)
+      // Chama o backend para registrar o lembrete enviado
       await apiFetch(`/api/appointments/${app.id}/remind`, { method: 'POST' });
-      
-      // Formata a mensagem de WhatsApp
-      const date = new Date(app.start_time).toLocaleDateString('pt-BR');
-      const time = new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const message = `Olá ${app.patient_name}, confirmamos sua consulta com ${app.dentist_name} para o dia ${date} às ${time}. Podemos confirmar sua presença?`;
-      
-      // Limpa o número de telefone (apenas números)
-      const phone = app.patient_phone.replace(/\D/g, '');
-      
-      // Abre o WhatsApp
-      const url = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
-      window.open(url, '_blank');
     } catch (error) {
-      console.error('Error sending reminder:', error);
+      console.error('Error sending reminder log:', error);
     }
   };
 
@@ -2226,7 +2250,7 @@ export default function App() {
                       </h4>
                       <div className="space-y-3 text-sm">
                         <p><span className="text-slate-400 font-medium uppercase text-[10px] block">CPF</span> {selectedPatient.cpf || '---'}</p>
-                        <p><span className="text-slate-400 font-medium uppercase text-[10px] block">Nascimento</span> {selectedPatient.birth_date || '---'}</p>
+                        <p><span className="text-slate-400 font-medium uppercase text-[10px] block">Nascimento</span> {formatDate(selectedPatient.birth_date) || '---'}</p>
                         <p><span className="text-slate-400 font-medium uppercase text-[10px] block">Telefone</span> {selectedPatient.phone}</p>
                         <p><span className="text-slate-400 font-medium uppercase text-[10px] block">E-mail</span> {selectedPatient.email}</p>
                         <p><span className="text-slate-400 font-medium uppercase text-[10px] block">Endereço</span> {selectedPatient.address || '---'}</p>
@@ -2400,7 +2424,7 @@ export default function App() {
                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                       <div className="flex justify-between items-start mb-2">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase">
-                                          {new Date(evo.date).toLocaleDateString('pt-BR')} às {new Date(evo.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                          {formatDate(evo.date)}
                                         </span>
                                         <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
                                           {evo.procedure_performed}
@@ -2523,16 +2547,16 @@ export default function App() {
                                               </span>
                                               <div>
                                                 <p className="font-medium text-slate-700">{Number(inst.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase">Vencimento: {new Date(inst.due_date).toLocaleDateString('pt-BR')}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase">Vencimento: {formatDate(inst.due_date)}</p>
                                               </div>
                                             </div>
                                             <div className="flex items-center gap-3">
                                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                                                 inst.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 
-                                                new Date(inst.due_date) < new Date() ? 'bg-rose-100 text-rose-700' : 
+                                                isOverdue(inst.due_date) ? 'bg-rose-100 text-rose-700' : 
                                                 'bg-amber-100 text-amber-700'
                                               }`}>
-                                                {inst.status === 'PAID' ? 'Pago' : new Date(inst.due_date) < new Date() ? 'Atrasado' : 'Pendente'}
+                                                {inst.status === 'PAID' ? 'Pago' : isOverdue(inst.due_date) ? 'Atrasado' : 'Pendente'}
                                               </span>
                                               {inst.status === 'PENDING' && (
                                                 <button 
@@ -2583,7 +2607,7 @@ export default function App() {
                                   <tbody className="divide-y divide-slate-100">
                                     {selectedPatient.financial?.transactions.map(t => (
                                       <tr key={t.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 text-slate-500">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                                        <td className="px-4 py-3 text-slate-500">{formatDate(t.date)}</td>
                                         <td className="px-4 py-3 font-medium text-slate-700">{t.description}</td>
                                         <td className={`px-4 py-3 text-right font-bold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                           {t.type === 'INCOME' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -2783,7 +2807,7 @@ export default function App() {
                             {filteredTransactions.map((t) => (
                               <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-4 text-sm text-slate-500">
-                                  {new Date(t.date).toLocaleDateString('pt-BR')}
+                                  {formatDate(t.date)}
                                 </td>
                                 <td className="px-6 py-4">
                                   <p className="font-bold text-slate-800">{t.description}</p>
@@ -2836,7 +2860,7 @@ export default function App() {
                             <div className="min-w-0 flex-1 pr-4">
                               <p className="font-bold text-slate-800 text-sm truncate">{t.description}</p>
                               <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('pt-BR')}</span>
+                                <span className="text-[10px] text-slate-400">{formatDate(t.date)}</span>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">• {t.category}</span>
                               </div>
                             </div>
@@ -3125,6 +3149,30 @@ export default function App() {
                     </button>
                   </div>
 
+                  <div className="mb-6 flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                      <input 
+                        type="text"
+                        placeholder="Buscar dentista por nome ou e-mail..."
+                        value={dentistSearchTerm}
+                        onChange={(e) => setDentistSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                    <div className="sm:w-48">
+                      <select
+                        value={dentistStatusFilter}
+                        onChange={(e) => setDentistStatusFilter(e.target.value as any)}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-600 font-medium"
+                      >
+                        <option value="all">Todos os Status</option>
+                        <option value="active">Ativos</option>
+                        <option value="blocked">Bloqueados</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                     {/* Desktop Table View */}
                     <div className="hidden md:block">
@@ -3138,7 +3186,15 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {adminUsers.filter(u => u.status !== 'pending').map((u) => (
+                          {adminUsers
+                            .filter(u => u.status !== 'pending')
+                            .filter(u => 
+                              !dentistSearchTerm || 
+                              u.name?.toLowerCase().includes(dentistSearchTerm.toLowerCase()) || 
+                              u.email?.toLowerCase().includes(dentistSearchTerm.toLowerCase())
+                            )
+                            .filter(u => dentistStatusFilter === 'all' || u.status === dentistStatusFilter)
+                            .map((u) => (
                             <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
@@ -3197,7 +3253,15 @@ export default function App() {
 
                     {/* Mobile Card View */}
                     <div className="md:hidden divide-y divide-slate-100">
-                      {adminUsers.filter(u => u.status !== 'pending').map((u) => (
+                      {adminUsers
+                        .filter(u => u.status !== 'pending')
+                        .filter(u => 
+                          !dentistSearchTerm || 
+                          u.name?.toLowerCase().includes(dentistSearchTerm.toLowerCase()) || 
+                          u.email?.toLowerCase().includes(dentistSearchTerm.toLowerCase())
+                        )
+                        .filter(u => dentistStatusFilter === 'all' || u.status === dentistStatusFilter)
+                        .map((u) => (
                         <div key={u.id} className="p-4 space-y-4">
                           <div className="flex justify-between items-start">
                             <div className="flex items-center gap-3">
@@ -3910,7 +3974,7 @@ export default function App() {
       {/* Modal de Recibo */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 receipt-modal-overlay">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3922,7 +3986,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-2xl rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+              className="relative bg-white w-full max-w-2xl rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto receipt-content"
             >
               <div className="p-8 md:p-12 bg-white text-slate-800 font-serif">
                 <div className="flex justify-between items-start mb-12 no-print">
@@ -3951,6 +4015,7 @@ export default function App() {
 
                 <div className="text-center mb-12">
                   <h2 className="text-3xl font-bold uppercase tracking-widest border-b-2 border-slate-200 pb-4 inline-block px-12">Recibo</h2>
+                  <p className="hidden print:block text-[10px] text-slate-400 mt-2 uppercase tracking-widest">Via do Paciente</p>
                 </div>
 
                 <div className="space-y-8 text-lg leading-relaxed">
@@ -4460,17 +4525,17 @@ export default function App() {
                               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(inst.amount)}
                             </td>
                             <td className="py-4 text-sm text-slate-500">
-                              {new Date(inst.due_date).toLocaleDateString('pt-BR')}
+                              {formatDate(inst.due_date)}
                             </td>
                             <td className="py-4">
                               <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                 inst.status === 'PAID'
                                   ? 'bg-emerald-100 text-emerald-700'
-                                  : new Date(inst.due_date) < new Date()
+                                  : isOverdue(inst.due_date)
                                     ? 'bg-rose-100 text-rose-700'
                                     : 'bg-amber-100 text-amber-700'
                               }`}>
-                                {inst.status === 'PAID' ? 'Pago' : new Date(inst.due_date) < new Date() ? 'Atrasado' : 'Pendente'}
+                                {inst.status === 'PAID' ? 'Pago' : isOverdue(inst.due_date) ? 'Atrasado' : 'Pendente'}
                               </span>
                             </td>
                             <td className="py-4 text-right">
