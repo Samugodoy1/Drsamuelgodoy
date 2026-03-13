@@ -56,11 +56,6 @@ export const updatePatient = async (req: Request, res: Response) => {
   const { name, cpf, birth_date, phone, email, address } = req.body;
   let { photo_url } = req.body;
 
-  // If a file was uploaded, use its Cloudinary URL
-  if ((req as any).file) {
-    photo_url = (req as any).file.path;
-  }
-
   try {
     const checkOwnership = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [id, user.id]);
     if (checkOwnership.rows.length === 0) return res.status(403).json({ error: 'Acesso negado' });
@@ -173,10 +168,6 @@ export const addPatientFile = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { file_type, description } = req.body;
   let { file_url } = req.body;
-
-  if ((req as any).file) {
-    file_url = (req as any).file.path;
-  }
 
   try {
     const checkOwnership = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [id, user.id]);

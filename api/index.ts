@@ -49,7 +49,6 @@ import { deleteFile } from '../server/controllers/fileController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
 
-
 import { initDb } from '../server/utils/initDb.js';
 
 const app = express();
