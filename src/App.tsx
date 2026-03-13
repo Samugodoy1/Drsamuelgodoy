@@ -133,6 +133,7 @@ interface Appointment {
   start_time: string;
   end_time: string;
   status: 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'IN_PROGRESS' | 'FINISHED';
+  notes?: string;
 }
 
 interface Transaction {
@@ -1357,6 +1358,29 @@ export default function App() {
     );
   }
 
+  // Routing for print pages
+  const pathname = window.location.pathname;
+  if (pathname.includes('/imprimir')) {
+    if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando dados para impressão...</div>;
+    
+    if (pathname === '/agenda/imprimir') {
+      const dateStr = new URLSearchParams(window.location.search).get('date') || new Date().toISOString().split('T')[0];
+      const date = new Date(dateStr + 'T12:00:00');
+      return <PrintAgenda date={date} appointments={appointments} profile={profile} />;
+    }
+    
+    if (pathname === '/recibo/imprimir') {
+      const id = new URLSearchParams(window.location.search).get('id');
+      const transaction = transactions.find(t => t.id.toString() === id);
+      const installment = installments.find(i => i.id.toString() === id);
+      return <PrintReceipt transaction={transaction} installment={installment} profile={profile} patients={patients} paymentPlans={paymentPlans} />;
+    }
+    
+    if (pathname === '/relatorio/imprimir') {
+      return <PrintReport profile={profile} />;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
@@ -1796,9 +1820,8 @@ export default function App() {
                           </button>
                           <button 
                             onClick={() => {
-                              document.body.classList.add('print-agenda');
-                              window.print();
-                              document.body.classList.remove('print-agenda');
+                              const dateStr = selectedDate.toISOString().split('T')[0];
+                              window.open(`/agenda/imprimir?date=${dateStr}`, '_blank');
                             }}
                             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all no-print"
                             title="Imprimir agenda do dia"
@@ -4198,7 +4221,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-3">
                     <button 
-                      onClick={() => window.print()}
+                      onClick={() => window.open(`/recibo/imprimir?id=${selectedReceipt.id}`, '_blank')}
                       className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
                       title="Imprimir"
                     >
@@ -4837,78 +4860,165 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
 
-      {/* Print-only Agenda */}
-      <div id="agenda-print" className="hidden print:block fixed inset-0 bg-white z-[9999] p-10 overflow-auto">
-        <div className="max-w-4xl mx-auto">
-          <div className="border-b-4 border-slate-900 pb-8 mb-10">
-            <h1 className="text-4xl font-black text-slate-900 mb-2 uppercase tracking-tight">Agenda do Dia</h1>
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-2xl font-bold text-slate-700 capitalize">
-                  {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                </p>
-                <p className="text-xl text-slate-500 mt-1">
-                  {profile?.name || 'Dr. Samuel Godoy'}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-slate-900">
-                  Total: {appointments.filter(a => new Date(a.start_time).toDateString() === selectedDate.toDateString()).length} consultas
-                </p>
-              </div>
-            </div>
+// Print Components
+function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, title: string, onPrint: () => void }) {
+  return (
+    <div className="min-h-screen bg-white p-8 font-sans text-slate-900">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8 no-print">
+          <h1 className="text-xl font-bold text-slate-800">{title}</h1>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => window.close()}
+              className="px-6 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
+            >
+              Fechar
+            </button>
+            <button 
+              onClick={onPrint}
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+            >
+              <Printer size={20} />
+              Imprimir Agora
+            </button>
           </div>
+        </div>
+        <div className="print-content">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          <div className="space-y-8">
-            {appointments
-              .filter(a => new Date(a.start_time).toDateString() === selectedDate.toDateString())
-              .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-              .map((app) => (
-                <div key={app.id} className="flex gap-8 pb-8 border-b border-slate-200 last:border-0">
-                  <div className="w-8 h-8 border-2 border-slate-400 rounded flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-2xl font-black text-slate-900">
-                        {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        <span className="mx-3 text-slate-300">—</span>
-                        {app.patient_name}
-                      </p>
-                      <span className="text-sm font-black text-slate-400 border border-slate-200 px-3 py-1 rounded-lg uppercase tracking-widest">
-                        {app.status === 'SCHEDULED' ? 'Agendado' : 
-                         app.status === 'CONFIRMED' ? 'Confirmado' : 
-                         app.status === 'CANCELLED' ? 'Cancelado' : 
-                         app.status === 'IN_PROGRESS' ? 'Em Atendimento' : 'Finalizado'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <p className="text-slate-700 text-lg">
-                        <span className="font-bold text-slate-400 uppercase text-xs tracking-wider block mb-0.5">Procedimento</span>
-                        {app.procedure_name || 'Não especificado'}
-                      </p>
-                      <p className="text-slate-700 text-lg">
-                        <span className="font-bold text-slate-400 uppercase text-xs tracking-wider block mb-0.5">Dentista</span>
-                        {app.dentist_name}
-                      </p>
-                    </div>
-                    {app.notes && (
-                      <p className="mt-3 text-slate-500 italic text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="font-bold not-italic text-[10px] uppercase tracking-widest block mb-1">Observações:</span>
-                        {app.notes}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+function PrintAgenda({ date, appointments, profile }: { date: Date, appointments: Appointment[], profile: Dentist | null }) {
+  const dayAppointments = appointments
+    .filter(a => new Date(a.start_time).toDateString() === date.toDateString())
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  return (
+    <PrintLayout title="Agenda do Dia" onPrint={() => window.print()}>
+      <div className="border-b-4 border-slate-900 pb-8 mb-10">
+        <h1 className="text-4xl font-black text-slate-900 mb-2 uppercase tracking-tight">Agenda do Dia</h1>
+        <div className="flex justify-between items-end">
+          <div>
+            <p className="text-2xl font-bold text-slate-700 capitalize">
+              {date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+            </p>
+            <p className="text-xl text-slate-500 mt-1">
+              {profile?.name || 'Dr. Samuel Godoy'}
+            </p>
           </div>
-
-          <div className="mt-20 pt-10 border-t border-slate-200 text-center">
-            <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">
-              Documento gerado pelo sistema OdontoPro em {new Date().toLocaleString('pt-BR')}
+          <div className="text-right">
+            <p className="text-lg font-bold text-slate-900">
+              Total: {dayAppointments.length} consultas
             </p>
           </div>
         </div>
       </div>
-    </div>
+
+      <div className="space-y-8">
+        {dayAppointments.map((app) => (
+          <div key={app.id} className="flex gap-8 pb-8 border-b border-slate-200 last:border-0">
+            <div className="w-8 h-8 border-2 border-slate-400 rounded flex-shrink-0 mt-1" />
+            <div className="flex-1">
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-2xl font-black text-slate-900">
+                  {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  <span className="mx-3 text-slate-300">—</span>
+                  {app.patient_name}
+                </p>
+                <span className="text-sm font-black text-slate-400 border border-slate-200 px-3 py-1 rounded-lg uppercase tracking-widest">
+                  {app.status === 'SCHEDULED' ? 'Agendado' : 
+                   app.status === 'CONFIRMED' ? 'Confirmado' : 
+                   app.status === 'CANCELLED' ? 'Cancelado' : 
+                   app.status === 'IN_PROGRESS' ? 'Em Atendimento' : 'Finalizado'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <p className="text-slate-700 text-lg">
+                  <span className="font-bold text-slate-400 uppercase text-xs tracking-wider block mb-0.5">Observações</span>
+                  {app.notes || 'Nenhuma observação'}
+                </p>
+                <p className="text-slate-700 text-lg">
+                  <span className="font-bold text-slate-400 uppercase text-xs tracking-wider block mb-0.5">Dentista</span>
+                  {app.dentist_name}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </PrintLayout>
+  );
+}
+
+function PrintReceipt({ transaction, installment, profile, patients, paymentPlans }: any) {
+  const data = transaction || installment;
+  if (!data) return <div className="p-8 text-center text-slate-500">Documento não encontrado.</div>;
+
+  const patient = patients.find((p: any) => p.id === data.patient_id);
+  const plan = installment ? paymentPlans.find((p: any) => p.id === data.payment_plan_id) : null;
+
+  return (
+    <PrintLayout title="Recibo" onPrint={() => window.print()}>
+      <div className="p-12 bg-white text-slate-800 font-serif border border-slate-200">
+        <div className="flex justify-between items-start mb-16">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+              <Plus size={28} strokeWidth={3} />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-800">OdontoHub</h1>
+          </div>
+          <div className="text-right">
+            <h2 className="text-3xl font-serif italic text-slate-400 mb-1">Recibo</h2>
+            <p className="text-sm font-sans font-bold text-slate-500 uppercase tracking-widest">Nº {data.id.toString().padStart(6, '0')}</p>
+          </div>
+        </div>
+
+        <div className="space-y-10 text-lg leading-relaxed">
+          <p>
+            Recebemos de <span className="font-bold border-b-2 border-slate-200 px-2">{patient?.name || data.patient_name || '________________________________'}</span>, 
+            a importância de <span className="font-bold border-b-2 border-slate-200 px-2">R$ {data.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span> 
+            (<span className="italic text-slate-500">________________________________________________</span>).
+          </p>
+
+          <p>
+            Referente a <span className="font-bold border-b-2 border-slate-200 px-2">{data.procedure || plan?.procedure || data.description || 'tratamento odontológico'}</span>.
+          </p>
+
+          <div className="pt-10 flex justify-between items-end">
+            <div>
+              <p className="text-slate-500 mb-1">Data do Pagamento</p>
+              <p className="font-bold text-xl">{new Date(data.date || data.payment_date || data.due_date).toLocaleDateString('pt-BR')}</p>
+            </div>
+            <div className="text-center w-64">
+              <div className="border-b-2 border-slate-900 mb-2"></div>
+              <p className="font-bold text-slate-800">{profile?.name || 'Assinatura do Responsável'}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-widest">{profile?.cro ? `CRO: ${profile.cro}` : 'Cirurgião Dentista'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </PrintLayout>
+  );
+}
+
+function PrintReport({ profile }: any) {
+  return (
+    <PrintLayout title="Relatório" onPrint={() => window.print()}>
+      <div className="border-b-2 border-slate-200 pb-4 mb-8">
+        <h1 className="text-2xl font-bold">Relatório do Sistema</h1>
+        <p className="text-slate-500">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
+        <p className="text-slate-500">Profissional: {profile?.name}</p>
+      </div>
+      <div className="p-8 border border-slate-200 rounded-xl">
+        <p className="text-center text-slate-400 italic">Conteúdo do relatório em desenvolvimento...</p>
+      </div>
+    </PrintLayout>
   );
 }

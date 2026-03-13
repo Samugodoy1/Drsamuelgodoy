@@ -26,74 +26,9 @@
       padding: 0 !important;
     }
 
-    /* Hide all elements by default using visibility to allow selective showing */
-    body * {
-      visibility: hidden;
-    }
-
-    /* Show only the receipt content and its children */
-    .receipt-content, .receipt-content * {
-      visibility: visible;
-    }
-
-    /* Position and style the receipt content for a clean print */
-    .receipt-content {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
-      max-width: none !important;
-      margin: 0 !important;
-      padding: 40px !important;
-      box-shadow: none !important;
-      border: none !important;
-      background: white !important;
-      visibility: visible !important;
-    }
-
-    /* Agenda specific print styles */
-    body.print-agenda * {
-      visibility: hidden;
-    }
-
-    body.print-agenda #agenda-print,
-    body.print-agenda #agenda-print * {
-      visibility: visible;
-    }
-
-    body.print-agenda #agenda-print {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
-      max-width: none !important;
-      margin: 0 !important;
-      padding: 40px !important;
-      box-shadow: none !important;
-      border: none !important;
-      background: white !important;
-      visibility: visible !important;
-    }
-
-    /* Ensure the modal overlay doesn't interfere with printing */
-    .receipt-modal-overlay {
-      position: static !important;
-      display: block !important;
-      padding: 0 !important;
-      background: none !important;
-      backdrop-filter: none !important;
-      visibility: visible !important;
-    }
-
     /* Hide scrollbars on print */
     ::-webkit-scrollbar {
       display: none;
-    }
-
-    /* Page breaks */
-    .receipt-content {
-      page-break-after: avoid;
-      page-break-before: avoid;
     }
   }
 
