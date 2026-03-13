@@ -31,13 +31,37 @@
       visibility: hidden;
     }
 
-    /* Show only the receipt content or print-only content and its children */
-    .receipt-content, .receipt-content *, .print-only, .print-only * {
+    /* Show only the receipt content and its children */
+    .receipt-content, .receipt-content * {
       visibility: visible;
     }
 
     /* Position and style the receipt content for a clean print */
-    .receipt-content, .print-only {
+    .receipt-content {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 40px !important;
+      box-shadow: none !important;
+      border: none !important;
+      background: white !important;
+      visibility: visible !important;
+    }
+
+    /* Agenda specific print styles */
+    body.print-agenda * {
+      visibility: hidden;
+    }
+
+    body.print-agenda #agenda-print,
+    body.print-agenda #agenda-print * {
+      visibility: visible;
+    }
+
+    body.print-agenda #agenda-print {
       position: absolute !important;
       left: 0 !important;
       top: 0 !important;

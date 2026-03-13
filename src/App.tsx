@@ -1795,7 +1795,11 @@ export default function App() {
                             Hoje
                           </button>
                           <button 
-                            onClick={() => window.print()}
+                            onClick={() => {
+                              document.body.classList.add('print-agenda');
+                              window.print();
+                              document.body.classList.remove('print-agenda');
+                            }}
                             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all no-print"
                             title="Imprimir agenda do dia"
                           >
@@ -4835,7 +4839,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Print-only Agenda */}
-      <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-10 overflow-auto print-only">
+      <div id="agenda-print" className="hidden print:block fixed inset-0 bg-white z-[9999] p-10 overflow-auto">
         <div className="max-w-4xl mx-auto">
           <div className="border-b-4 border-slate-900 pb-8 mb-10">
             <h1 className="text-4xl font-black text-slate-900 mb-2 uppercase tracking-tight">Agenda do Dia</h1>
