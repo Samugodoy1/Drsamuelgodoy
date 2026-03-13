@@ -297,6 +297,14 @@ export default function App() {
   const [dentistStatusFilter, setDentistStatusFilter] = useState<'all' | 'active' | 'blocked'>('all');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [agendaViewMode, setAgendaViewMode] = useState<'day' | 'week' | 'month'>('day');
+  const [selectedWeekDay, setSelectedWeekDay] = useState<number>(new Date().getDay());
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [statusFilter, setStatusFilter] = useState<string[]>(['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']);
   const [agendaSearchTerm, setAgendaSearchTerm] = useState('');
   const [isEvolutionFormOpen, setIsEvolutionFormOpen] = useState(false);
@@ -1828,7 +1836,13 @@ export default function App() {
                           </h3>
                           <p className="text-xs font-medium text-slate-500">
                             {agendaViewMode === 'day' ? selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : 
-                             agendaViewMode === 'week' ? `Semana de ${new Date(selectedDate.getTime() - selectedDate.getDay() * 86400000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` : 
+                             agendaViewMode === 'week' ? `Semana de ${(() => {
+                               const d = new Date(selectedDate);
+                               const day = d.getDay();
+                               const diff = (day === 0 ? 7 : day) - 1;
+                               d.setDate(d.getDate() - diff);
+                               return d;
+                             })().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` : 
                              selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                           </p>
                         </div>
@@ -1837,12 +1851,16 @@ export default function App() {
                             const appDate = new Date(a.start_time);
                             if (agendaViewMode === 'day') return appDate.toDateString() === selectedDate.toDateString();
                             if (agendaViewMode === 'week') {
+                              const day = selectedDate.getDay();
+                              const diff = (day === 0 ? 7 : day) - 1;
                               const startOfWeek = new Date(selectedDate);
-                              startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+                              startOfWeek.setDate(selectedDate.getDate() - diff);
+                              startOfWeek.setHours(0, 0, 0, 0);
                               const endOfWeek = new Date(startOfWeek);
                               endOfWeek.setDate(startOfWeek.getDate() + 6);
+                              endOfWeek.setHours(23, 59, 59, 999);
                               const appDateTime = appDate.getTime();
-                              return appDateTime >= startOfWeek.setHours(0,0,0,0) && appDateTime <= endOfWeek.setHours(23,59,59,999);
+                              return appDateTime >= startOfWeek.getTime() && appDateTime <= endOfWeek.getTime();
                             }
                             if (agendaViewMode === 'month') return appDate.getMonth() === selectedDate.getMonth() && appDate.getFullYear() === selectedDate.getFullYear();
                             return false;
@@ -1871,6 +1889,132 @@ export default function App() {
                       </div>
                     </div>
 
+                    {agendaViewMode === 'week' && (
+                      <div className="px-4 tablet-l:px-8 py-3 bg-slate-50 border-b border-slate-100 overflow-x-auto no-scrollbar">
+                        <div className="flex gap-2 min-w-max tablet-l:min-w-0 tablet-l:justify-between">
+                          {[
+                            { label: 'SEG', value: 1 },
+                            { label: 'TER', value: 2 },
+                            { label: 'QUA', value: 3 },
+                            { label: 'QUI', value: 4 },
+                            { label: 'SEX', value: 5 },
+                            { label: 'SÁB', value: 6 },
+                            { label: 'DOM', value: 0 },
+                          ].map((day) => {
+                            const dayOfWeek = selectedDate.getDay();
+                            const diffToMon = (dayOfWeek === 0 ? 7 : dayOfWeek) - 1;
+                            const startOfMonday = new Date(selectedDate);
+                            startOfMonday.setDate(selectedDate.getDate() - diffToMon);
+                            const dayDate = new Date(startOfMonday);
+                            const offset = (day.value === 0 ? 7 : day.value) - 1;
+                            dayDate.setDate(startOfMonday.getDate() + offset);
+                            const dayOfMonth = dayDate.getDate();
+
+                            const count = appointments.filter(a => {
+                              const appDate = new Date(a.start_time);
+                              const endOfWeek = new Date(startOfMonday);
+                              endOfWeek.setDate(startOfMonday.getDate() + 6);
+                              const appDateTime = appDate.getTime();
+                              const isInWeek = appDateTime >= startOfMonday.setHours(0,0,0,0) && appDateTime <= endOfWeek.setHours(23,59,59,999);
+                              return isInWeek && appDate.getDay() === day.value && (statusFilter.length === 0 || statusFilter.includes(a.status));
+                            }).length;
+
+                            return (
+                              <button
+                                key={day.value}
+                                onClick={() => setSelectedWeekDay(day.value)}
+                                className={`flex flex-col items-center justify-center min-w-[60px] tablet-l:min-w-0 tablet-l:flex-1 py-2 px-2 rounded-xl transition-all ${
+                                  selectedWeekDay === day.value
+                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-100'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-100'
+                                }`}
+                              >
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">{day.label}</span>
+                                <span className="text-base font-black leading-tight">{dayOfMonth}</span>
+                                <span className={`text-[9px] font-bold mt-0.5 ${selectedWeekDay === day.value ? 'text-emerald-100' : 'text-slate-400'}`}>
+                                  ({count})
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {agendaViewMode === 'month' && (
+                      <div className="px-4 tablet-l:px-8 py-6 bg-slate-50 border-b border-slate-100">
+                        <div className="max-w-md mx-auto">
+                          <div className="grid grid-cols-7 gap-1 mb-2">
+                            {['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'].map(day => (
+                              <div key={day} className="text-center text-[10px] font-bold text-slate-400 py-2 uppercase tracking-widest">
+                                {day}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-7 gap-1">
+                            {(() => {
+                              const year = selectedDate.getFullYear();
+                              const month = selectedDate.getMonth();
+                              const firstDayOfMonth = new Date(year, month, 1);
+                              const lastDayOfMonth = new Date(year, month + 1, 0);
+                              
+                              let firstDayIdx = firstDayOfMonth.getDay();
+                              firstDayIdx = firstDayIdx === 0 ? 6 : firstDayIdx - 1;
+                              
+                              const days = [];
+                              const prevMonthLastDay = new Date(year, month, 0).getDate();
+                              for (let i = firstDayIdx - 1; i >= 0; i--) {
+                                days.push({ day: prevMonthLastDay - i, month: month - 1, currentMonth: false });
+                              }
+                              for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+                                days.push({ day: i, month: month, currentMonth: true });
+                              }
+                              const remainingSlots = 42 - days.length;
+                              for (let i = 1; i <= remainingSlots; i++) {
+                                days.push({ day: i, month: month + 1, currentMonth: false });
+                              }
+                              
+                              return days.map((d, idx) => {
+                                const date = new Date(year, d.month, d.day);
+                                const dateStr = date.toDateString();
+                                const isSelected = dateStr === selectedDate.toDateString();
+                                const isToday = dateStr === new Date().toDateString();
+                                
+                                const dayAppointments = appointments.filter(a => 
+                                  new Date(a.start_time).toDateString() === dateStr &&
+                                  (statusFilter.length === 0 || statusFilter.includes(a.status))
+                                );
+                                
+                                const dotsCount = Math.min(dayAppointments.length, 3);
+                                
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() => setSelectedDate(date)}
+                                    className={`relative flex flex-col items-center justify-center aspect-square rounded-xl transition-all ${
+                                      !d.currentMonth ? 'text-slate-300 opacity-40' : 
+                                      isSelected ? 'bg-emerald-600 text-white shadow-md shadow-emerald-100' :
+                                      isToday ? 'bg-emerald-50 text-emerald-600 font-bold border border-emerald-100' :
+                                      'hover:bg-slate-100 text-slate-600'
+                                    }`}
+                                  >
+                                    <span className="text-xs tablet-l:text-sm font-bold">{d.day}</span>
+                                    {dotsCount > 0 && (
+                                      <div className="flex gap-0.5 mt-0.5">
+                                        {[...Array(dotsCount)].map((_, i) => (
+                                          <div key={i} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="divide-y divide-slate-100">
                       {(() => {
                         const filtered = appointments
@@ -1881,17 +2025,22 @@ export default function App() {
                             if (agendaViewMode === 'day') return isSameDay;
                             
                             if (agendaViewMode === 'week') {
+                              const day = selectedDate.getDay();
+                              const diff = (day === 0 ? 7 : day) - 1;
                               const startOfWeek = new Date(selectedDate);
-                              startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+                              startOfWeek.setDate(selectedDate.getDate() - diff);
+                              startOfWeek.setHours(0, 0, 0, 0);
                               const endOfWeek = new Date(startOfWeek);
                               endOfWeek.setDate(startOfWeek.getDate() + 6);
+                              endOfWeek.setHours(23, 59, 59, 999);
                               
                               const appDateTime = appDate.getTime();
-                              return appDateTime >= startOfWeek.setHours(0,0,0,0) && appDateTime <= endOfWeek.setHours(23,59,59,999);
+                              const isInWeek = appDateTime >= startOfWeek.getTime() && appDateTime <= endOfWeek.getTime();
+                              return isInWeek && appDate.getDay() === selectedWeekDay;
                             }
                             
                             if (agendaViewMode === 'month') {
-                              return appDate.getMonth() === selectedDate.getMonth() && appDate.getFullYear() === selectedDate.getFullYear();
+                              return appDate.toDateString() === selectedDate.toDateString();
                             }
                             
                             return false;
@@ -1991,7 +2140,7 @@ export default function App() {
                           </div>
                         );
 
-                        if (agendaViewMode === 'day') {
+                        if (agendaViewMode === 'day' || agendaViewMode === 'week' || agendaViewMode === 'month') {
                           const morning = filtered.filter(a => {
                             const hour = new Date(a.start_time).getHours();
                             return hour >= 6 && hour < 12;
@@ -2009,53 +2158,92 @@ export default function App() {
                             return hour < 6 || hour >= 22;
                           });
 
+                          const isToday = (() => {
+                            const today = new Date();
+                            if (agendaViewMode === 'day' || agendaViewMode === 'month') return selectedDate.toDateString() === today.toDateString();
+                            if (agendaViewMode === 'week') {
+                              const dayOfWeek = selectedDate.getDay();
+                              const diffToMon = (dayOfWeek === 0 ? 7 : dayOfWeek) - 1;
+                              const targetDate = new Date(selectedDate);
+                              targetDate.setDate(selectedDate.getDate() - diffToMon + (selectedWeekDay === 0 ? 6 : selectedWeekDay - 1));
+                              return targetDate.toDateString() === today.toDateString();
+                            }
+                            return false;
+                          })();
+
+                          const renderNowIndicator = () => (
+                            <div key="now-indicator" className="relative py-2 px-6 flex items-center gap-3 bg-rose-50/30">
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                                <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Agora — {now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <div className="h-px flex-1 bg-rose-200" />
+                            </div>
+                          );
+
+                          const renderPeriod = (apps: Appointment[], periodStart: number, periodEnd: number, label: string, icon: React.ReactNode) => {
+                            const nowHour = now.getHours();
+                            const showNowInThisPeriod = isToday && nowHour >= periodStart && nowHour < periodEnd;
+                            
+                            if (apps.length === 0 && !showNowInThisPeriod) return null;
+
+                            let content;
+                            if (!showNowInThisPeriod) {
+                              content = apps.map(renderAppointment);
+                            } else {
+                              const nowTime = now.getHours() * 60 + now.getMinutes();
+                              const result = [];
+                              let nowInserted = false;
+                              
+                              for (const app of apps) {
+                                const appTime = new Date(app.start_time).getHours() * 60 + new Date(app.start_time).getMinutes();
+                                if (!nowInserted && nowTime < appTime) {
+                                  result.push(renderNowIndicator());
+                                  nowInserted = true;
+                                }
+                                result.push(renderAppointment(app));
+                              }
+                              
+                              if (!nowInserted) {
+                                result.push(renderNowIndicator());
+                              }
+                              content = result;
+                            }
+
+                            return (
+                              <div key={label}>
+                                <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
+                                  {icon}
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+                                </div>
+                                {content}
+                              </div>
+                            );
+                          };
+
                           return (
                             <div className="divide-y divide-slate-100">
-                              {others.filter(a => new Date(a.start_time).getHours() < 6).length > 0 && (
-                                <div>
-                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
-                                    <Clock size={14} className="text-slate-400" />
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Madrugada (00:00 – 06:00)</span>
-                                  </div>
-                                  {others.filter(a => new Date(a.start_time).getHours() < 6).map(renderAppointment)}
+                              {(agendaViewMode === 'week' || agendaViewMode === 'month') && (
+                                <div className="bg-slate-50 px-6 py-3 border-b border-slate-100">
+                                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                    {(() => {
+                                      if (agendaViewMode === 'week') {
+                                        const dayOfWeek = selectedDate.getDay();
+                                        const diffToMon = (dayOfWeek === 0 ? 7 : dayOfWeek) - 1;
+                                        const targetDate = new Date(selectedDate);
+                                        targetDate.setDate(selectedDate.getDate() - diffToMon + (selectedWeekDay === 0 ? 6 : selectedWeekDay - 1));
+                                        return targetDate.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase().replace('.', '');
+                                      }
+                                      return selectedDate.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase().replace('.', '');
+                                    })()}
+                                  </p>
                                 </div>
                               )}
-                              {morning.length > 0 && (
-                                <div>
-                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
-                                    <Sun size={14} className="text-amber-500" />
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Manhã (06:00 – 12:00)</span>
-                                  </div>
-                                  {morning.map(renderAppointment)}
-                                </div>
-                              )}
-                              {afternoon.length > 0 && (
-                                <div>
-                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
-                                    <Sun size={14} className="text-orange-500" />
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tarde (12:00 – 18:00)</span>
-                                  </div>
-                                  {afternoon.map(renderAppointment)}
-                                </div>
-                              )}
-                              {evening.length > 0 && (
-                                <div>
-                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
-                                    <Moon size={14} className="text-indigo-500" />
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Noite (18:00 – 22:00)</span>
-                                  </div>
-                                  {evening.map(renderAppointment)}
-                                </div>
-                              )}
-                              {others.filter(a => new Date(a.start_time).getHours() >= 22).length > 0 && (
-                                <div>
-                                  <div className="bg-slate-50 px-6 py-2 border-y border-slate-100 flex items-center gap-2">
-                                    <Moon size={14} className="text-slate-600" />
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Noite Tardia (22:00 – 00:00)</span>
-                                  </div>
-                                  {others.filter(a => new Date(a.start_time).getHours() >= 22).map(renderAppointment)}
-                                </div>
-                              )}
+                              {renderPeriod(others.filter(a => new Date(a.start_time).getHours() < 6), 0, 6, "Madrugada (00:00 – 06:00)", <Clock size={14} className="text-slate-400" />)}
+                              {renderPeriod(morning, 6, 12, "Manhã (06:00 – 12:00)", <Sun size={14} className="text-amber-500" />)}
+                              {renderPeriod(afternoon, 12, 18, "Tarde (12:00 – 18:00)", <Sun size={14} className="text-orange-500" />)}
+                              {renderPeriod(evening, 18, 22, "Noite (18:00 – 22:00)", <Moon size={14} className="text-indigo-500" />)}
+                              {renderPeriod(others.filter(a => new Date(a.start_time).getHours() >= 22), 22, 24, "Noite Tardia (22:00 – 00:00)", <Moon size={14} className="text-slate-600" />)}
                             </div>
                           );
                         }
