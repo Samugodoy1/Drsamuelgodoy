@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import { query } from '../utils/db.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { getJwtSecret, COOKIE_OPTIONS } from '../utils/config.js';
+import { sendEmail } from '../utils/email.js';
 
 async function logSecurityEvent(userId: number | null, eventType: string, description: string, req: Request) {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -123,6 +125,107 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Este e-mail já está cadastrado' });
     }
     console.error('Register error:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+};
+
+export const requestPasswordReset = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'E-mail é obrigatório' });
+  }
+
+  try {
+    const userResult = await query('SELECT id, name FROM users WHERE email = $1', [email]);
+    const user = userResult.rows[0];
+
+    // Always return success for security (don't reveal if email exists)
+    const successMessage = 'Se o e-mail estiver cadastrado, enviaremos instruções para redefinir sua senha.';
+
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+
+      await query(
+        'INSERT INTO password_resets (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, token, expiresAt]
+      );
+
+      await logSecurityEvent(user.id, 'PASSWORD_RESET_REQUESTED', `Solicitação de recuperação de senha para: ${email}`, req);
+
+      // Enviar e-mail real
+      const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+      await sendEmail({
+        to: email,
+        subject: 'Recuperação de Senha - OdontoHub',
+        text: `Olá ${user.name},\n\nVocê solicitou a recuperação de senha para sua conta no OdontoHub.\n\nClique no link abaixo para definir uma nova senha:\n\n${resetLink}\n\nEste link expira em 1 hora.\n\nSe você não solicitou isso, ignore este e-mail.`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <h2 style="color: #059669;">Recuperação de Senha</h2>
+            <p>Olá <strong>${user.name}</strong>,</p>
+            <p>Você solicitou a recuperação de senha para sua conta no <strong>OdontoHub</strong>.</p>
+            <p>Clique no botão abaixo para definir uma nova senha:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetLink}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Redefinir Senha</a>
+            </div>
+            <p style="color: #64748b; font-size: 14px;">Este link expira em 1 hora.</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+            <p style="color: #94a3b8; font-size: 12px;">Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
+          </div>
+        `
+      });
+    }
+
+    return res.status(200).json({ message: successMessage });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ error: 'Token e nova senha são obrigatórios' });
+  }
+
+  // Password validation: min 8 chars, upper, lower, number
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({ 
+      error: 'A senha deve ter pelo menos 8 caracteres, incluindo letras maiúsculas, minúsculas e números.' 
+    });
+  }
+
+  try {
+    const resetResult = await query(
+      'SELECT user_id, expires_at FROM password_resets WHERE token = $1',
+      [token]
+    );
+
+    const reset = resetResult.rows[0];
+
+    if (!reset) {
+      return res.status(400).json({ error: 'Token inválido ou expirado' });
+    }
+
+    if (new Date() > new Date(reset.expires_at)) {
+      await query('DELETE FROM password_resets WHERE token = $1', [token]);
+      return res.status(400).json({ error: 'Token expirado' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, reset.user_id]);
+    await query('DELETE FROM password_resets WHERE user_id = $2', [reset.user_id]);
+
+    await logSecurityEvent(reset.user_id, 'PASSWORD_RESET_SUCCESS', 'Senha redefinida com sucesso via token', req);
+
+    return res.status(200).json({ message: 'Sua senha foi redefinida com sucesso.' });
+  } catch (error) {
+    console.error('Password reset error:', error);
     return res.status(500).json({ error: 'Erro interno no servidor' });
   }
 };

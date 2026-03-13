@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, useParams, useLocation } from 'react-router-dom';
+import { Routes, Route, useParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { 
   Users, 
@@ -1249,134 +1249,10 @@ export default function App() {
     );
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
-        >
-          <div className="p-8 md:p-12">
-            <div className="flex justify-center mb-8">
-              <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-200">
-                <Plus size={32} strokeWidth={3} />
-              </div>
-            </div>
-            <div className="text-center mb-10">
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">OdontoHub</h1>
-              <p className="text-slate-500">Acesse sua conta para gerenciar sua clínica</p>
-            </div>
-
-            <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-6">
-              {isRegistering && (
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
-                  <div className="relative">
-                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Dr. João Silva"
-                      value={registerData.name}
-                      onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
-                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    />
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="email" 
-                    required
-                    placeholder="exemplo@clinica.com"
-                    value={isRegistering ? registerData.email : loginData.email}
-                    onChange={(e) => isRegistering 
-                      ? setRegisterData({...registerData, email: e.target.value})
-                      : setLoginData({...loginData, email: e.target.value})
-                    }
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Senha</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="password" 
-                    required
-                    placeholder="••••••••"
-                    value={isRegistering ? registerData.password : loginData.password}
-                    onChange={(e) => isRegistering
-                      ? setRegisterData({...registerData, password: e.target.value})
-                      : setLoginData({...loginData, password: e.target.value})
-                    }
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              {!isRegistering && (
-                <div className="flex items-center">
-                  <input 
-                    id="remember-me"
-                    type="checkbox" 
-                    checked={loginData.rememberMe}
-                    onChange={(e) => setLoginData({...loginData, rememberMe: e.target.checked})}
-                    className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 font-medium cursor-pointer">
-                    Lembrar de mim
-                  </label>
-                </div>
-              )}
-
-              {loginError && (
-                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
-                  <AlertCircle size={18} />
-                  {loginError}
-                </div>
-              )}
-
-              {registerMessage && (
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm">
-                  <CheckCircle2 size={18} />
-                  {registerMessage}
-                </div>
-              )}
-
-              <button 
-                type="submit"
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
-              >
-                {isRegistering ? 'Criar Conta' : 'Entrar no Sistema'}
-              </button>
-            </form>
-
-            <div className="mt-8 text-center">
-              <button 
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setLoginError('');
-                  setRegisterMessage('');
-                }}
-                className="text-xs text-emerald-600 font-bold hover:underline"
-              >
-                {isRegistering ? 'Já tem uma conta? Faça login' : 'Não tem uma conta? Cadastre-se'}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <Routes>
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/print/:tipo/:id?" element={
         <PrintDocument 
           profile={profile} 
@@ -1389,7 +1265,135 @@ export default function App() {
         />
       } />
       <Route path="*" element={
-        <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
+        !user ? (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+            >
+              <div className="p-8 md:p-12">
+                <div className="flex justify-center mb-8">
+                  <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-200">
+                    <Plus size={32} strokeWidth={3} />
+                  </div>
+                </div>
+                <div className="text-center mb-10">
+                  <h1 className="text-3xl font-bold text-slate-900 mb-2">OdontoHub</h1>
+                  <p className="text-slate-500">Acesse sua conta para gerenciar sua clínica</p>
+                </div>
+
+                <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-6">
+                  {isRegistering && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
+                      <div className="relative">
+                        <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                          type="text" 
+                          required
+                          placeholder="Dr. João Silva"
+                          value={registerData.name}
+                          onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
+                          className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input 
+                        type="email" 
+                        required
+                        placeholder="exemplo@clinica.com"
+                        value={isRegistering ? registerData.email : loginData.email}
+                        onChange={(e) => isRegistering 
+                          ? setRegisterData({...registerData, email: e.target.value})
+                          : setLoginData({...loginData, email: e.target.value})
+                        }
+                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Senha</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input 
+                        type="password" 
+                        required
+                        placeholder="••••••••"
+                        value={isRegistering ? registerData.password : loginData.password}
+                        onChange={(e) => isRegistering
+                          ? setRegisterData({...registerData, password: e.target.value})
+                          : setLoginData({...loginData, password: e.target.value})
+                        }
+                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {!isRegistering && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <input 
+                          id="remember-me"
+                          type="checkbox" 
+                          checked={loginData.rememberMe}
+                          onChange={(e) => setLoginData({...loginData, rememberMe: e.target.checked})}
+                          className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                        />
+                        <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 font-medium cursor-pointer">
+                          Lembrar de mim
+                        </label>
+                      </div>
+                      <Link to="/forgot-password" title="Recuperar senha" className="text-sm text-emerald-600 font-bold hover:underline">
+                        Esqueci minha senha
+                      </Link>
+                    </div>
+                  )}
+
+                  {loginError && (
+                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
+                      <AlertCircle size={18} />
+                      {loginError}
+                    </div>
+                  )}
+
+                  {registerMessage && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm">
+                      <CheckCircle2 size={18} />
+                      {registerMessage}
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit"
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+                  >
+                    {isRegistering ? 'Criar Conta' : 'Entrar no Sistema'}
+                  </button>
+                </form>
+
+                <div className="mt-8 text-center">
+                  <button 
+                    onClick={() => {
+                      setIsRegistering(!isRegistering);
+                      setLoginError('');
+                      setRegisterMessage('');
+                    }}
+                    className="text-xs text-emerald-600 font-bold hover:underline"
+                  >
+                    {isRegistering ? 'Já tem uma conta? Faça login' : 'Não tem uma conta? Cadastre-se'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        ) : (
+          <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -4872,8 +4876,245 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+        )
       } />
     </Routes>
+  );
+}
+
+function ForgotPassword() {
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await fetch('/api/auth/request-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(data.message);
+      } else {
+        setError(data.error);
+      }
+    } catch (err) {
+      setError('Erro ao conectar com o servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+      >
+        <div className="p-8 md:p-12">
+          <div className="flex justify-center mb-8">
+            <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-200">
+              <Plus size={32} strokeWidth={3} />
+            </div>
+          </div>
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Recuperar Senha</h1>
+            <p className="text-slate-500">Digite seu e-mail para receber as instruções</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="email" 
+                  required
+                  placeholder="exemplo@clinica.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
+                <AlertCircle size={18} />
+                {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm">
+                <CheckCircle2 size={18} />
+                {message}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? 'Enviando...' : 'Enviar Instruções'}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center">
+            <Link to="/" className="text-xs text-emerald-600 font-bold hover:underline">
+              Voltar para o login
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function ResetPassword() {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const token = new URLSearchParams(location.search).get('token');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(true);
+        setMessage(data.message);
+        setTimeout(() => navigate('/'), 3000);
+      } else {
+        setError(data.error);
+      }
+    } catch (err) {
+      setError('Erro ao conectar com o servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-md">
+          <AlertTriangle className="mx-auto text-rose-500 mb-4" size={48} />
+          <h1 className="text-2xl font-bold mb-2">Link Inválido</h1>
+          <p className="text-slate-500 mb-6">Este link de recuperação de senha é inválido ou expirou.</p>
+          <Link to="/" className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold inline-block">
+            Voltar para o login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+      >
+        <div className="p-8 md:p-12">
+          <div className="flex justify-center mb-8">
+            <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-200">
+              <Lock size={32} strokeWidth={3} />
+            </div>
+          </div>
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Nova Senha</h1>
+            <p className="text-slate-500">Crie uma nova senha segura para sua conta</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nova Senha</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="password" 
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Confirmar Nova Senha</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="password" 
+                  required
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
+                <AlertCircle size={18} />
+                {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm">
+                <CheckCircle2 size={18} />
+                {message}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={loading || success}
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? 'Processando...' : 'Redefinir Senha'}
+            </button>
+          </form>
+
+          {success && (
+            <div className="mt-6 text-center text-sm text-slate-500">
+              Redirecionando para o login em instantes...
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
