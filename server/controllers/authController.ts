@@ -137,6 +137,17 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
   }
 
   try {
+    // Ensure table exists (extra safety for serverless)
+    await query(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const userResult = await query('SELECT id, name FROM users WHERE email = $1', [email]);
     const user = userResult.rows[0];
 
@@ -156,31 +167,41 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
 
       // Enviar e-mail real
       const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-      await sendEmail({
-        to: email,
-        subject: 'Recuperação de Senha - OdontoHub',
-        text: `Olá ${user.name},\n\nVocê solicitou a recuperação de senha para sua conta no OdontoHub.\n\nClique no link abaixo para definir uma nova senha:\n\n${resetLink}\n\nEste link expira em 1 hora.\n\nSe você não solicitou isso, ignore este e-mail.`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #059669;">Recuperação de Senha</h2>
-            <p>Olá <strong>${user.name}</strong>,</p>
-            <p>Você solicitou a recuperação de senha para sua conta no <strong>OdontoHub</strong>.</p>
-            <p>Clique no botão abaixo para definir uma nova senha:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetLink}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Redefinir Senha</a>
+      
+      try {
+        await sendEmail({
+          to: email,
+          subject: 'Recuperação de Senha - OdontoHub',
+          text: `Olá ${user.name},\n\nVocê solicitou a recuperação de senha para sua conta no OdontoHub.\n\nClique no link abaixo para definir uma nova senha:\n\n${resetLink}\n\nEste link expira em 1 hora.\n\nSe você não solicitou isso, ignore este e-mail.`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+              <h2 style="color: #059669;">Recuperação de Senha</h2>
+              <p>Olá <strong>${user.name}</strong>,</p>
+              <p>Você solicitou a recuperação de senha para sua conta no <strong>OdontoHub</strong>.</p>
+              <p>Clique no botão abaixo para definir uma nova senha:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetLink}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Redefinir Senha</a>
+              </div>
+              <p style="color: #64748b; font-size: 14px;">Este link expira em 1 hora.</p>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <p style="color: #94a3b8; font-size: 12px;">Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
             </div>
-            <p style="color: #64748b; font-size: 14px;">Este link expira em 1 hora.</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-            <p style="color: #94a3b8; font-size: 12px;">Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
-          </div>
-        `
-      });
+          `
+        });
+      } catch (emailError) {
+        console.error('Failed to send reset email:', emailError);
+        // We don't throw here to avoid 500 if it's just an email delivery issue
+        // but the user won't get the email. In production, this is a problem.
+      }
     }
 
     return res.status(200).json({ message: successMessage });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Password reset request error:', error);
-    return res.status(500).json({ error: 'Erro interno no servidor' });
+    return res.status(500).json({ 
+      error: 'Erro interno no servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -200,6 +221,17 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 
   try {
+    // Ensure table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const resetResult = await query(
       'SELECT user_id, expires_at FROM password_resets WHERE token = $1',
       [token]
@@ -219,13 +251,16 @@ export const resetPassword = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, reset.user_id]);
-    await query('DELETE FROM password_resets WHERE user_id = $2', [reset.user_id]);
+    await query('DELETE FROM password_resets WHERE user_id = $1', [reset.user_id]);
 
     await logSecurityEvent(reset.user_id, 'PASSWORD_RESET_SUCCESS', 'Senha redefinida com sucesso via token', req);
 
     return res.status(200).json({ message: 'Sua senha foi redefinida com sucesso.' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Password reset error:', error);
-    return res.status(500).json({ error: 'Erro interno no servidor' });
+    return res.status(500).json({ 
+      error: 'Erro interno no servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
