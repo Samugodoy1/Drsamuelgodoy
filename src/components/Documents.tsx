@@ -60,11 +60,12 @@ interface DocumentsProps {
   patients: Patient[];
   profile: Dentist | null;
   apiFetch: (url: string, options?: any) => Promise<Response>;
+  imprimirDocumento: (tipo: string, id: string | number | null) => void;
 }
 
 type DocType = 'receituario' | 'declaracao' | 'atestado' | 'encaminhamento' | 'ficha' | 'orcamento';
 
-export function Documents({ patients, profile, apiFetch }: DocumentsProps) {
+export function Documents({ patients, profile, apiFetch, imprimirDocumento }: DocumentsProps) {
   const [selectedDoc, setSelectedDoc] = useState<DocType | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [fullPatientData, setFullPatientData] = useState<Patient | null>(null);
@@ -107,13 +108,34 @@ export function Documents({ patients, profile, apiFetch }: DocumentsProps) {
     fetchFullPatient();
   }, [selectedPatientId, apiFetch]);
 
-  const handlePrint = () => {
+  const saveAndPrint = async () => {
+    if (!selectedPatientId || !selectedDoc) return;
+
+    let content = {};
+    if (selectedDoc === 'receituario') content = prescription;
+    else if (selectedDoc === 'atestado') content = certificate;
+    else if (selectedDoc === 'encaminhamento') content = referral;
+    else if (selectedDoc === 'orcamento') content = budget;
+
     try {
-      window.focus();
-      window.print();
-    } catch (e) {
-      console.error('Print failed:', e);
-      alert('Se a impressão não abrir, tente abrir o aplicativo em uma nova aba usando o ícone no canto superior direito.');
+      const res = await apiFetch('/api/documents', {
+        method: 'POST',
+        body: JSON.stringify({
+          patient_id: parseInt(selectedPatientId),
+          type: selectedDoc,
+          content: content
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        imprimirDocumento(selectedDoc, data.id);
+      } else {
+        alert('Erro ao salvar documento para impressão.');
+      }
+    } catch (error) {
+      console.error('Error saving document:', error);
+      alert('Erro ao salvar documento para impressão.');
     }
   };
 
@@ -171,7 +193,7 @@ export function Documents({ patients, profile, apiFetch }: DocumentsProps) {
           </button>
           <div className="flex gap-3">
             <button 
-              onClick={handlePrint}
+              onClick={saveAndPrint}
               className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 transition-colors"
             >
               <Printer size={18} />

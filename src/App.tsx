@@ -611,6 +611,7 @@ export default function App() {
   const generateReceipt = (transaction: any) => {
     const dentist = adminUsers.find(u => u.id === transaction.dentist_id) || profile;
     setSelectedReceipt({
+      id: transaction.id,
       patientName: transaction.patient_name || transaction.patientName || (transaction.patient && transaction.patient.name) || 'Paciente não identificado',
       amount: transaction.amount,
       amountFormatted: Number(transaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
@@ -623,6 +624,21 @@ export default function App() {
       clinicAddress: profile?.clinic_address || ''
     });
     setIsReceiptModalOpen(true);
+  };
+
+  const imprimirDocumento = (tipo: string, id: string | number | null = null) => {
+    let url = `/print/${tipo}`;
+    if (id) {
+      url += `/${id}`;
+    }
+    
+    // Special case for agenda date if not provided as ID
+    if (tipo === 'agenda' && !id) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      url += `?date=${dateStr}`;
+    }
+    
+    window.open(url, "_blank");
   };
 
   const handleSaveTransaction = async (e: React.FormEvent) => {
@@ -1360,25 +1376,31 @@ export default function App() {
 
   // Routing for print pages
   const pathname = window.location.pathname;
-  if (pathname.includes('/imprimir')) {
+  if (pathname.startsWith('/print/')) {
     if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando dados para impressão...</div>;
     
-    if (pathname === '/agenda/imprimir') {
+    const parts = pathname.split('/');
+    const type = parts[2];
+    const id = parts[3];
+    
+    if (type === 'agenda') {
       const dateStr = new URLSearchParams(window.location.search).get('date') || new Date().toISOString().split('T')[0];
       const date = new Date(dateStr + 'T12:00:00');
       return <PrintAgenda date={date} appointments={appointments} profile={profile} />;
     }
     
-    if (pathname === '/recibo/imprimir') {
-      const id = new URLSearchParams(window.location.search).get('id');
+    if (type === 'recibo') {
       const transaction = transactions.find(t => t.id.toString() === id);
       const installment = installments.find(i => i.id.toString() === id);
       return <PrintReceipt transaction={transaction} installment={installment} profile={profile} patients={patients} paymentPlans={paymentPlans} />;
     }
     
-    if (pathname === '/relatorio/imprimir') {
-      return <PrintReport profile={profile} />;
+    if (type === 'relatorio') {
+      return <PrintReport profile={profile} transactions={transactions} patients={patients} appointments={appointments} />;
     }
+
+    // Generic documents from the 'documents' table
+    return <PrintDocument id={id} type={type} profile={profile} patients={patients} apiFetch={apiFetch} />;
   }
 
   return (
@@ -1819,10 +1841,7 @@ export default function App() {
                             Hoje
                           </button>
                           <button 
-                            onClick={() => {
-                              const dateStr = selectedDate.toISOString().split('T')[0];
-                              window.open(`/agenda/imprimir?date=${dateStr}`, '_blank');
-                            }}
+                            onClick={() => imprimirDocumento('agenda')}
                             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all no-print"
                             title="Imprimir agenda do dia"
                           >
@@ -2936,6 +2955,13 @@ export default function App() {
                       </div>
                       <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                         <button 
+                          onClick={() => imprimirDocumento('relatorio')}
+                          className="flex-1 sm:flex-none bg-white text-slate-600 border border-slate-200 px-6 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                        >
+                          <Printer size={18} />
+                          Relatório
+                        </button>
+                        <button 
                           onClick={() => {
                             setExportType('finance');
                             setIsExportModalOpen(true);
@@ -3540,7 +3566,7 @@ export default function App() {
             )}
 
             {activeTab === 'documentos' && (
-              <Documents patients={patients} profile={profile} apiFetch={apiFetch} />
+              <Documents patients={patients} profile={profile} apiFetch={apiFetch} imprimirDocumento={imprimirDocumento} />
             )}
 
             {activeTab === 'configuracoes' && profile && (
@@ -4221,7 +4247,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-3">
                     <button 
-                      onClick={() => window.open(`/recibo/imprimir?id=${selectedReceipt.id}`, '_blank')}
+                      onClick={() => imprimirDocumento('recibo', selectedReceipt.id)}
                       className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
                       title="Imprimir"
                     >
@@ -5008,16 +5034,329 @@ function PrintReceipt({ transaction, installment, profile, patients, paymentPlan
   );
 }
 
-function PrintReport({ profile }: any) {
+function PrintReport({ profile, transactions, patients, appointments }: any) {
+  const summary = {
+    totalIncome: transactions.filter((t: any) => t.type === 'INCOME').reduce((acc: number, t: any) => acc + Number(t.amount), 0),
+    totalExpense: transactions.filter((t: any) => t.type === 'EXPENSE').reduce((acc: number, t: any) => acc + Number(t.amount), 0),
+    totalPatients: patients.length,
+    totalAppointments: appointments.length
+  };
+
   return (
-    <PrintLayout title="Relatório" onPrint={() => window.print()}>
-      <div className="border-b-2 border-slate-200 pb-4 mb-8">
-        <h1 className="text-2xl font-bold">Relatório do Sistema</h1>
-        <p className="text-slate-500">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
-        <p className="text-slate-500">Profissional: {profile?.name}</p>
+    <PrintLayout title="Relatório Financeiro" onPrint={() => window.print()}>
+      <div className="p-12 bg-white text-slate-800 font-sans">
+        <div className="flex justify-between items-start mb-16 border-b-4 border-slate-900 pb-8">
+          <div>
+            <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tight mb-2">Relatório Geral</h1>
+            <p className="text-xl text-slate-500 font-medium">Resumo de Atividades e Financeiro</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Data de Emissão</p>
+            <p className="text-xl font-bold text-slate-900">{new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-12 mb-16">
+          <div className="space-y-6">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Resumo Financeiro</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Total de Entradas</span>
+                <span className="text-2xl font-black text-emerald-600">
+                  {summary.totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Total de Saídas</span>
+                <span className="text-2xl font-black text-rose-600">
+                  {summary.totalExpense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
+                <span className="text-lg font-black text-slate-900 uppercase">Saldo Final</span>
+                <span className={`text-3xl font-black ${(summary.totalIncome - summary.totalExpense) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {(summary.totalIncome - summary.totalExpense).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Estatísticas Gerais</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Pacientes</p>
+                <p className="text-4xl font-black text-slate-900">{summary.totalPatients}</p>
+              </div>
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Consultas</p>
+                <p className="text-4xl font-black text-slate-900">{summary.totalAppointments}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Últimas Transações</h3>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="text-slate-400 text-xs uppercase tracking-widest">
+                <th className="pb-4 font-black">Data</th>
+                <th className="pb-4 font-black">Descrição</th>
+                <th className="pb-4 font-black">Tipo</th>
+                <th className="pb-4 font-black text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-700">
+              {transactions.slice(0, 15).map((t: any) => (
+                <tr key={t.id} className="border-b border-slate-50">
+                  <td className="py-4 font-medium">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                  <td className="py-4 font-bold text-slate-900">{t.description}</td>
+                  <td className="py-4">
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded ${t.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                      {t.type === 'INCOME' ? 'Entrada' : 'Saída'}
+                    </span>
+                  </td>
+                  <td className={`py-4 font-black text-right ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-24 pt-12 border-t border-slate-100 flex justify-between items-end">
+          <div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Clínica</p>
+            <p className="text-lg font-bold text-slate-900">{profile?.clinic_name || 'OdontoHub'}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Responsável</p>
+            <p className="text-lg font-bold text-slate-900">{profile?.name}</p>
+          </div>
+        </div>
       </div>
-      <div className="p-8 border border-slate-200 rounded-xl">
-        <p className="text-center text-slate-400 italic">Conteúdo do relatório em desenvolvimento...</p>
+    </PrintLayout>
+  );
+}
+
+function PrintDocument({ id, type, profile, patients, apiFetch }: any) {
+  const [doc, setDoc] = useState<any>(null);
+  const [fullPatient, setFullPatient] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDoc = async () => {
+      try {
+        const res = await apiFetch(`/api/documents/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          const parsedDoc = {
+            ...data,
+            content: JSON.parse(data.content)
+          };
+          setDoc(parsedDoc);
+          
+          // If it's a ficha or has a patient_id, fetch full patient data
+          if (data.patient_id) {
+            const pRes = await apiFetch(`/api/patients/${data.patient_id}`);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              setFullPatient(pData);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching document:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchDoc();
+    } else {
+      setLoading(false);
+    }
+  }, [id, apiFetch]);
+
+  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando documento...</div>;
+  if (!doc && id) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Documento não encontrado.</div>;
+
+  const patient = fullPatient || patients.find((p: any) => p.id === doc?.patient_id);
+  const content = doc?.content || {};
+
+  return (
+    <PrintLayout title={type.charAt(0).toUpperCase() + type.slice(1)} onPrint={() => window.print()}>
+      <div className="bg-white p-[1cm] font-serif text-slate-900">
+        {/* Header */}
+        <div className="text-center border-b-2 border-emerald-600 pb-6 mb-10">
+          <h1 className="text-3xl font-bold text-emerald-800 uppercase tracking-widest">
+            {profile?.clinic_name || 'Clínica Odontológica'}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {profile?.clinic_address || 'Endereço não informado'}
+          </p>
+          <p className="text-sm text-slate-500">
+            Tel: {profile?.phone || 'Telefone não informado'}
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="space-y-8 min-h-[15cm]">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold uppercase underline decoration-emerald-600 underline-offset-8">
+              {type === 'receituario' ? 'Receituário' : 
+               type === 'declaracao' ? 'Declaração' : 
+               type === 'atestado' ? 'Atestado' : 
+               type === 'encaminhamento' ? 'Encaminhamento' : 
+               type === 'ficha' ? 'Ficha Clínica' : 
+               type === 'orcamento' ? 'Orçamento' : type}
+            </h2>
+          </div>
+
+          <div className="space-y-6 text-lg leading-relaxed">
+            <p><strong>Paciente:</strong> {patient?.name || '________________________________'}</p>
+            <p><strong>Data:</strong> {doc?.created_at ? new Date(doc.created_at).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}</p>
+
+            {type === 'receituario' && (
+              <div className="mt-10 space-y-8">
+                <p className="font-bold text-xl mb-4 text-emerald-800">Uso Interno:</p>
+                {content.items?.map((item: any, i: number) => (
+                  <div key={i} className="border-l-4 border-emerald-600 pl-4 mb-6">
+                    <p className="font-bold text-lg">{item.medication}</p>
+                    <p className="text-slate-700 italic">{item.dosage}</p>
+                  </div>
+                ))}
+                {content.instructions && (
+                  <div className="mt-8 pt-6 border-t border-slate-100">
+                    <p className="font-bold mb-2">Instruções:</p>
+                    <p className="text-slate-700 whitespace-pre-wrap">{content.instructions}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {type === 'declaracao' && (
+              <div className="mt-10">
+                <p className="text-justify">
+                  Declaro para os devidos fins que o(a) paciente <strong>{patient?.name}</strong> compareceu a esta clínica odontológica na data de <strong>{new Date(doc?.created_at || Date.now()).toLocaleDateString('pt-BR')}</strong> para atendimento odontológico.
+                </p>
+              </div>
+            )}
+
+            {type === 'atestado' && (
+              <div className="mt-10 space-y-6">
+                <p className="text-justify">
+                  Atesto, para os devidos fins, que o(a) Sr(a). <strong>{patient?.name}</strong> necessita de <strong>{content.period}</strong> de afastamento de suas atividades, a partir desta data, por motivo de tratamento odontológico.
+                </p>
+                {content.reason && (
+                  <p><strong>Observação:</strong> {content.reason}</p>
+                )}
+              </div>
+            )}
+
+            {type === 'encaminhamento' && (
+              <div className="mt-10 space-y-6">
+                <p><strong>Ao Especialista:</strong> {content.specialist}</p>
+                <p className="text-justify">
+                  Encaminho o(a) paciente <strong>{patient?.name}</strong> para avaliação e conduta especializada.
+                </p>
+                <p><strong>Motivo/Histórico:</strong> {content.reason}</p>
+              </div>
+            )}
+
+            {type === 'ficha' && (
+              <div className="mt-10 space-y-8">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <p><strong>CPF:</strong> {patient?.cpf}</p>
+                  <p><strong>Data de Nasc.:</strong> {patient?.birth_date ? new Date(patient.birth_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+                  <p><strong>E-mail:</strong> {patient?.email}</p>
+                  <p><strong>Telefone:</strong> {patient?.phone}</p>
+                  <p className="col-span-2"><strong>Endereço:</strong> {patient?.address || 'Não informado'}</p>
+                </div>
+                
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h4 className="font-bold border-b-2 border-emerald-600 pb-1 text-emerald-800 uppercase tracking-wider">Histórico Clínico (Anamnese)</h4>
+                    <div className="grid grid-cols-1 gap-4 text-sm">
+                      <div>
+                        <p className="font-bold text-slate-500 text-[10px] uppercase">Histórico Médico:</p>
+                        <p>{patient?.anamnesis?.medical_history || 'Nenhum histórico registrado.'}</p>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-500 text-[10px] uppercase">Alergias:</p>
+                        <p className="text-rose-600 font-bold">{patient?.anamnesis?.allergies || 'Nenhuma alergia informada.'}</p>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-500 text-[10px] uppercase">Medicações em Uso:</p>
+                        <p>{patient?.anamnesis?.medications || 'Nenhuma medicação informada.'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold border-b-2 border-emerald-600 pb-1 text-emerald-800 uppercase tracking-wider">Histórico de Atendimentos (Evolução)</h4>
+                    {patient?.evolution && patient.evolution.length > 0 ? (
+                      <div className="space-y-4">
+                        {patient.evolution.map((evo: any, i: number) => (
+                          <div key={i} className="border-b border-slate-100 pb-3">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs font-bold text-emerald-700">{new Date(evo.date).toLocaleDateString('pt-BR')}</span>
+                              <span className="text-xs font-bold text-slate-400 uppercase">{evo.procedure_performed}</span>
+                            </div>
+                            <p className="text-sm text-slate-600 italic">{evo.notes}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">Nenhum atendimento registrado até o momento.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {type === 'orcamento' && (
+              <div className="mt-10 space-y-6">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-emerald-50 text-emerald-800">
+                      <th className="border border-emerald-100 p-3 text-left">Procedimento</th>
+                      <th className="border border-emerald-100 p-3 text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {content.items?.map((item: any, i: number) => (
+                      <tr key={i}>
+                        <td className="border border-slate-100 p-3">{item.procedure}</td>
+                        <td className="border border-slate-100 p-3 text-right">
+                          {Number(item.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="font-bold bg-slate-50">
+                      <td className="border border-slate-100 p-3 text-right">Total</td>
+                      <td className="border border-slate-100 p-3 text-right text-emerald-700">
+                        {content.items?.reduce((acc: number, item: any) => acc + Number(item.value), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer / Signature */}
+        <div className="mt-20 flex flex-col items-center">
+          <div className="w-64 border-t border-slate-400 mb-2"></div>
+          <p className="font-bold text-lg">{profile?.name}</p>
+          <p className="text-slate-600">Cirurgião-Dentista • CRO: {profile?.cro}</p>
+        </div>
       </div>
     </PrintLayout>
   );

@@ -149,6 +149,15 @@ export async function initDb() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS documents (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Bootstrap default admin if not exists
       -- Password is 'admin123'
       INSERT INTO users (name, email, password, role, status)

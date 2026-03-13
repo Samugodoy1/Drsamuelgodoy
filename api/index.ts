@@ -46,6 +46,12 @@ import {
   updateProfile 
 } from '../server/controllers/profileController.js';
 import { deleteFile } from '../server/controllers/fileController.js';
+import { 
+  getDocuments, 
+  getDocumentById, 
+  createDocument, 
+  deleteDocument 
+} from '../server/controllers/documentController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
 
@@ -126,6 +132,12 @@ app.post(['/profile', '/api/profile'], updateProfile);
 
 // Files
 app.delete(['/files/:id', '/api/files/:id'], deleteFile);
+
+// Documents
+app.get(['/documents', '/api/documents'], getDocuments);
+app.get(['/documents/:id', '/api/documents/:id'], getDocumentById);
+app.post(['/documents', '/api/documents'], createDocument);
+app.delete(['/documents/:id', '/api/documents/:id'], deleteDocument);
 
 // Admin
 app.get(['/admin/users', '/api/admin/users'], requireAdmin, getUsers);
