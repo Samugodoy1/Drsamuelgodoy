@@ -18,6 +18,7 @@ import {
   Lock,
   Mail,
   Trash2,
+  Printer,
   Upload,
   FileText,
   UserPlus,
@@ -29,7 +30,6 @@ import {
   UserCog,
   Sun,
   Moon,
-  Printer,
   Download,
   X,
   List
@@ -1710,7 +1710,7 @@ export default function App() {
             {activeTab === 'agenda' && (
               <div className="flex flex-col desktop:grid desktop:grid-cols-4 gap-6 md:gap-8">
                 {/* Mini Calendar / Filters */}
-                <div className="space-y-6 order-1 desktop:order-1">
+                <div className="space-y-6 order-1 desktop:order-1 no-print">
                   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <h3 className="font-bold mb-4 text-slate-800">Filtros da Agenda</h3>
                     <div className="space-y-4 tablet-p:grid tablet-p:grid-cols-3 tablet-p:gap-6 tablet-p:space-y-0 desktop:flex desktop:flex-col desktop:space-y-4">
@@ -1784,7 +1784,7 @@ export default function App() {
 
                 {/* Timeline View */}
                 <div className="desktop:col-span-3 space-y-4 order-2 desktop:order-2">
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden no-print">
                     <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="flex flex-wrap items-center gap-3 md:gap-4">
                         <div className="flex items-center gap-2">
@@ -1793,6 +1793,14 @@ export default function App() {
                             className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
                           >
                             Hoje
+                          </button>
+                          <button 
+                            onClick={() => window.print()}
+                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all no-print"
+                            title="Imprimir agenda do dia"
+                          >
+                            <Printer size={18} />
+                            <span className="hidden xs:inline">Imprimir</span>
                           </button>
                           <div className="flex items-center gap-1">
                             <button 
@@ -4752,7 +4760,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Floating Action Button (Mobile) */}
-      <div className="fixed bottom-20 md:bottom-8 right-6 z-40 lg:hidden hidden md:flex flex-col gap-3">
+      <div className="fixed bottom-20 md:bottom-8 right-6 z-40 lg:hidden hidden md:flex flex-col gap-3 no-print">
         <button 
           onClick={() => setIsModalOpen(true)}
           className="w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform"
@@ -4825,6 +4833,78 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Print-only Agenda */}
+      <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-10 overflow-auto print-only">
+        <div className="max-w-4xl mx-auto">
+          <div className="border-b-4 border-slate-900 pb-8 mb-10">
+            <h1 className="text-4xl font-black text-slate-900 mb-2 uppercase tracking-tight">Agenda do Dia</h1>
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-2xl font-bold text-slate-700 capitalize">
+                  {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-xl text-slate-500 mt-1">
+                  {profile?.name || 'Dr. Samuel Godoy'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-bold text-slate-900">
+                  Total: {appointments.filter(a => new Date(a.start_time).toDateString() === selectedDate.toDateString()).length} consultas
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-8">
+            {appointments
+              .filter(a => new Date(a.start_time).toDateString() === selectedDate.toDateString())
+              .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+              .map((app) => (
+                <div key={app.id} className="flex gap-8 pb-8 border-b border-slate-200 last:border-0">
+                  <div className="w-8 h-8 border-2 border-slate-400 rounded flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-2xl font-black text-slate-900">
+                        {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        <span className="mx-3 text-slate-300">—</span>
+                        {app.patient_name}
+                      </p>
+                      <span className="text-sm font-black text-slate-400 border border-slate-200 px-3 py-1 rounded-lg uppercase tracking-widest">
+                        {app.status === 'SCHEDULED' ? 'Agendado' : 
+                         app.status === 'CONFIRMED' ? 'Confirmado' : 
+                         app.status === 'CANCELLED' ? 'Cancelado' : 
+                         app.status === 'IN_PROGRESS' ? 'Em Atendimento' : 'Finalizado'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <p className="text-slate-700 text-lg">
+                        <span className="font-bold text-slate-400 uppercase text-xs tracking-wider block mb-0.5">Procedimento</span>
+                        {app.procedure_name || 'Não especificado'}
+                      </p>
+                      <p className="text-slate-700 text-lg">
+                        <span className="font-bold text-slate-400 uppercase text-xs tracking-wider block mb-0.5">Dentista</span>
+                        {app.dentist_name}
+                      </p>
+                    </div>
+                    {app.notes && (
+                      <p className="mt-3 text-slate-500 italic text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="font-bold not-italic text-[10px] uppercase tracking-widest block mb-1">Observações:</span>
+                        {app.notes}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          <div className="mt-20 pt-10 border-t border-slate-200 text-center">
+            <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">
+              Documento gerado pelo sistema OdontoPro em {new Date().toLocaleString('pt-BR')}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

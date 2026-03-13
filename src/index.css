@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --breakpoint-xs: 400px;
   --breakpoint-tablet-p: 768px;
   --breakpoint-tablet-l: 900px;
   --breakpoint-desktop: 1200px;
@@ -30,13 +31,13 @@
       visibility: hidden;
     }
 
-    /* Show only the receipt content and its children */
-    .receipt-content, .receipt-content * {
+    /* Show only the receipt content or print-only content and its children */
+    .receipt-content, .receipt-content *, .print-only, .print-only * {
       visibility: visible;
     }
 
     /* Position and style the receipt content for a clean print */
-    .receipt-content {
+    .receipt-content, .print-only {
       position: absolute !important;
       left: 0 !important;
       top: 0 !important;
