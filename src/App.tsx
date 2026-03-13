@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useParams, useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { 
   Users, 
@@ -1374,37 +1375,21 @@ export default function App() {
     );
   }
 
-  // Routing for print pages
-  const pathname = window.location.pathname;
-  if (pathname.startsWith('/print/')) {
-    if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando dados para impressão...</div>;
-    
-    const parts = pathname.split('/');
-    const type = parts[2];
-    const id = parts[3];
-    
-    if (type === 'agenda') {
-      const dateStr = new URLSearchParams(window.location.search).get('date') || new Date().toISOString().split('T')[0];
-      const date = new Date(dateStr + 'T12:00:00');
-      return <PrintAgenda date={date} appointments={appointments} profile={profile} />;
-    }
-    
-    if (type === 'recibo') {
-      const transaction = transactions.find(t => t.id.toString() === id);
-      const installment = installments.find(i => i.id.toString() === id);
-      return <PrintReceipt transaction={transaction} installment={installment} profile={profile} patients={patients} paymentPlans={paymentPlans} />;
-    }
-    
-    if (type === 'relatorio') {
-      return <PrintReport profile={profile} transactions={transactions} patients={patients} appointments={appointments} />;
-    }
-
-    // Generic documents from the 'documents' table
-    return <PrintDocument id={id} type={type} profile={profile} patients={patients} apiFetch={apiFetch} />;
-  }
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
+    <Routes>
+      <Route path="/print/:tipo/:id?" element={
+        <PrintDocument 
+          profile={profile} 
+          patients={patients} 
+          apiFetch={apiFetch} 
+          appointments={appointments} 
+          transactions={transactions} 
+          installments={installments} 
+          paymentPlans={paymentPlans} 
+        />
+      } />
+      <Route path="*" element={
+        <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -4887,6 +4872,8 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+      } />
+    </Routes>
   );
 }
 
@@ -5141,54 +5128,74 @@ function PrintReport({ profile, transactions, patients, appointments }: any) {
   );
 }
 
-function PrintDocument({ id, type, profile, patients, apiFetch }: any) {
+function PrintDocument({ profile, patients, apiFetch, appointments, transactions, installments, paymentPlans }: any) {
+  const { tipo: type, id } = useParams();
   const [doc, setDoc] = useState<any>(null);
   const [fullPatient, setFullPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDoc = async () => {
-      try {
-        const res = await apiFetch(`/api/documents/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          const parsedDoc = {
-            ...data,
-            content: JSON.parse(data.content)
-          };
-          setDoc(parsedDoc);
-          
-          // If it's a ficha or has a patient_id, fetch full patient data
-          if (data.patient_id) {
-            const pRes = await apiFetch(`/api/patients/${data.patient_id}`);
-            if (pRes.ok) {
-              const pData = await pRes.json();
-              setFullPatient(pData);
+      // If it's a generic document from the 'documents' table
+      const genericTypes = ['receituario', 'declaracao', 'atestado', 'encaminhamento', 'ficha', 'orcamento'];
+      if (type && genericTypes.includes(type) && id) {
+        try {
+          const res = await apiFetch(`/api/documents/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            const parsedDoc = {
+              ...data,
+              content: JSON.parse(data.content)
+            };
+            setDoc(parsedDoc);
+            
+            if (data.patient_id) {
+              const pRes = await apiFetch(`/api/patients/${data.patient_id}`);
+              if (pRes.ok) {
+                const pData = await pRes.json();
+                setFullPatient(pData);
+              }
             }
           }
+        } catch (error) {
+          console.error('Error fetching document:', error);
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching document:', error);
-      } finally {
+      } else {
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchDoc();
-    } else {
-      setLoading(false);
-    }
-  }, [id, apiFetch]);
+    fetchDoc();
+  }, [id, type, apiFetch]);
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando documento...</div>;
+  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando dados para impressão...</div>;
+
+  // Handle specific non-generic types
+  if (type === 'agenda') {
+    const dateStr = new URLSearchParams(window.location.search).get('date') || new Date().toISOString().split('T')[0];
+    const date = new Date(dateStr + 'T12:00:00');
+    return <PrintAgenda date={date} appointments={appointments} profile={profile} />;
+  }
+  
+  if (type === 'recibo') {
+    const transaction = transactions.find((t: any) => t.id.toString() === id);
+    const installment = installments.find((i: any) => i.id.toString() === id);
+    return <PrintReceipt transaction={transaction} installment={installment} profile={profile} patients={patients} paymentPlans={paymentPlans} />;
+  }
+  
+  if (type === 'relatorio') {
+    return <PrintReport profile={profile} transactions={transactions} patients={patients} appointments={appointments} />;
+  }
+
   if (!doc && id) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Documento não encontrado.</div>;
 
   const patient = fullPatient || patients.find((p: any) => p.id === doc?.patient_id);
   const content = doc?.content || {};
 
   return (
-    <PrintLayout title={type.charAt(0).toUpperCase() + type.slice(1)} onPrint={() => window.print()}>
+    <PrintLayout title={type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Documento'} onPrint={() => window.print()}>
       <div className="bg-white p-[1cm] font-serif text-slate-900">
         {/* Header */}
         <div className="text-center border-b-2 border-emerald-600 pb-6 mb-10">
