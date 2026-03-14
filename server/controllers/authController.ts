@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getJwtSecret, COOKIE_OPTIONS } from '../utils/config.js';
-import { sendEmail } from '../utils/email.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 async function logSecurityEvent(userId: number | null, eventType: string, description: string, req: Request) {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -169,33 +169,14 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
 
       await logSecurityEvent(user.id, 'PASSWORD_RESET_REQUESTED', `Solicitação de recuperação de senha para: ${email}`, req);
 
-      // Enviar e-mail real
-      const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+      // Enviar e-mail real via MailerSend
+      const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+      const resetLink = `${frontendUrl}/reset-password?token=${token}`;
       
       try {
-        await sendEmail({
-          to: email,
-          subject: 'Recuperação de Senha - OdontoHub',
-          text: `Olá ${user.name},\n\nVocê solicitou a recuperação de senha para sua conta no OdontoHub.\n\nClique no link abaixo para definir uma nova senha:\n\n${resetLink}\n\nEste link expira em 1 hora.\n\nSe você não solicitou isso, ignore este e-mail.`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-              <h2 style="color: #059669;">Recuperação de Senha</h2>
-              <p>Olá <strong>${user.name}</strong>,</p>
-              <p>Você solicitou a recuperação de senha para sua conta no <strong>OdontoHub</strong>.</p>
-              <p>Clique no botão abaixo para definir uma nova senha:</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${resetLink}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Redefinir Senha</a>
-              </div>
-              <p style="color: #64748b; font-size: 14px;">Este link expira em 1 hora.</p>
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-              <p style="color: #94a3b8; font-size: 12px;">Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
-            </div>
-          `
-        });
+        await sendPasswordResetEmail(email, resetLink);
       } catch (emailError) {
         console.error('Failed to send reset email:', emailError);
-        // We don't throw here to avoid 500 if it's just an email delivery issue
-        // but the user won't get the email. In production, this is a problem.
       }
     }
 

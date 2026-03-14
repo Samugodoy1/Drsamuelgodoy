@@ -323,7 +323,7 @@ export default function App() {
   const [isEvolutionFormOpen, setIsEvolutionFormOpen] = useState(false);
   const [newEvolution, setNewEvolution] = useState({ notes: '', procedure: '' });
   const [newDentist, setNewDentist] = useState({ name: '', email: '', password: '' });
-  const [newImage, setNewImage] = useState({ url: '', description: '' });
+  const [newImage, setNewImage] = useState<{ url: string, description: string, file: File | null }>({ url: '', description: '', file: null });
   const [newAppointment, setNewAppointment] = useState({
     patient_id: '',
     dentist_id: '',
@@ -463,14 +463,29 @@ export default function App() {
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfile(prev => prev ? { ...prev, photo_url: reader.result as string } : null);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await apiFetch('/api/profile/photo', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(prev => prev ? { ...prev, photo_url: data.url } : null);
+        showNotification('Foto de perfil atualizada!');
+      } else {
+        showNotification('Erro ao carregar foto de perfil.', 'error');
+      }
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      showNotification('Erro ao carregar foto de perfil.', 'error');
     }
   };
 
@@ -478,31 +493,26 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file || !selectedPatient) return;
 
+    const formData = new FormData();
+    formData.append('file', file);
+
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        try {
-          await apiFetch(`/api/patients/${selectedPatient.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-              ...selectedPatient,
-              photo_url: base64String
-            })
-          });
-          
-          // Refresh patient data
-          openPatientRecord(selectedPatient.id);
-          fetchData(); // Refresh list
-          showNotification('Foto do paciente atualizada!');
-        } catch (error) {
-          console.error('Error uploading patient photo:', error);
-          showNotification('Erro ao carregar foto do paciente.', 'error');
-        }
-      };
-      reader.readAsDataURL(file);
+      const res = await apiFetch(`/api/patients/${selectedPatient.id}/photo`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        // Refresh patient data
+        openPatientRecord(selectedPatient.id);
+        fetchData(); // Refresh list
+        showNotification('Foto do paciente atualizada!');
+      } else {
+        showNotification('Erro ao carregar foto do paciente.', 'error');
+      }
     } catch (error) {
-      console.error('Error reading file:', error);
+      console.error('Error uploading patient photo:', error);
+      showNotification('Erro ao carregar foto do paciente.', 'error');
     }
   };
 
@@ -899,9 +909,12 @@ export default function App() {
     const token = options.explicitToken || localStorage.getItem('token');
     const headers: any = {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
       ...options.headers,
     };
+    
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -1032,7 +1045,7 @@ export default function App() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewImage({ ...newImage, url: reader.result as string });
+        setNewImage({ ...newImage, url: reader.result as string, file: file });
       };
       reader.readAsDataURL(file);
     }
@@ -1040,11 +1053,11 @@ export default function App() {
 
   const handleUploadImage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient) return;
+    if (!selectedPatient || !newImage.file) return;
     try {
-      await uploadFile(selectedPatient.id, newImage.url, newImage.description);
+      await uploadFile(selectedPatient.id, newImage.file, newImage.description);
       setIsImageModalOpen(false);
-      setNewImage({ url: '', description: '' });
+      setNewImage({ url: '', description: '', file: null });
     } catch (error) {
       console.error('Error uploading image:', error);
     }
@@ -1196,11 +1209,16 @@ export default function App() {
     }
   };
 
-  const uploadFile = async (patientId: number, fileUrl: string, description: string) => {
+  const uploadFile = async (patientId: number, file: File, description: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('description', description);
+    formData.append('file_type', 'image');
+
     try {
       const res = await apiFetch(`/api/patients/${patientId}/files`, {
         method: 'POST',
-        body: JSON.stringify({ file_url: fileUrl, file_type: 'image', description })
+        body: formData
       });
       if (res.ok) openPatientRecord(patientId);
     } catch (error) {

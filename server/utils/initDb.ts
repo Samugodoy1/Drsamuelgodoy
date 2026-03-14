@@ -16,6 +16,7 @@ export async function initDb() {
         specialty TEXT,
         bio TEXT,
         photo_url TEXT,
+        photo_public_id TEXT,
         clinic_name TEXT,
         clinic_address TEXT,
         accepted_terms BOOLEAN DEFAULT FALSE,
@@ -36,6 +37,9 @@ export async function initDb() {
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='accepted_privacy_policy') THEN
           ALTER TABLE users ADD COLUMN accepted_privacy_policy BOOLEAN DEFAULT FALSE;
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='photo_public_id') THEN
+          ALTER TABLE users ADD COLUMN photo_public_id TEXT;
+        END IF;
       END $$;
 
       CREATE TABLE IF NOT EXISTS patients (
@@ -48,8 +52,17 @@ export async function initDb() {
         email TEXT,
         address TEXT,
         photo_url TEXT,
+        photo_public_id TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Add photo_public_id to patients if it doesn't exist
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='photo_public_id') THEN
+          ALTER TABLE patients ADD COLUMN photo_public_id TEXT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS appointments (
         id SERIAL PRIMARY KEY,
@@ -84,10 +97,19 @@ export async function initDb() {
         id SERIAL PRIMARY KEY,
         patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
         file_url TEXT NOT NULL,
+        file_public_id TEXT,
         file_type TEXT,
         description TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Add public_id to patient_files if it doesn't exist
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patient_files' AND column_name='file_public_id') THEN
+          ALTER TABLE patient_files ADD COLUMN file_public_id TEXT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS transactions (
         id SERIAL PRIMARY KEY,
