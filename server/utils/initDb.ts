@@ -18,8 +18,25 @@ export async function initDb() {
         photo_url TEXT,
         clinic_name TEXT,
         clinic_address TEXT,
+        accepted_terms BOOLEAN DEFAULT FALSE,
+        accepted_terms_at TIMESTAMP WITH TIME ZONE,
+        accepted_privacy_policy BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Add columns if they don't exist (for existing databases)
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='accepted_terms') THEN
+          ALTER TABLE users ADD COLUMN accepted_terms BOOLEAN DEFAULT FALSE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='accepted_terms_at') THEN
+          ALTER TABLE users ADD COLUMN accepted_terms_at TIMESTAMP WITH TIME ZONE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='accepted_privacy_policy') THEN
+          ALTER TABLE users ADD COLUMN accepted_privacy_policy BOOLEAN DEFAULT FALSE;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS patients (
         id SERIAL PRIMARY KEY,

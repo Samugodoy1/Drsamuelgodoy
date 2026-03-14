@@ -91,10 +91,14 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const register = async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, acceptedTerms, acceptedPrivacyPolicy } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios' });
+  }
+
+  if (!acceptedTerms || !acceptedPrivacyPolicy) {
+    return res.status(400).json({ error: 'Você deve aceitar os Termos de Uso e a Política de Privacidade' });
   }
 
   // Password validation: min 8 chars, upper, lower, number
@@ -109,8 +113,8 @@ export const register = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const result = await query(
-      "INSERT INTO users (name, email, password, role, status) VALUES ($1, $2, $3, 'DENTIST', 'pending') RETURNING id",
-      [name, email, hashedPassword]
+      "INSERT INTO users (name, email, password, role, status, accepted_terms, accepted_terms_at, accepted_privacy_policy) VALUES ($1, $2, $3, 'DENTIST', 'pending', $4, CURRENT_TIMESTAMP, $5) RETURNING id",
+      [name, email, hashedPassword, acceptedTerms, acceptedPrivacyPolicy]
     );
 
     const userId = result.rows[0].id;

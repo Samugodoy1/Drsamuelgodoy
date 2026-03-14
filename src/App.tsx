@@ -38,6 +38,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
+import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { formatDate, isOverdue } from './utils/dateUtils';
 
 // Types
@@ -122,6 +123,9 @@ interface Dentist {
   photo_url?: string;
   clinic_name?: string;
   clinic_address?: string;
+  accepted_terms?: boolean;
+  accepted_terms_at?: string;
+  accepted_privacy_policy?: boolean;
 }
 
 interface Appointment {
@@ -280,7 +284,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
   const [loginData, setLoginData] = useState({ email: '', password: '', rememberMe: false });
-  const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
+  const [registerData, setRegisterData] = useState({ 
+    name: '', 
+    email: '', 
+    password: '',
+    acceptedTerms: false,
+    acceptedPrivacyPolicy: false,
+    acceptedResponsibility: false
+  });
   const [isRegistering, setIsRegistering] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [registerMessage, setRegisterMessage] = useState('');
@@ -757,6 +768,12 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
     setRegisterMessage('');
+
+    if (!registerData.acceptedTerms || !registerData.acceptedPrivacyPolicy || !registerData.acceptedResponsibility) {
+      setLoginError('Você deve aceitar todos os termos e declarações para continuar.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -1253,6 +1270,8 @@ export default function App() {
     <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/termos" element={<TermsPage />} />
+      <Route path="/privacidade" element={<PrivacyPage />} />
       <Route path="/print/:tipo/:id?" element={
         <PrintDocument 
           profile={profile} 
@@ -1369,6 +1388,42 @@ export default function App() {
                     </div>
                   )}
 
+                  {isRegistering && (
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <input 
+                          id="accepted-terms"
+                          type="checkbox" 
+                          required
+                          checked={registerData.acceptedTerms && registerData.acceptedPrivacyPolicy}
+                          onChange={(e) => setRegisterData({
+                            ...registerData, 
+                            acceptedTerms: e.target.checked,
+                            acceptedPrivacyPolicy: e.target.checked
+                          })}
+                          className="mt-1 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                        />
+                        <label htmlFor="accepted-terms" className="text-sm text-slate-600 leading-tight">
+                          Li e concordo com os <Link to="/termos" target="_blank" className="text-emerald-600 font-bold hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="text-emerald-600 font-bold hover:underline">Política de Privacidade</Link>.
+                        </label>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <input 
+                          id="accepted-responsibility"
+                          type="checkbox" 
+                          required
+                          checked={registerData.acceptedResponsibility}
+                          onChange={(e) => setRegisterData({...registerData, acceptedResponsibility: e.target.checked})}
+                          className="mt-1 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                        />
+                        <label htmlFor="accepted-responsibility" className="text-sm text-slate-600 leading-tight">
+                          Declaro que sou responsável legal pelos dados dos pacientes cadastrados na plataforma.
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   <button 
                     type="submit"
                     className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
@@ -1377,7 +1432,7 @@ export default function App() {
                   </button>
                 </form>
 
-                <div className="mt-8 text-center">
+                <div className="mt-8 text-center space-y-4">
                   <button 
                     onClick={() => {
                       setIsRegistering(!isRegistering);
@@ -1388,6 +1443,15 @@ export default function App() {
                   >
                     {isRegistering ? 'Já tem uma conta? Faça login' : 'Não tem uma conta? Cadastre-se'}
                   </button>
+
+                  <div className="pt-8 border-t border-slate-100">
+                    <p className="text-xs text-slate-400 mb-2">© 2026 OdontoHub</p>
+                    <div className="flex justify-center gap-4 text-xs font-bold text-slate-500">
+                      <Link to="/termos" className="hover:text-emerald-600 transition-colors">Termos de Uso</Link>
+                      <span>|</span>
+                      <Link to="/privacidade" className="hover:text-emerald-600 transition-colors">Política de Privacidade</Link>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -1462,6 +1526,14 @@ export default function App() {
             <LogOut size={18} className="shrink-0" />
             <span className="text-sm font-medium tablet-l:hidden desktop:block whitespace-nowrap">Sair</span>
           </button>
+
+          <div className="mt-6 pt-6 border-t border-slate-50 tablet-l:hidden desktop:block">
+            <p className="text-[10px] text-slate-400 px-4 mb-2">© 2026 OdontoHub</p>
+            <div className="flex flex-col gap-1 px-4 text-[10px] font-bold text-slate-500">
+              <Link to="/termos" className="hover:text-emerald-600 transition-colors">Termos de Uso</Link>
+              <Link to="/privacidade" className="hover:text-emerald-600 transition-colors">Política de Privacidade</Link>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -3694,6 +3766,43 @@ export default function App() {
                       </button>
                     </div>
                   </form>
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                    <FileText className="text-emerald-600" />
+                    Informações Legais
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Link 
+                      to="/termos" 
+                      target="_blank"
+                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-emerald-200 transition-all"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">Termos de Uso</p>
+                        <p className="text-[10px] text-slate-500">Leia as regras de uso da plataforma</p>
+                      </div>
+                      <ChevronRight className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" size={16} />
+                    </Link>
+                    <Link 
+                      to="/privacidade" 
+                      target="_blank"
+                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-emerald-200 transition-all"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">Política de Privacidade</p>
+                        <p className="text-[10px] text-slate-500">Saiba como cuidamos dos seus dados</p>
+                      </div>
+                      <ChevronRight className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" size={16} />
+                    </Link>
+                  </div>
+                  <div className="mt-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-2">
+                      <CheckCircle2 size={14} />
+                      TERMOS ACEITOS EM: {profile.accepted_terms_at ? new Date(profile.accepted_terms_at).toLocaleString('pt-BR') : 'N/A'}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
