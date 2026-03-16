@@ -5298,12 +5298,8 @@ function ResetPassword() {
 }
 
 // Print Components
-function PrintLayout({ children, title, onPrint, pdfUrl }: { children: React.ReactNode, title: string, onPrint: () => void, pdfUrl?: string }) {
+function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, title: string, onPrint: () => void }) {
   useEffect(() => {
-    // Prevent auto-print if we are in PDF generation mode (token in URL)
-    const isPdfMode = new URLSearchParams(window.location.search).has('token');
-    if (isPdfMode) return;
-
     const timer = setTimeout(() => {
       window.print();
     }, 600);
@@ -5322,18 +5318,6 @@ function PrintLayout({ children, title, onPrint, pdfUrl }: { children: React.Rea
             >
               Fechar
             </button>
-            {pdfUrl && (
-              <button 
-                onClick={() => {
-                  const token = localStorage.getItem('token');
-                  window.location.href = `${pdfUrl}?token=${token}`;
-                }}
-                className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-all shadow-lg shadow-slate-100"
-              >
-                <Download size={20} />
-                Gerar PDF
-              </button>
-            )}
             <button 
               onClick={onPrint}
               className="print-btn flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
@@ -5579,15 +5563,11 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
 
   useEffect(() => {
     const fetchDoc = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlToken = urlParams.get('token');
-      const fetchOptions = urlToken ? { explicitToken: urlToken } : {};
-
       // If it's a generic document from the 'documents' table
       const genericTypes = ['receituario', 'declaracao', 'atestado', 'encaminhamento', 'ficha', 'orcamento'];
       if (type && genericTypes.includes(type) && id) {
         try {
-          const res = await apiFetch(`/api/documents/${id}`, fetchOptions);
+          const res = await apiFetch(`/api/documents/${id}`);
           if (res.ok) {
             const data = await res.json();
             const parsedDoc = {
@@ -5597,7 +5577,7 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
             setDoc(parsedDoc);
             
             if (data.patient_id) {
-              const pRes = await apiFetch(`/api/patients/${data.patient_id}`, fetchOptions);
+              const pRes = await apiFetch(`/api/patients/${data.patient_id}`);
               if (pRes.ok) {
                 const pData = await pRes.json();
                 setFullPatient(pData);
@@ -5640,16 +5620,9 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
 
   const patient = fullPatient || patients.find((p: any) => p.id === doc?.patient_id);
   const content = doc?.content || {};
-  const pdfUrl = (type && id && ['receituario', 'declaracao', 'atestado', 'encaminhamento', 'ficha', 'orcamento'].includes(type)) 
-    ? `/api/documents/${id}/pdf` 
-    : undefined;
 
   return (
-    <PrintLayout 
-      title={type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Documento'} 
-      onPrint={() => window.print()}
-      pdfUrl={pdfUrl}
-    >
+    <PrintLayout title={type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Documento'} onPrint={() => window.print()}>
       <div className="bg-white p-[1cm] font-serif text-slate-900">
         {/* Header */}
         <div className="text-center border-b-2 border-emerald-600 pb-6 mb-10">

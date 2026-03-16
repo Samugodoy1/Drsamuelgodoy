@@ -54,7 +54,6 @@ import {
   createDocument, 
   deleteDocument 
 } from '../server/controllers/documentController.js';
-import { generateDocumentPDF } from '../server/controllers/pdfController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
 
@@ -143,7 +142,6 @@ app.delete(['/files/:id', '/api/files/:id'], deleteFile);
 // Documents
 app.get(['/documents', '/api/documents'], getDocuments);
 app.get(['/documents/:id', '/api/documents/:id'], getDocumentById);
-app.get(['/documents/:id/pdf', '/api/documents/:id/pdf'], generateDocumentPDF);
 app.post(['/documents', '/api/documents'], createDocument);
 app.delete(['/documents/:id', '/api/documents/:id'], deleteDocument);
 
