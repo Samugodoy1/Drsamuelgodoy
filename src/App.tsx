@@ -421,6 +421,12 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
+    if (selectedPatientTab === 'financeiro' && selectedPatient) {
+      fetchPatientFinancialHistory(selectedPatient.id);
+    }
+  }, [selectedPatientTab, selectedPatient?.id]);
+
+  useEffect(() => {
     if ((activeTab === 'configuracoes' || activeTab === 'documentos') && user) {
       fetchProfile();
     }
@@ -2879,28 +2885,33 @@ export default function App() {
                             <div className="space-y-4">
                               <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Planos de Pagamento</h5>
                               {selectedPatient.financial?.paymentPlans && selectedPatient.financial.paymentPlans.length > 0 ? (
-                                selectedPatient.financial.paymentPlans.map(plan => (
-                                  <div key={plan.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                                    <div className="flex justify-between items-start mb-4">
-                                      <div>
-                                        <p className="font-bold text-slate-800">{plan.procedure}</p>
-                                        <p className="text-xs text-slate-500">
-                                          Total: {Number(plan.total_amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} • {plan.installments_count} parcelas
-                                        </p>
+                                selectedPatient.financial.paymentPlans.map(plan => {
+                                  const planInstallments = selectedPatient.financial?.installments.filter(i => i.payment_plan_id === plan.id) || [];
+                                  const hasOverdue = planInstallments.some(i => i.status === 'PENDING' && isOverdue(i.due_date));
+                                  
+                                  return (
+                                    <div key={plan.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                                      <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                          <p className="font-bold text-slate-800">{plan.procedure}</p>
+                                          <p className="text-xs text-slate-500">
+                                            Total: {Number(plan.total_amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} • {plan.installments_count} parcelas
+                                          </p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                          plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 
+                                          plan.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600' : 
+                                          hasOverdue ? 'bg-rose-100 text-rose-700' :
+                                          'bg-blue-100 text-blue-700'
+                                        }`}>
+                                          {plan.status === 'COMPLETED' ? 'Concluído' : 
+                                           plan.status === 'CANCELLED' ? 'Cancelado' : 
+                                           hasOverdue ? 'Atrasado' : 'Em Aberto'}
+                                        </span>
                                       </div>
-                                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                        plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 
-                                        plan.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600' : 
-                                        'bg-blue-100 text-blue-700'
-                                      }`}>
-                                        {plan.status === 'COMPLETED' ? 'Concluído' : plan.status === 'CANCELLED' ? 'Cancelado' : 'Em Aberto'}
-                                      </span>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                      {selectedPatient.financial?.installments
-                                        .filter(i => i.payment_plan_id === plan.id)
-                                        .map(inst => (
+                                      
+                                      <div className="space-y-2">
+                                        {planInstallments.map(inst => (
                                           <div key={inst.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-100 text-sm">
                                             <div className="flex items-center gap-3">
                                               <span className="w-6 h-6 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center text-[10px] font-bold">
@@ -2941,9 +2952,10 @@ export default function App() {
                                             </div>
                                           </div>
                                         ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))
+                                  );
+                                })
                               ) : (
                                 <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                                   <DollarSign size={32} className="mx-auto mb-2 opacity-20" />

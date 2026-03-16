@@ -197,13 +197,21 @@ export const getPatientFinancialHistory = async (req: Request, res: Response) =>
 
     // Get payment plans
     const paymentPlans = await query(
-      'SELECT * FROM payment_plans WHERE dentist_id = $1 AND patient_id = $2 ORDER BY created_at DESC',
+      `SELECT pp.*, p.name as patient_name 
+       FROM payment_plans pp 
+       LEFT JOIN patients p ON pp.patient_id = p.id 
+       WHERE pp.dentist_id = $1 AND pp.patient_id = $2 
+       ORDER BY pp.created_at DESC`,
       [user.id, id]
     );
 
     // Get installments
     const installments = await query(
-      'SELECT i.*, p.procedure FROM installments i JOIN payment_plans p ON i.payment_plan_id = p.id WHERE i.dentist_id = $1 AND i.patient_id = $2 ORDER BY i.due_date ASC',
+      `SELECT i.*, p.procedure 
+       FROM installments i 
+       JOIN payment_plans p ON i.payment_plan_id = p.id 
+       WHERE i.dentist_id = $1 AND i.patient_id = $2 
+       ORDER BY i.due_date ASC`,
       [user.id, id]
     );
 
