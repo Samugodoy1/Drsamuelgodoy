@@ -16,7 +16,7 @@
       color-adjust: exact !important;
     }
 
-    .no-print {
+    .no-print, .print-btn {
       display: none !important;
     }
     
@@ -45,6 +45,7 @@
       background: white !important;
       box-shadow: none !important;
       border: none !important;
+      overflow: visible !important;
     }
   }
 

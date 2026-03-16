@@ -5299,20 +5299,6 @@ function ResetPassword() {
 
 // Print Components
 function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, title: string, onPrint: () => void }) {
-  useEffect(() => {
-    // Auto print on load
-    const timer = setTimeout(() => {
-      window.print();
-    }, 300);
-
-    // Auto close after print
-    window.onafterprint = () => {
-      window.close();
-    };
-
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className="min-h-screen bg-slate-100 py-0 md:py-8 font-sans text-slate-900 no-scrollbar">
       <div className="max-w-4xl mx-auto">
@@ -5327,7 +5313,7 @@ function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, 
             </button>
             <button 
               onClick={onPrint}
-              className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+              className="print-btn flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
             >
               <Printer size={20} />
               Imprimir Agora
