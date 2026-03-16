@@ -5299,10 +5299,17 @@ function ResetPassword() {
 
 // Print Components
 function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, title: string, onPrint: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.print();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-100 py-0 md:py-8 font-sans text-slate-900 no-scrollbar">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center p-4 md:p-0 mb-4 md:mb-8 no-print">
+    <div className="bg-slate-50 py-4 md:py-8 font-sans text-slate-900">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="flex justify-between items-center mb-8 no-print">
           <h1 className="text-xl font-bold text-slate-800">{title}</h1>
           <div className="flex gap-4">
             <button 
@@ -5320,7 +5327,7 @@ function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, 
             </button>
           </div>
         </div>
-        <div className="print-container shadow-2xl md:rounded-2xl">
+        <div className="print-container bg-white shadow-xl">
           {children}
         </div>
       </div>
@@ -5590,7 +5597,7 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
     fetchDoc();
   }, [id, type, apiFetch]);
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando dados para impressão...</div>;
+  if (loading) return <div className="bg-white flex items-center justify-center font-bold text-slate-400 py-20">Carregando dados para impressão...</div>;
 
   // Handle specific non-generic types
   if (type === 'agenda') {
@@ -5609,7 +5616,7 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
     return <PrintReport profile={profile} transactions={transactions} patients={patients} appointments={appointments} />;
   }
 
-  if (!doc && id) return <div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Documento não encontrado.</div>;
+  if (!doc && id) return <div className="bg-white flex items-center justify-center font-bold text-slate-400 py-20">Documento não encontrado.</div>;
 
   const patient = fullPatient || patients.find((p: any) => p.id === doc?.patient_id);
   const content = doc?.content || {};

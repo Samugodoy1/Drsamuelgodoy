@@ -20,10 +20,26 @@
       display: none !important;
     }
     
-    body {
+    html, body {
       background: white !important;
       margin: 0 !important;
       padding: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+
+    /* Remove problematic layout styles for printing */
+    * {
+      position: static !important;
+      overflow: visible !important;
+      max-height: none !important;
+      height: auto !important;
+    }
+
+    /* Re-allow relative/absolute for elements that need it inside the document */
+    .print-container, .print-container * {
+      position: relative !important;
     }
 
     /* Hide scrollbars on print */
@@ -41,11 +57,11 @@
       width: 210mm !important;
       min-height: 297mm !important;
       padding: 20mm !important;
-      margin: 0 !important;
+      margin: auto !important;
       background: white !important;
       box-shadow: none !important;
       border: none !important;
-      overflow: visible !important;
+      display: block !important;
     }
   }
 
