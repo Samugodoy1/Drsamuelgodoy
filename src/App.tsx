@@ -1682,24 +1682,64 @@ export default function App() {
                 {/* Stats */}
                 <div className="md:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                   {[
-                    { label: 'Pacientes Ativos', value: patients.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Consultas Hoje', value: appointments.filter(a => new Date(a.start_time).toDateString() === new Date().toDateString()).length, icon: Calendar, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Consultas da Semana', value: weeklyAppointmentsCount, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { 
+                      label: 'Pacientes Ativos', 
+                      value: patients.length, 
+                      icon: Users, 
+                      color: 'text-blue-600', 
+                      bg: 'bg-blue-50',
+                      action: () => setActiveTab('pacientes')
+                    },
+                    { 
+                      label: 'Consultas Hoje', 
+                      value: appointments.filter(a => new Date(a.start_time).toDateString() === new Date().toDateString()).length, 
+                      icon: Calendar, 
+                      color: 'text-emerald-600', 
+                      bg: 'bg-emerald-50',
+                      action: () => {
+                        setActiveTab('agenda');
+                        setAgendaViewMode('day');
+                        setSelectedDate(new Date());
+                      }
+                    },
+                    { 
+                      label: 'Consultas da Semana', 
+                      value: weeklyAppointmentsCount, 
+                      icon: Clock, 
+                      color: 'text-amber-600', 
+                      bg: 'bg-amber-50',
+                      action: () => {
+                        setActiveTab('agenda');
+                        setAgendaViewMode('week');
+                        setSelectedDate(new Date());
+                      }
+                    },
                     { 
                       label: 'Receita do Mês', 
                       value: monthlyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 
                       icon: DollarSign, 
                       color: 'text-indigo-600', 
                       bg: 'bg-indigo-50',
-                      variation: revenueVariation
+                      variation: revenueVariation,
+                      action: () => {
+                        setActiveTab('financeiro');
+                        setFinanceSubTab('transacoes');
+                        setFinanceFilter(prev => ({ ...prev, period: 'month', type: 'INCOME' }));
+                      }
                     },
                   ].map((stat, i) => (
-                    <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 md:block">
-                      <div className={`w-12 h-12 shrink-0 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center md:mb-4`}>
+                    <motion.div 
+                      key={i} 
+                      whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+                      transition={{ duration: 0.2 }}
+                      onClick={stat.action}
+                      className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 md:block cursor-pointer group"
+                    >
+                      <div className={`w-12 h-12 shrink-0 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center md:mb-4 group-hover:scale-110 transition-transform`}>
                         <stat.icon size={24} />
                       </div>
                       <div>
-                        <p className="text-slate-500 text-xs md:text-sm font-medium">{stat.label}</p>
+                        <p className="text-slate-500 text-xs md:text-sm font-medium group-hover:text-slate-700 transition-colors">{stat.label}</p>
                         <p className="text-xl md:text-2xl font-bold text-slate-900 md:mt-1">{stat.value}</p>
                         {stat.variation !== undefined && stat.variation !== 0 && (
                           <p className={`text-[10px] font-bold mt-1 ${stat.variation >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -1707,7 +1747,7 @@ export default function App() {
                           </p>
                         )}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
 
