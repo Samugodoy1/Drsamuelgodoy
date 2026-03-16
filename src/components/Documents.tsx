@@ -139,6 +139,39 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
     }
   };
 
+  const saveAndDownloadPDF = async () => {
+    if (!selectedPatientId || !selectedDoc) return;
+
+    let content = {};
+    if (selectedDoc === 'receituario') content = prescription;
+    else if (selectedDoc === 'atestado') content = certificate;
+    else if (selectedDoc === 'encaminhamento') content = referral;
+    else if (selectedDoc === 'orcamento') content = budget;
+
+    try {
+      const res = await apiFetch('/api/documents', {
+        method: 'POST',
+        body: JSON.stringify({
+          patient_id: parseInt(selectedPatientId),
+          type: selectedDoc,
+          content: content
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const token = localStorage.getItem('token');
+        // Trigger PDF download via browser with token in query string
+        window.location.href = `/api/documents/${data.id}/pdf?token=${token}`;
+      } else {
+        alert('Erro ao salvar documento para gerar PDF.');
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF.');
+    }
+  };
+
   const addPrescriptionItem = () => {
     setPrescription({ ...prescription, items: [...prescription.items, { medication: '', dosage: '' }] });
   };
@@ -193,11 +226,18 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
           </button>
           <div className="flex gap-3">
             <button 
+              onClick={saveAndDownloadPDF}
+              className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-900 transition-colors"
+            >
+              <Download size={18} />
+              Gerar PDF
+            </button>
+            <button 
               onClick={saveAndPrint}
               className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 transition-colors"
             >
               <Printer size={18} />
-              Imprimir / PDF
+              Imprimir Agora
             </button>
           </div>
         </div>
