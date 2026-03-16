@@ -30,6 +30,38 @@
     ::-webkit-scrollbar {
       display: none;
     }
+
+    /* A4 Dimensions */
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    .print-container {
+      width: 210mm !important;
+      min-height: 297mm !important;
+      padding: 20mm !important;
+      margin: 0 !important;
+      background: white !important;
+      box-shadow: none !important;
+      border: none !important;
+    }
+  }
+
+  .print-container {
+    background: white;
+    width: 100%;
+    max-width: 210mm;
+    min-height: 297mm;
+    padding: 10mm;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+  }
+
+  @media (min-width: 768px) {
+    .print-container {
+      padding: 20mm;
+    }
   }
 
   .no-scrollbar::-webkit-scrollbar {

@@ -5287,28 +5287,42 @@ function ResetPassword() {
 
 // Print Components
 function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, title: string, onPrint: () => void }) {
+  useEffect(() => {
+    // Auto print on load
+    const timer = setTimeout(() => {
+      window.print();
+    }, 300);
+
+    // Auto close after print
+    window.onafterprint = () => {
+      window.close();
+    };
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-white p-8 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-100 py-0 md:py-8 font-sans text-slate-900 no-scrollbar">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8 no-print">
+        <div className="flex justify-between items-center p-4 md:p-0 mb-4 md:mb-8 no-print">
           <h1 className="text-xl font-bold text-slate-800">{title}</h1>
           <div className="flex gap-4">
             <button 
               onClick={() => window.close()}
-              className="px-6 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              className="px-6 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition-all"
             >
               Fechar
             </button>
             <button 
               onClick={onPrint}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+              className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
             >
               <Printer size={20} />
               Imprimir Agora
             </button>
           </div>
         </div>
-        <div className="print-content">
+        <div className="print-container shadow-2xl md:rounded-2xl">
           {children}
         </div>
       </div>
