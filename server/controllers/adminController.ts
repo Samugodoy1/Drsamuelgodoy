@@ -46,6 +46,8 @@ export const updateSchema = async (req: Request, res: Response) => {
       ALTER TABLE patients
       ADD COLUMN IF NOT EXISTS dentist_id INTEGER REFERENCES users(id),
       ADD COLUMN IF NOT EXISTS photo_url TEXT,
+      ADD COLUMN IF NOT EXISTS treatment_plan JSONB DEFAULT '[]',
+      ADD COLUMN IF NOT EXISTS procedures JSONB DEFAULT '[]',
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
       CREATE TABLE IF NOT EXISTS appointments (
@@ -64,8 +66,18 @@ export const updateSchema = async (req: Request, res: Response) => {
         medical_history TEXT,
         allergies TEXT,
         medications TEXT,
+        chief_complaint TEXT,
+        habits TEXT,
+        family_history TEXT,
+        vital_signs TEXT,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE anamnesis
+      ADD COLUMN IF NOT EXISTS chief_complaint TEXT,
+      ADD COLUMN IF NOT EXISTS habits TEXT,
+      ADD COLUMN IF NOT EXISTS family_history TEXT,
+      ADD COLUMN IF NOT EXISTS vital_signs TEXT;
 
       CREATE TABLE IF NOT EXISTS clinical_evolution (
         id SERIAL PRIMARY KEY,
@@ -74,8 +86,14 @@ export const updateSchema = async (req: Request, res: Response) => {
         date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         notes TEXT,
         procedure_performed TEXT,
+        materials TEXT,
+        observations TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE clinical_evolution
+      ADD COLUMN IF NOT EXISTS materials TEXT,
+      ADD COLUMN IF NOT EXISTS observations TEXT;
 
       CREATE TABLE IF NOT EXISTS patient_files (
         id SERIAL PRIMARY KEY,

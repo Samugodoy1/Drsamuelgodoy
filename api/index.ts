@@ -18,6 +18,7 @@ import {
 import { 
   getAppointments, 
   createAppointment, 
+  updateAppointment,
   updateAppointmentStatus, 
   remindAppointment 
 } from '../server/controllers/appointmentController.js';
@@ -29,7 +30,8 @@ import {
   createPaymentPlan,
   getPaymentPlans,
   getInstallments,
-  payInstallment
+  payInstallment,
+  getFinancialInsights
 } from '../server/controllers/financeController.js';
 import { 
   getDentists, 
@@ -54,6 +56,12 @@ import {
   createDocument, 
   deleteDocument 
 } from '../server/controllers/documentController.js';
+import { generateDocumentPDF } from '../server/controllers/pdfController.js';
+import {
+  getPatientsIntelligence,
+  getDashboardData,
+  getSchedulingSuggestionsEndpoint
+} from '../server/controllers/intelligenceController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
 
@@ -113,6 +121,7 @@ app.get(['/patients/:id/financial', '/api/patients/:id/financial'], getPatientFi
 // Appointments
 app.get(['/appointments', '/api/appointments'], getAppointments);
 app.post(['/appointments', '/api/appointments'], createAppointment);
+app.put(['/appointments/:id', '/api/appointments/:id'], updateAppointment);
 app.patch(['/appointments/:id/status', '/api/appointments/:id/status'], updateAppointmentStatus);
 app.post(['/appointments/:id/remind', '/api/appointments/:id/remind'], remindAppointment);
 
@@ -125,6 +134,7 @@ app.get(['/finance/installments', '/api/finance/installments'], getInstallments)
 app.patch(['/finance/installments/:id/pay', '/api/finance/installments/:id/pay'], payInstallment);
 app.post(['/finance', '/api/finance'], createTransaction);
 app.delete(['/finance/:id', '/api/finance/:id'], deleteTransaction);
+app.get(['/finance/insights', '/api/finance/insights'], getFinancialInsights);
 
 // Dentists
 app.get(['/dentists', '/api/dentists'], getDentists);
@@ -142,8 +152,14 @@ app.delete(['/files/:id', '/api/files/:id'], deleteFile);
 // Documents
 app.get(['/documents', '/api/documents'], getDocuments);
 app.get(['/documents/:id', '/api/documents/:id'], getDocumentById);
+app.get(['/documents/:id/pdf', '/api/documents/:id/pdf'], generateDocumentPDF);
 app.post(['/documents', '/api/documents'], createDocument);
 app.delete(['/documents/:id', '/api/documents/:id'], deleteDocument);
+
+// Intelligence
+app.get(['/intelligence/patients', '/api/intelligence/patients'], getPatientsIntelligence);
+app.get(['/intelligence/dashboard', '/api/intelligence/dashboard'], getDashboardData);
+app.get(['/intelligence/scheduling', '/api/intelligence/scheduling'], getSchedulingSuggestionsEndpoint);
 
 // Admin
 app.get(['/admin/users', '/api/admin/users'], requireAdmin, getUsers);

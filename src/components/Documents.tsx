@@ -139,6 +139,39 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
     }
   };
 
+  const saveAndDownloadPDF = async () => {
+    if (!selectedPatientId || !selectedDoc) return;
+
+    let content = {};
+    if (selectedDoc === 'receituario') content = prescription;
+    else if (selectedDoc === 'atestado') content = certificate;
+    else if (selectedDoc === 'encaminhamento') content = referral;
+    else if (selectedDoc === 'orcamento') content = budget;
+
+    try {
+      const res = await apiFetch('/api/documents', {
+        method: 'POST',
+        body: JSON.stringify({
+          patient_id: parseInt(selectedPatientId),
+          type: selectedDoc,
+          content: content
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const token = localStorage.getItem('token');
+        // Trigger PDF download via browser with token in query string
+        window.location.href = `/api/documents/${data.id}/pdf?token=${token}`;
+      } else {
+        alert('Erro ao salvar documento para gerar PDF.');
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF.');
+    }
+  };
+
   const addPrescriptionItem = () => {
     setPrescription({ ...prescription, items: [...prescription.items, { medication: '', dosage: '' }] });
   };
@@ -182,44 +215,51 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
   if (isPreview) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 font-sans">
         <div className="flex justify-between items-center no-print">
           <button 
             onClick={() => setIsPreview(false)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-bold"
+            className="flex items-center gap-2 text-[#64748B] hover:text-[#0F172A] font-bold transition-colors"
           >
             <ChevronLeft size={20} />
             Voltar para Edição
           </button>
           <div className="flex gap-3">
             <button 
+              onClick={saveAndDownloadPDF}
+              className="flex items-center gap-2 bg-[#0F172A] text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-[#1E293B] transition-colors shadow-sm"
+            >
+              <Download size={18} />
+              Gerar PDF
+            </button>
+            <button 
               onClick={saveAndPrint}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 transition-colors"
+              className="flex items-center gap-2 bg-[#22C55E] text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-[#16A34A] transition-colors shadow-sm"
             >
               <Printer size={18} />
-              Imprimir / PDF
+              Imprimir Agora
             </button>
           </div>
         </div>
         
-        <div className="no-print bg-amber-50 border border-amber-100 p-3 rounded-xl flex items-start gap-3 text-amber-800 text-xs">
-          <Info size={16} className="shrink-0 mt-0.5" />
+        <div className="no-print bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-sm">
+          <Info size={18} className="shrink-0 mt-0.5" />
           <p>
             <strong>Dica:</strong> Se a janela de impressão não abrir, clique no ícone de "Abrir em nova aba" no canto superior direito do aplicativo e tente novamente. Alguns navegadores bloqueiam a impressão dentro de quadros (iframes).
           </p>
         </div>
 
         {/* Paper Layout */}
-        <div className="bg-white shadow-2xl mx-auto max-w-[21cm] min-h-[29.7cm] p-[2cm] font-serif text-slate-900 print:shadow-none print:p-0">
+        <div className="bg-white shadow-xl mx-auto max-w-[21cm] min-h-[29.7cm] p-[2cm] font-serif text-[#0F172A] print:shadow-none print:p-0 rounded-[4px]">
           {/* Header */}
-          <div className="text-center border-b-2 border-emerald-600 pb-6 mb-10">
-            <h1 className="text-3xl font-bold text-emerald-800 uppercase tracking-widest">
+          <div className="text-center border-b border-slate-100 pb-6 mb-10">
+            <h1 className="text-3xl font-bold text-[#0F172A] uppercase tracking-widest">
               {profile?.clinic_name || 'Clínica Odontológica'}
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-[#64748B] mt-1">
               {profile?.clinic_address || 'Endereço não informado'}
             </p>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-[#64748B]">
               Tel: {profile?.phone || 'Telefone não informado'}
             </p>
           </div>
@@ -227,7 +267,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
           {/* Content */}
           <div className="space-y-8 min-h-[15cm]">
             <div className="text-center mb-12">
-              <h2 className="text-2xl font-bold uppercase underline decoration-emerald-600 underline-offset-8">
+              <h2 className="text-2xl font-bold uppercase border-b-2 border-[#22C55E] inline-block pb-1">
                 {docTypes.find(d => d.id === selectedDoc)?.label}
               </h2>
             </div>
@@ -238,17 +278,17 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
               {selectedDoc === 'receituario' && (
                 <div className="mt-10 space-y-8">
-                  <p className="font-bold text-xl mb-4 text-emerald-800">Uso Interno:</p>
+                  <p className="font-bold text-xl mb-4 text-[#0F172A]">Uso Interno:</p>
                   {prescription.items.map((item, i) => (
-                    <div key={i} className="border-l-4 border-emerald-600 pl-4 mb-6">
+                    <div key={i} className="border-l-4 border-[#22C55E] pl-4 mb-6">
                       <p className="font-bold text-lg">{item.medication}</p>
-                      <p className="text-slate-700 italic">{item.dosage}</p>
+                      <p className="text-[#64748B] italic">{item.dosage}</p>
                     </div>
                   ))}
                   {prescription.instructions && (
-                    <div className="mt-8 pt-6 border-t border-slate-100">
+                    <div className="mt-8 pt-6 border-t border-black/5">
                       <p className="font-bold mb-2">Instruções:</p>
-                      <p className="text-slate-700 whitespace-pre-wrap">{prescription.instructions}</p>
+                      <p className="text-[#64748B] whitespace-pre-wrap">{prescription.instructions}</p>
                     </div>
                   )}
                 </div>
@@ -285,7 +325,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
               {selectedDoc === 'ficha' && (
                 <div className="mt-10 space-y-8">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4 text-sm font-sans">
                     <p><strong>CPF:</strong> {selectedPatient?.cpf}</p>
                     <p><strong>Data de Nasc.:</strong> {selectedPatient?.birth_date ? new Date(selectedPatient.birth_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
                     <p><strong>E-mail:</strong> {selectedPatient?.email}</p>
@@ -293,27 +333,27 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                     <p className="col-span-2"><strong>Endereço:</strong> {selectedPatient?.address || 'Não informado'}</p>
                   </div>
                   
-                  <div className="space-y-6">
+                  <div className="space-y-6 font-sans">
                     <div className="space-y-4">
-                      <h4 className="font-bold border-b-2 border-emerald-600 pb-1 text-emerald-800 uppercase tracking-wider">Histórico Clínico (Anamnese)</h4>
+                      <h4 className="font-bold border-b-2 border-[#22C55E] pb-1 text-[#0F172A] uppercase tracking-wider">Histórico Clínico (Anamnese)</h4>
                       <div className="grid grid-cols-1 gap-4 text-sm">
                         <div>
-                          <p className="font-bold text-slate-500 text-[10px] uppercase">Histórico Médico:</p>
+                          <p className="font-bold text-[#64748B] text-[10px] uppercase">Histórico Médico:</p>
                           <p>{selectedPatient?.anamnesis?.medical_history || 'Nenhum histórico registrado.'}</p>
                         </div>
                         <div>
-                          <p className="font-bold text-slate-500 text-[10px] uppercase">Alergias:</p>
+                          <p className="font-bold text-[#64748B] text-[10px] uppercase">Alergias:</p>
                           <p className="text-rose-600 font-bold">{selectedPatient?.anamnesis?.allergies || 'Nenhuma alergia informada.'}</p>
                         </div>
                         <div>
-                          <p className="font-bold text-slate-500 text-[10px] uppercase">Medicações em Uso:</p>
+                          <p className="font-bold text-[#64748B] text-[10px] uppercase">Medicações em Uso:</p>
                           <p>{selectedPatient?.anamnesis?.medications || 'Nenhuma medicação informada.'}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-bold border-b-2 border-emerald-600 pb-1 text-emerald-800 uppercase tracking-wider">Odontograma Atual</h4>
+                      <h4 className="font-bold border-b-2 border-[#22C55E] pb-1 text-[#0F172A] uppercase tracking-wider">Odontograma Atual</h4>
                       <div className="scale-90 origin-top">
                         <Odontogram 
                           data={selectedPatient?.odontogram || {}} 
@@ -325,21 +365,21 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-bold border-b-2 border-emerald-600 pb-1 text-emerald-800 uppercase tracking-wider">Histórico de Atendimentos (Evolução)</h4>
+                      <h4 className="font-bold border-b-2 border-[#22C55E] pb-1 text-[#0F172A] uppercase tracking-wider">Histórico de Atendimentos (Evolução)</h4>
                       {selectedPatient?.evolution && selectedPatient.evolution.length > 0 ? (
-                        <div className="space-y-4">
-                          {selectedPatient.evolution.map((evo, i) => (
-                            <div key={i} className="border-b border-slate-100 pb-3">
-                              <div className="flex justify-between items-center mb-1">
-                                <span className="text-xs font-bold text-emerald-700">{new Date(evo.date).toLocaleDateString('pt-BR')}</span>
-                                <span className="text-xs font-bold text-slate-400 uppercase">{evo.procedure_performed}</span>
-                              </div>
-                              <p className="text-sm text-slate-600 italic">{evo.notes}</p>
-                            </div>
-                          ))}
+                    <div className="space-y-4">
+                      {selectedPatient.evolution.map((evo, i) => (
+                        <div key={`${evo.id}-${i}`} className="border-b border-slate-100 pb-3">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-bold text-[#22C55E]">{new Date(evo.date).toLocaleDateString('pt-BR')}</span>
+                            <span className="text-xs font-bold text-[#64748B] uppercase">{evo.procedure_performed}</span>
+                          </div>
+                          <p className="text-sm text-[#64748B] italic">{evo.notes}</p>
                         </div>
+                      ))}
+                    </div>
                       ) : (
-                        <p className="text-sm text-slate-500 italic">Nenhum atendimento registrado até o momento.</p>
+                        <p className="text-sm text-[#64748B] italic">Nenhum atendimento registrado até o momento.</p>
                       )}
                     </div>
                   </div>
@@ -347,28 +387,28 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
               )}
 
               {selectedDoc === 'orcamento' && (
-                <div className="mt-10 space-y-6">
+                <div className="mt-10 space-y-6 font-sans">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-emerald-50 text-emerald-800">
-                        <th className="border border-emerald-100 p-3 text-left">Procedimento</th>
-                        <th className="border border-emerald-100 p-3 text-right">Valor</th>
+                      <tr className="bg-[#F8FAFC] text-[#0F172A]">
+                        <th className="border border-black/5 p-3 text-left">Procedimento</th>
+                        <th className="border border-black/5 p-3 text-right">Valor</th>
                       </tr>
                     </thead>
                     <tbody>
                       {budget.items.map((item, i) => (
                         <tr key={i}>
-                          <td className="border border-slate-100 p-3">{item.procedure}</td>
-                          <td className="border border-slate-100 p-3 text-right">
+                          <td className="border border-black/5 p-3">{item.procedure}</td>
+                          <td className="border border-black/5 p-3 text-right">
                             {Number(item.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="font-bold bg-slate-50">
-                        <td className="border border-slate-100 p-3 text-right">Total</td>
-                        <td className="border border-slate-100 p-3 text-right text-emerald-700">
+                      <tr className="font-bold bg-[#F8FAFC]">
+                        <td className="border border-black/5 p-3 text-right">Total</td>
+                        <td className="border border-black/5 p-3 text-right text-[#22C55E]">
                           {totalBudget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </td>
                       </tr>
@@ -381,9 +421,9 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
           {/* Footer / Signature */}
           <div className="mt-20 flex flex-col items-center">
-            <div className="w-64 border-t border-slate-400 mb-2"></div>
+            <div className="w-64 border-t border-black/10 mb-2"></div>
             <p className="font-bold text-lg">{profile?.name}</p>
-            <p className="text-slate-600">Cirurgião-Dentista • CRO: {profile?.cro}</p>
+            <p className="text-[#64748B]">Cirurgião-Dentista • CRO: {profile?.cro}</p>
           </div>
         </div>
       </div>
@@ -391,72 +431,72 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8 font-sans p-4 md:p-0">
       {!selectedDoc ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {docTypes.map((doc) => (
             <button
               key={doc.id}
               onClick={() => setSelectedDoc(doc.id as DocType)}
-              className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all text-left group"
+              className="bg-white p-8 rounded-[32px] shadow-sm hover:shadow-md transition-all text-left group border-none"
             >
-              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 bg-[#F8FAFC] text-[#22C55E] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <doc.icon size={28} />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">{doc.label}</h3>
-              <p className="text-sm text-slate-500 mt-1">{doc.description}</p>
+              <h3 className="text-xl font-bold text-[#0F172A]">{doc.label}</h3>
+              <p className="text-sm text-[#64748B] mt-2 leading-relaxed">{doc.description}</p>
             </button>
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white rounded-[32px] shadow-sm overflow-hidden border-none">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
             <button 
               onClick={() => setSelectedDoc(null)}
-              className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors"
+              className="flex items-center gap-2 text-[#64748B] hover:text-[#0F172A] font-bold transition-colors"
             >
               <ChevronLeft size={20} />
               Voltar
             </button>
-            <h3 className="font-bold text-lg text-slate-800">
+            <h3 className="font-bold text-lg text-[#0F172A]">
               Gerar {docTypes.find(d => d.id === selectedDoc)?.label}
             </h3>
             <div className="w-20"></div>
           </div>
 
-          <div className="p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="p-8 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
               {/* Common Fields */}
               <div className="space-y-6">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Informações Básicas</h4>
-                <div className="space-y-4">
+                <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Informações Básicas</h4>
+                <div className="space-y-6">
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-2 block">Selecionar Paciente</label>
+                    <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Selecionar Paciente</label>
                     <div className="relative">
                       <select 
                         value={selectedPatientId}
                         onChange={(e) => setSelectedPatientId(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none appearance-none text-[#0F172A] shadow-sm"
                       >
                         <option value="">Selecione um paciente...</option>
-                        {patients.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
+                        {patients.map((p, idx) => (
+                          <option key={`${p.id}-${idx}`} value={p.id}>{p.name}</option>
                         ))}
                       </select>
                       {isLoadingPatient && (
                         <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                          <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="w-4 h-4 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin"></div>
                         </div>
                       )}
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-2 block">Data do Documento</label>
+                    <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Data do Documento</label>
                     <input 
                       type="date" 
                       value={docDate}
                       onChange={(e) => setDocDate(e.target.value)}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-[#0F172A] shadow-sm"
                     />
                   </div>
                 </div>
@@ -464,38 +504,38 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
               {/* Specific Fields */}
               <div className="space-y-6">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Conteúdo do Documento</h4>
+                <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Conteúdo do Documento</h4>
                 
                 {selectedDoc === 'receituario' && (
                   <div className="space-y-6">
                     <div className="space-y-4">
                       {prescription.items.map((item, i) => (
-                        <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 relative group">
+                        <div key={i} className="p-5 bg-[#F8FAFC] rounded-2xl border-none shadow-sm space-y-4 relative group">
                           {prescription.items.length > 1 && (
                             <button 
                               onClick={() => removePrescriptionItem(i)}
-                              className="absolute top-2 right-2 p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                              className="absolute top-3 right-3 p-1.5 text-rose-500 hover:bg-rose-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
                             >
                               <Trash2 size={16} />
                             </button>
                           )}
                           <div>
-                            <label className="text-[10px] font-bold text-slate-500 mb-1 block uppercase">Medicamento {i + 1}</label>
+                            <label className="text-[10px] font-bold text-[#64748B] mb-1.5 block uppercase">Medicamento {i + 1}</label>
                             <input 
                               type="text" 
                               value={item.medication}
                               onChange={(e) => updatePrescriptionItem(i, 'medication', e.target.value)}
-                              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm"
+                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-sm text-[#0F172A] shadow-sm"
                               placeholder="Ex: Amoxicilina 500mg"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-slate-500 mb-1 block uppercase">Dosagem / Posologia</label>
+                            <label className="text-[10px] font-bold text-[#64748B] mb-1.5 block uppercase">Dosagem / Posologia</label>
                             <input 
                               type="text" 
                               value={item.dosage}
                               onChange={(e) => updatePrescriptionItem(i, 'dosage', e.target.value)}
-                              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm"
+                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-sm text-[#0F172A] shadow-sm"
                               placeholder="Ex: Tomar 1 comprimido a cada 8 horas"
                             />
                           </div>
@@ -505,19 +545,19 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                     
                     <button 
                       onClick={addPrescriptionItem}
-                      className="flex items-center gap-2 text-emerald-600 text-xs font-bold hover:underline"
+                      className="flex items-center gap-2 text-[#22C55E] text-sm font-bold hover:opacity-80 transition-opacity"
                     >
-                      <Plus size={14} />
+                      <Plus size={16} />
                       Adicionar Medicamento
                     </button>
 
-                    <div className="pt-4 border-t border-slate-100">
-                      <label className="text-xs font-bold text-slate-500 mb-2 block uppercase">Instruções Adicionais</label>
+                    <div className="pt-6 border-t border-slate-100">
+                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Instruções Adicionais</label>
                       <textarea 
                         rows={3}
-                        value={prescription.instructions}
+                        value={prescription.instructions || ''}
                         onChange={(e) => setPrescription({...prescription, instructions: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none text-sm"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-sm text-[#0F172A] shadow-sm"
                         placeholder="Orientações sobre alimentação, repouso, etc."
                       />
                     </div>
@@ -525,24 +565,24 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                 )}
 
                 {selectedDoc === 'atestado' && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <label className="text-xs font-bold text-slate-500 mb-2 block">Período de Afastamento</label>
+                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Período de Afastamento</label>
                       <input 
                         type="text" 
                         value={certificate.period}
                         onChange={(e) => setCertificate({...certificate, period: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-[#0F172A] shadow-sm"
                         placeholder="Ex: 03 (três) dias"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-500 mb-2 block">Motivo (Opcional)</label>
+                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Motivo (Opcional)</label>
                       <textarea 
-                        rows={3}
-                        value={certificate.reason}
+                        rows={4}
+                        value={certificate.reason || ''}
                         onChange={(e) => setCertificate({...certificate, reason: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-[#0F172A] shadow-sm"
                         placeholder="Ex: Extração de siso"
                       />
                     </div>
@@ -550,24 +590,24 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                 )}
 
                 {selectedDoc === 'encaminhamento' && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <label className="text-xs font-bold text-slate-500 mb-2 block">Especialista / Área</label>
+                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Especialista / Área</label>
                       <input 
                         type="text" 
                         value={referral.specialist}
                         onChange={(e) => setReferral({...referral, specialist: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-[#0F172A] shadow-sm"
                         placeholder="Ex: Dr. João (Endodontista)"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-500 mb-2 block">Motivo do Encaminhamento</label>
+                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Motivo do Encaminhamento</label>
                       <textarea 
-                        rows={4}
-                        value={referral.reason}
+                        rows={5}
+                        value={referral.reason || ''}
                         onChange={(e) => setReferral({...referral, reason: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-[#0F172A] shadow-sm"
                         placeholder="Descreva o caso clínico..."
                       />
                     </div>
@@ -575,31 +615,31 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                 )}
 
                 {selectedDoc === 'orcamento' && (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
+                  <div className="space-y-6">
+                    <div className="space-y-4">
                       {budget.items.map((item, i) => (
-                        <div key={i} className="flex gap-2 items-end">
+                        <div key={i} className="flex gap-3 items-end bg-[#F8FAFC] p-4 rounded-2xl border-none shadow-sm">
                           <div className="flex-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Procedimento</label>
+                            <label className="text-[10px] font-bold text-[#64748B] uppercase mb-1.5 block">Procedimento</label>
                             <input 
                               type="text" 
                               value={item.procedure}
                               onChange={(e) => updateBudgetItem(i, 'procedure', e.target.value)}
-                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none"
+                              className="w-full p-2.5 bg-white border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
                             />
                           </div>
                           <div className="w-32">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Valor (R$)</label>
+                            <label className="text-[10px] font-bold text-[#64748B] uppercase mb-1.5 block">Valor (R$)</label>
                             <input 
                               type="number" 
                               value={item.value}
                               onChange={(e) => updateBudgetItem(i, 'value', e.target.value)}
-                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none"
+                              className="w-full p-2.5 bg-white border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
                             />
                           </div>
                           <button 
                             onClick={() => removeBudgetItem(i)}
-                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -608,14 +648,14 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                     </div>
                     <button 
                       onClick={addBudgetItem}
-                      className="flex items-center gap-2 text-emerald-600 text-xs font-bold hover:underline"
+                      className="flex items-center gap-2 text-[#22C55E] text-sm font-bold hover:opacity-80 transition-opacity"
                     >
-                      <Plus size={14} />
+                      <Plus size={16} />
                       Adicionar Item
                     </button>
-                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                      <span className="font-bold text-slate-800">Total:</span>
-                      <span className="text-lg font-black text-emerald-600">
+                    <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
+                      <span className="font-bold text-[#0F172A]">Total:</span>
+                      <span className="text-2xl font-black text-[#22C55E]">
                         {totalBudget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </span>
                     </div>
@@ -623,8 +663,8 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                 )}
 
                 {(selectedDoc === 'declaracao' || selectedDoc === 'ficha') && (
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
-                    <p className="text-sm text-slate-500">
+                  <div className="p-8 bg-[#F8FAFC] rounded-[32px] border border-dashed border-slate-200 text-center">
+                    <p className="text-sm text-[#64748B] leading-relaxed">
                       Este documento será gerado automaticamente com os dados do paciente selecionado.
                     </p>
                   </div>
@@ -632,14 +672,14 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
               </div>
             </div>
 
-            <div className="pt-8 border-t border-slate-100 flex justify-end">
+            <div className="pt-10 border-t border-slate-100 flex justify-end">
               <button
                 disabled={!selectedPatientId}
                 onClick={() => setIsPreview(true)}
-                className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all ${
+                className={`flex items-center gap-3 px-10 py-4 rounded-2xl font-bold transition-all ${
                   selectedPatientId 
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-100' 
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    ? 'bg-[#22C55E] text-white hover:bg-[#16A34A] shadow-md' 
+                    : 'bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed'
                 }`}
               >
                 <FileText size={20} />

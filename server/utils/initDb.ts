@@ -53,6 +53,8 @@ export async function initDb() {
         address TEXT,
         photo_url TEXT,
         photo_public_id TEXT,
+        treatment_plan JSONB DEFAULT '[]',
+        procedures JSONB DEFAULT '[]',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -61,6 +63,12 @@ export async function initDb() {
       BEGIN 
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='photo_public_id') THEN
           ALTER TABLE patients ADD COLUMN photo_public_id TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='treatment_plan') THEN
+          ALTER TABLE patients ADD COLUMN treatment_plan JSONB DEFAULT '[]';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='procedures') THEN
+          ALTER TABLE patients ADD COLUMN procedures JSONB DEFAULT '[]';
         END IF;
       END $$;
 
@@ -80,8 +88,29 @@ export async function initDb() {
         medical_history TEXT,
         allergies TEXT,
         medications TEXT,
+        chief_complaint TEXT,
+        habits TEXT,
+        family_history TEXT,
+        vital_signs TEXT,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Add new columns to anamnesis if they don't exist
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='anamnesis' AND column_name='chief_complaint') THEN
+          ALTER TABLE anamnesis ADD COLUMN chief_complaint TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='anamnesis' AND column_name='habits') THEN
+          ALTER TABLE anamnesis ADD COLUMN habits TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='anamnesis' AND column_name='family_history') THEN
+          ALTER TABLE anamnesis ADD COLUMN family_history TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='anamnesis' AND column_name='vital_signs') THEN
+          ALTER TABLE anamnesis ADD COLUMN vital_signs TEXT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS clinical_evolution (
         id SERIAL PRIMARY KEY,
@@ -90,8 +119,21 @@ export async function initDb() {
         date DATE DEFAULT CURRENT_DATE,
         notes TEXT,
         procedure_performed TEXT,
+        materials TEXT,
+        observations TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Add materials and observations to clinical_evolution if they don't exist
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clinical_evolution' AND column_name='materials') THEN
+          ALTER TABLE clinical_evolution ADD COLUMN materials TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clinical_evolution' AND column_name='observations') THEN
+          ALTER TABLE clinical_evolution ADD COLUMN observations TEXT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS patient_files (
         id SERIAL PRIMARY KEY,

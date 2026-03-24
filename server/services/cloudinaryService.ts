@@ -19,7 +19,8 @@ const storage = new CloudinaryStorage({
   params: async (req, file) => {
     return {
       folder: 'odontohub/patients',
-      allowed_formats: ['jpg', 'png', 'webp'],
+      resource_type: 'auto',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf'],
       public_id: `file_${Date.now()}_${Math.round(Math.random() * 1E9)}`,
     };
   },

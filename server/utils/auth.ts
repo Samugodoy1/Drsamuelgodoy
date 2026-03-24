@@ -32,6 +32,8 @@ export function verifyToken(req: Request): AuthUser | null {
     token = customHeader as string;
   } else if (req.cookies && req.cookies.auth_token) {
     token = req.cookies.auth_token;
+  } else if (req.query && req.query.token) {
+    token = req.query.token as string;
   }
 
   if (!token || token === 'null' || token === 'undefined' || token === '[object Object]') {

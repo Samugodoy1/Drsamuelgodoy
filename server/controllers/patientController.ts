@@ -38,11 +38,21 @@ export const getPatientById = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       ...patient,
-      anamnesis: anamnesis.rows[0] || { medical_history: '', allergies: '', medications: '' },
+      anamnesis: anamnesis.rows[0] || { 
+        medical_history: '', 
+        allergies: '', 
+        medications: '',
+        chief_complaint: '',
+        habits: '',
+        family_history: '',
+        vital_signs: ''
+      },
       evolution: evolution.rows,
       files: files.rows,
       odontogram: odontogram.rows[0] ? JSON.parse(odontogram.rows[0].data) : {},
-      toothHistory: toothHistory.rows
+      toothHistory: toothHistory.rows,
+      treatmentPlan: patient.treatment_plan || [],
+      procedures: patient.procedures || []
     });
   } catch (error: any) {
     console.error('getPatientById error:', error);
@@ -53,7 +63,7 @@ export const getPatientById = async (req: Request, res: Response) => {
 export const updatePatient = async (req: Request, res: Response) => {
   const user = req.user!;
   const { id } = req.params;
-  const { name, cpf, birth_date, phone, email, address } = req.body;
+  const { name, cpf, birth_date, phone, email, address, treatmentPlan, procedures } = req.body;
   let { photo_url } = req.body;
 
   try {
@@ -61,8 +71,11 @@ export const updatePatient = async (req: Request, res: Response) => {
     if (checkOwnership.rows.length === 0) return res.status(403).json({ error: 'Acesso negado' });
 
     await query(
-      'UPDATE patients SET name = $1, cpf = $2, birth_date = $3, phone = $4, email = $5, address = $6, photo_url = $7 WHERE id = $8',
-      [name, cpf, birth_date, phone, email, address, photo_url, id]
+      `UPDATE patients 
+       SET name = $1, cpf = $2, birth_date = $3, phone = $4, email = $5, address = $6, photo_url = $7, 
+           treatment_plan = $8, procedures = $9 
+       WHERE id = $10`,
+      [name, cpf, birth_date, phone, email, address, photo_url, JSON.stringify(treatmentPlan || []), JSON.stringify(procedures || []), id]
     );
 
     return res.status(200).json({ success: true });
@@ -90,14 +103,25 @@ export const createPatient = async (req: Request, res: Response) => {
 export const updateAnamnesis = async (req: Request, res: Response) => {
   const user = req.user!;
   const { id } = req.params;
-  const { medical_history, allergies, medications } = req.body;
+  const { medical_history, allergies, medications, chief_complaint, habits, family_history, vital_signs } = req.body;
   try {
     const checkOwnership = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [id, user.id]);
     if (checkOwnership.rows.length === 0) return res.status(403).json({ error: 'Acesso negado' });
 
     await query(
-      'INSERT INTO anamnesis (patient_id, medical_history, allergies, medications) VALUES ($1, $2, $3, $4) ON CONFLICT (patient_id) DO UPDATE SET medical_history = $2, allergies = $3, medications = $4, updated_at = CURRENT_TIMESTAMP',
-      [id, medical_history, allergies, medications]
+      `INSERT INTO anamnesis (patient_id, medical_history, allergies, medications, chief_complaint, habits, family_history, vital_signs) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       ON CONFLICT (patient_id) 
+       DO UPDATE SET 
+         medical_history = $2, 
+         allergies = $3, 
+         medications = $4, 
+         chief_complaint = $5, 
+         habits = $6, 
+         family_history = $7, 
+         vital_signs = $8, 
+         updated_at = CURRENT_TIMESTAMP`,
+      [id, medical_history, allergies, medications, chief_complaint, habits, family_history, vital_signs]
     );
     return res.status(200).json({ success: true });
   } catch (error: any) {
@@ -109,14 +133,14 @@ export const updateAnamnesis = async (req: Request, res: Response) => {
 export const addEvolution = async (req: Request, res: Response) => {
   const user = req.user!;
   const { id } = req.params;
-  const { notes, procedure_performed } = req.body;
+  const { notes, procedure_performed, materials, observations } = req.body;
   try {
     const checkOwnership = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [id, user.id]);
     if (checkOwnership.rows.length === 0) return res.status(403).json({ error: 'Acesso negado' });
 
     await query(
-      'INSERT INTO clinical_evolution (patient_id, notes, procedure_performed, dentist_id) VALUES ($1, $2, $3, $4)',
-      [id, notes, procedure_performed, user.id]
+      'INSERT INTO clinical_evolution (patient_id, notes, procedure_performed, materials, observations, dentist_id) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, notes, procedure_performed, materials, observations, user.id]
     );
     return res.status(201).json({ success: true });
   } catch (error: any) {

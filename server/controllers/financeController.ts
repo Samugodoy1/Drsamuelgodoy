@@ -309,3 +309,95 @@ export const payInstallment = async (req: Request, res: Response) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+export const getFinancialInsights = async (req: Request, res: Response) => {
+  const user = req.user!;
+  const today = new Date().toISOString().split('T')[0];
+  const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const firstDayOfPrevMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0];
+  const lastDayOfPrevMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0];
+
+  try {
+    // Top category by revenue
+    const topCategory = await query(
+      `SELECT category, SUM(amount) as total FROM transactions 
+       WHERE dentist_id = $1 AND type = 'INCOME' AND date >= $2
+       GROUP BY category ORDER BY total DESC LIMIT 1`,
+      [user.id, firstDayOfMonth]
+    );
+
+    // Revenue lost from cancelled appointments (estimate based on avg income per appointment)
+    const cancelledCount = await query(
+      `SELECT COUNT(*) as count FROM appointments 
+       WHERE dentist_id = $1 AND status = 'CANCELLED' AND start_time >= $2`,
+      [user.id, firstDayOfMonth]
+    );
+
+    const avgTicket = await query(
+      `SELECT AVG(amount) as avg FROM transactions 
+       WHERE dentist_id = $1 AND type = 'INCOME' AND date >= $2`,
+      [user.id, firstDayOfMonth]
+    );
+
+    // Best day of week
+    const bestDay = await query(
+      `SELECT EXTRACT(DOW FROM date::date) as dow, SUM(amount) as total 
+       FROM transactions 
+       WHERE dentist_id = $1 AND type = 'INCOME' AND date >= $2
+       GROUP BY dow ORDER BY total DESC LIMIT 1`,
+      [user.id, firstDayOfMonth]
+    );
+
+    // Monthly revenue for comparison
+    const currentMonthRev = await query(
+      `SELECT SUM(amount) as total FROM transactions 
+       WHERE dentist_id = $1 AND type = 'INCOME' AND date >= $2`,
+      [user.id, firstDayOfMonth]
+    );
+
+    const prevMonthRev = await query(
+      `SELECT SUM(amount) as total FROM transactions 
+       WHERE dentist_id = $1 AND type = 'INCOME' AND date >= $2 AND date <= $3`,
+      [user.id, firstDayOfPrevMonth, lastDayOfPrevMonth]
+    );
+
+    // Pending installments with patient details (dinheiro parado)
+    const pendingDetails = await query(
+      `SELECT i.id, i.amount, i.due_date, i.number, pp.procedure, pt.name as patient_name, pt.id as patient_id, pp.id as plan_id
+       FROM installments i
+       JOIN payment_plans pp ON i.payment_plan_id = pp.id
+       LEFT JOIN patients pt ON i.patient_id = pt.id
+       WHERE i.dentist_id = $1 AND i.status = 'PENDING'
+       ORDER BY i.due_date ASC`,
+      [user.id]
+    );
+
+    // Monthly expenses
+    const monthlyExpenses = await query(
+      `SELECT SUM(amount) as total FROM transactions 
+       WHERE dentist_id = $1 AND type = 'EXPENSE' AND date >= $2`,
+      [user.id, firstDayOfMonth]
+    );
+
+    const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const cancelled = parseInt(cancelledCount.rows[0]?.count || '0');
+    const avgAmount = parseFloat(avgTicket.rows[0]?.avg || '0');
+    const lostRevenue = cancelled * avgAmount;
+
+    return res.status(200).json({
+      topCategory: topCategory.rows[0]?.category || null,
+      topCategoryAmount: parseFloat(topCategory.rows[0]?.total || '0'),
+      cancelledAppointments: cancelled,
+      estimatedLostRevenue: Math.round(lostRevenue * 100) / 100,
+      bestDayOfWeek: bestDay.rows[0] ? dayNames[parseInt(bestDay.rows[0].dow)] : null,
+      bestDayAmount: parseFloat(bestDay.rows[0]?.total || '0'),
+      currentMonthRevenue: parseFloat(currentMonthRev.rows[0]?.total || '0'),
+      prevMonthRevenue: parseFloat(prevMonthRev.rows[0]?.total || '0'),
+      monthlyExpenses: parseFloat(monthlyExpenses.rows[0]?.total || '0'),
+      pendingInstallments: pendingDetails.rows
+    });
+  } catch (error: any) {
+    console.error('getFinancialInsights error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
