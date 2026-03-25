@@ -19,7 +19,6 @@ import {
   Image as ImageIcon,
   Bell,
   Lock,
-  Mail,
   Trash2,
   Printer,
   Upload,
@@ -38,7 +37,13 @@ import {
   List,
   Activity,
   Check,
-  CalendarDays
+  CalendarDays,
+  Pencil,
+  Mail,
+  Phone,
+  MapPin,
+  Building2,
+  Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -535,6 +540,8 @@ export default function App() {
     duration: '',
     notes: ''
   });
+  const [appointmentModalMode, setAppointmentModalMode] = useState<'schedule' | 'reschedule'>('schedule');
+  const [editingAppointmentId, setEditingAppointmentId] = useState<number | null>(null);
   const [suggestedSlot, setSuggestedSlot] = useState<{ date: Date; duration: number; procedure: string } | null>(null);
 
   const [newPaymentPlan, setNewPaymentPlan] = useState({
@@ -580,6 +587,7 @@ export default function App() {
   const [profile, setProfile] = useState<Dentist | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
+  const [isProfileEditing, setIsProfileEditing] = useState(false);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [confirmation, setConfirmation] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
@@ -655,6 +663,7 @@ export default function App() {
       if (res.ok) {
         showNotification('Perfil atualizado com sucesso!');
         setProfilePassword('');
+        setIsProfileEditing(false);
         fetchProfile();
       } else {
         const data = await res.json();
@@ -1095,10 +1104,12 @@ export default function App() {
   const tomorrowEnd = new Date(tomorrowStart);
   tomorrowEnd.setHours(23, 59, 59, 999);
 
-  const tomorrowUnconfirmedCount = appointments.filter(a => {
+  const tomorrowUnconfirmedAppointments = appointments.filter(a => {
     const apptDate = new Date(a.start_time);
     return apptDate >= tomorrowStart && apptDate <= tomorrowEnd && a.status !== 'CONFIRMED' && a.status !== 'CANCELLED';
-  }).length;
+  }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  const tomorrowUnconfirmedCount = tomorrowUnconfirmedAppointments.length;
 
   // Weekly Revenue Data for the Chart
   const weeklyRevenueData = Array.from({ length: 7 }, (_, i) => {
@@ -1146,14 +1157,18 @@ export default function App() {
   };
 
   const openAppointmentModal = () => {
-    // Initialize with current user if available
     const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
-    
+
+    setAppointmentModalMode('schedule');
+    setEditingAppointmentId(null);
+    setSuggestedSlot(null);
     setNewAppointment({
       patient_id: '',
+      patient_name: '',
       dentist_id: dentist_id || '',
-      start_time: '',
-      end_time: '',
+      date: selectedDate.toLocaleDateString('en-CA'),
+      time: '',
+      duration: '30',
       notes: ''
     });
     setIsModalOpen(true);
@@ -1162,8 +1177,12 @@ export default function App() {
   const openPatientAppointmentModal = (patient: Patient) => {
     const dentistId = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
 
+    setAppointmentModalMode('schedule');
+    setEditingAppointmentId(null);
+    setSuggestedSlot(null);
     setNewAppointment({
       patient_id: patient.id.toString(),
+      patient_name: patient.name,
       dentist_id: dentistId || '',
       date: new Date().toLocaleDateString('en-CA'),
       time: '',
@@ -1173,7 +1192,7 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  const openScheduleSuggestion = (patientId: number, date: string, startTime: string, endTime: string) => {
+  const openScheduleSuggestion = (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => {
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
     const dentistId = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
@@ -1181,13 +1200,40 @@ export default function App() {
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const duration = ((eh * 60 + em) - (sh * 60 + sm)).toString();
+    setAppointmentModalMode('schedule');
+    setEditingAppointmentId(null);
+    setSuggestedSlot(null);
     setNewAppointment({
       patient_id: patient.id.toString(),
+      patient_name: patient.name,
       dentist_id: dentistId || '',
       date,
       time: startTime,
       duration: duration || '30',
-      notes: ''
+      notes: procedure || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const openRescheduleAppointment = (appointment: Appointment) => {
+    const startDate = new Date(appointment.start_time);
+    const endDate = new Date(appointment.end_time);
+    const durationMinutes = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+
+    setAppointmentModalMode('reschedule');
+    setEditingAppointmentId(appointment.id);
+    setSuggestedSlot(null);
+    setActiveTab('agenda');
+    setAgendaViewMode('day');
+    setSelectedDate(startDate);
+    setNewAppointment({
+      patient_id: appointment.patient_id.toString(),
+      patient_name: appointment.patient_name || '',
+      dentist_id: appointment.dentist_id?.toString() || (user?.id ? user.id.toString() : ''),
+      date: startDate.toLocaleDateString('en-CA'),
+      time: startDate.toLocaleTimeString('pt-BR', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      duration: durationMinutes.toString(),
+      notes: appointment.notes || ''
     });
     setIsModalOpen(true);
   };
@@ -1588,18 +1634,21 @@ export default function App() {
         end_time: endTime.toISOString()
       };
 
-      const res = await apiFetch('/api/appointments', {
-        method: 'POST',
+      const isReschedule = appointmentModalMode === 'reschedule' && editingAppointmentId !== null;
+      const res = await apiFetch(isReschedule ? `/api/appointments/${editingAppointmentId}` : '/api/appointments', {
+        method: isReschedule ? 'PUT' : 'POST',
         body: JSON.stringify(body)
       });
       const data = await res.json();
       if (res.ok) {
         setIsModalOpen(false);
         setSuggestedSlot(null);
+        setAppointmentModalMode('schedule');
+        setEditingAppointmentId(null);
         fetchData();
 
-        setNewAppointment({ patient_id: '', dentist_id: '', date: '', time: '', duration: '', notes: '' });
-        showNotification('Agendamento realizado com sucesso!');
+        setNewAppointment({ patient_id: '', patient_name: '', dentist_id: '', date: '', time: '', duration: '', notes: '' });
+        showNotification(isReschedule ? 'Reagendamento salvo com sucesso!' : 'Agendamento realizado com sucesso!');
       } else {
         showNotification(data.error || 'Erro ao realizar agendamento', 'error');
       }
@@ -2058,173 +2107,182 @@ export default function App() {
       } />
       <Route path="*" element={
         !user ? (
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+          <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-sans antialiased">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-[372px]"
             >
-              <div className="p-8 md:p-12">
-                <div className="flex justify-center mb-8">
-                  <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/10">
-                    <Plus size={32} strokeWidth={3} />
+              {/* Heading */}
+              <motion.div
+                className="mb-11"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <h1 className="text-[26px] font-semibold text-[#0F1211] tracking-[-0.4px] leading-[1.2] mb-2.5">
+                  {isRegistering ? 'Solicite seu acesso' : (() => {
+                    const h = new Date().getHours();
+                    if (h >= 5 && h < 12) return 'Bom dia ☀️ Vamos organizar sua clínica?';
+                    if (h >= 12 && h < 18) return 'Boa tarde 👋🏻 Pronto para mais um turno?';
+                    return 'Boa noite 🌙 Vamos revisar o dia de hoje?';
+                  })()}
+                </h1>
+                <p className="text-[15px] text-[#8B918E] leading-relaxed">
+                  {isRegistering ? 'Preencha os dados para enviar sua solicitação' : 'Acesse sua clínica com segurança'}
+                </p>
+              </motion.div>
+
+              <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-5">
+                {isRegistering && (
+                  <div>
+                    <label className="block text-[13px] font-medium text-[#4B5250] mb-2">Nome completo</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Dr. João Silva"
+                      value={registerData.name}
+                      onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
+                      className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+                    />
                   </div>
-                </div>
-                <div className="text-center mb-10">
-                  <h1 className="text-3xl font-bold text-slate-900 mb-2">OdontoHub</h1>
-                  <p className="text-slate-500">Acesse sua conta para gerenciar sua clínica</p>
+                )}
+
+                <div>
+                  <label className="block text-[13px] font-medium text-[#4B5250] mb-2">E-mail</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="voce@clinica.com"
+                    value={isRegistering ? registerData.email : loginData.email}
+                    onChange={(e) => isRegistering
+                      ? setRegisterData({...registerData, email: e.target.value})
+                      : setLoginData({...loginData, email: e.target.value})
+                    }
+                    className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+                  />
                 </div>
 
-                <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-6">
-                  {isRegistering && (
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
-                      <div className="relative">
-                        <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                          type="text" 
-                          required
-                          placeholder="Dr. João Silva"
-                          value={registerData.name}
-                          onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
-                          className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input 
-                        type="email" 
-                        required
-                        placeholder="exemplo@clinica.com"
-                        value={isRegistering ? registerData.email : loginData.email}
-                        onChange={(e) => isRegistering 
-                          ? setRegisterData({...registerData, email: e.target.value})
-                          : setLoginData({...loginData, email: e.target.value})
-                        }
-                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Senha</label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input 
-                        type="password" 
-                        required
-                        placeholder="••••••••"
-                        value={isRegistering ? registerData.password : loginData.password}
-                        onChange={(e) => isRegistering
-                          ? setRegisterData({...registerData, password: e.target.value})
-                          : setLoginData({...loginData, password: e.target.value})
-                        }
-                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {!isRegistering && (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <input 
-                          id="remember-me"
-                          type="checkbox" 
-                          checked={loginData.rememberMe}
-                          onChange={(e) => setLoginData({...loginData, rememberMe: e.target.checked})}
-                          className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                        />
-                        <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 font-medium cursor-pointer">
-                          Lembrar de mim
-                        </label>
-                      </div>
-                      <Link to="/forgot-password" title="Recuperar senha" className="text-sm text-primary font-bold hover:underline">
-                        Esqueci minha senha
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[13px] font-medium text-[#4B5250]">Senha</label>
+                    {!isRegistering && (
+                      <Link
+                        to="/forgot-password"
+                        className="text-[12px] text-[#A3AAA7] hover:text-[#6B7270] transition-colors duration-200"
+                      >
+                        Esqueci a senha
                       </Link>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={isRegistering ? registerData.password : loginData.password}
+                    onChange={(e) => isRegistering
+                      ? setRegisterData({...registerData, password: e.target.value})
+                      : setLoginData({...loginData, password: e.target.value})
+                    }
+                    className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+                  />
+                </div>
 
-                  {loginError && (
-                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
-                      <AlertCircle size={18} />
-                      {loginError}
-                    </div>
-                  )}
-
-                  {registerMessage && (
-                    <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center gap-3 text-primary text-sm">
-                      <CheckCircle2 size={18} />
-                      {registerMessage}
-                    </div>
-                  )}
-
-                  {isRegistering && (
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <input 
-                          id="accepted-terms"
-                          type="checkbox" 
-                          required
-                          checked={registerData.acceptedTerms && registerData.acceptedPrivacyPolicy}
-                          onChange={(e) => setRegisterData({
-                            ...registerData, 
-                            acceptedTerms: e.target.checked,
-                            acceptedPrivacyPolicy: e.target.checked
-                          })}
-                          className="mt-1 w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                        />
-                        <label htmlFor="accepted-terms" className="text-sm text-slate-600 leading-tight">
-                          Li e concordo com os <Link to="/termos" target="_blank" className="text-primary font-bold hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="text-primary font-bold hover:underline">Política de Privacidade</Link>.
-                        </label>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <input 
-                          id="accepted-responsibility"
-                          type="checkbox" 
-                          required
-                          checked={registerData.acceptedResponsibility}
-                          onChange={(e) => setRegisterData({...registerData, acceptedResponsibility: e.target.checked})}
-                          className="mt-1 w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                        />
-                        <label htmlFor="accepted-responsibility" className="text-sm text-slate-600 leading-tight">
-                          Declaro que sou responsável legal pelos dados dos pacientes cadastrados na plataforma.
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  <button 
-                    type="submit"
-                    className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-[0.98]"
+                {loginError && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="text-[13px] text-red-400"
                   >
-                    {isRegistering ? 'Criar Conta' : 'Entrar no Sistema'}
-                  </button>
-                </form>
+                    {loginError}
+                  </motion.p>
+                )}
 
-                <div className="mt-8 text-center space-y-4">
-                  <button 
+                {registerMessage && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="text-[13px] text-[#2E6B53]"
+                  >
+                    {registerMessage}
+                  </motion.p>
+                )}
+
+                {isRegistering && (
+                  <div className="space-y-3 pt-0.5">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={registerData.acceptedTerms && registerData.acceptedPrivacyPolicy}
+                        onChange={(e) => setRegisterData({
+                          ...registerData,
+                          acceptedTerms: e.target.checked,
+                          acceptedPrivacyPolicy: e.target.checked
+                        })}
+                        className="mt-[3px] w-3.5 h-3.5 rounded-[4px] border-[#D1D5DB] text-[#2E6B53] focus:ring-0 cursor-pointer shrink-0"
+                      />
+                      <span className="text-[13px] text-[#6B7270] leading-snug">
+                        Li e concordo com os{' '}
+                        <Link to="/termos" target="_blank" className="text-[#0F1211] underline underline-offset-2 decoration-[#D1D5DB] hover:decoration-[#0F1211] transition-[text-decoration-color] duration-200">Termos de Uso</Link>
+                        {' '}e a{' '}
+                        <Link to="/privacidade" target="_blank" className="text-[#0F1211] underline underline-offset-2 decoration-[#D1D5DB] hover:decoration-[#0F1211] transition-[text-decoration-color] duration-200">Política de Privacidade</Link>.
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={registerData.acceptedResponsibility}
+                        onChange={(e) => setRegisterData({...registerData, acceptedResponsibility: e.target.checked})}
+                        className="mt-[3px] w-3.5 h-3.5 rounded-[4px] border-[#D1D5DB] text-[#2E6B53] focus:ring-0 cursor-pointer shrink-0"
+                      />
+                      <span className="text-[13px] text-[#6B7270] leading-snug">
+                        Declaro que sou responsável legal pelos dados dos pacientes cadastrados.
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                <div className="pt-3">
+                  <motion.button
+                    type="submit"
+                    whileHover={{ scale: 1.005 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
+                    className="w-full h-[48px] bg-[#264E36] hover:bg-[#1E4230] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(38,78,54,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(38,78,54,0.14),0_1px_2px_rgba(0,0,0,0.04)] transition-[background-color,box-shadow] duration-[160ms] ease-in-out"
+                    style={{ willChange: 'transform' }}
+                  >
+                    {isRegistering ? 'Criar conta' : 'Continuar'}
+                  </motion.button>
+                  <p className="text-center text-[11px] text-[#C0C7C3] mt-3.5">Ambiente seguro · Dados criptografados</p>
+                </div>
+              </form>
+
+              {/* Footer links */}
+              <div className="mt-14 space-y-6">
+                <div className="text-center">
+                  <motion.button
                     onClick={() => {
                       setIsRegistering(!isRegistering);
                       setLoginError('');
                       setRegisterMessage('');
                     }}
-                    className="text-xs text-primary font-bold hover:underline"
+                    whileTap={{ scale: 0.97 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    className="text-[13px] text-[#8B918E] hover:text-[#4B5250] transition-colors duration-200"
                   >
-                    {isRegistering ? 'Já tem uma conta? Faça login' : 'Não tem uma conta? Cadastre-se'}
-                  </button>
+                    {isRegistering ? 'Já tem uma conta? Entrar' : 'Não tem conta? Cadastre-se'}
+                  </motion.button>
+                </div>
 
-                  <div className="pt-8 border-t border-slate-100">
-                    <p className="text-xs text-slate-400 mb-2">© 2026 OdontoHub</p>
-                    <div className="flex justify-center gap-4 text-xs font-bold text-slate-500">
-                      <Link to="/termos" className="hover:text-primary transition-colors">Termos de Uso</Link>
-                      <span>|</span>
-                      <Link to="/privacidade" className="hover:text-primary transition-colors">Política de Privacidade</Link>
-                    </div>
-                  </div>
+                <div className="flex justify-center items-center gap-3 text-[11px] text-[#C0C7C3]">
+                  <Link to="/termos" className="hover:text-[#8B918E] transition-colors duration-200">Termos</Link>
+                  <span>·</span>
+                  <Link to="/privacidade" className="hover:text-[#8B918E] transition-colors duration-200">Privacidade</Link>
                 </div>
               </div>
             </motion.div>
@@ -2314,7 +2372,7 @@ export default function App() {
       <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 pb-36 md:pb-8">
         <AnimatePresence mode="wait">
           <motion.div
-            key={activeTab + (searchTerm ? '-search' : '')}
+            key={activeTab}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -2389,12 +2447,14 @@ export default function App() {
                 todayAppointmentsRemainingCount={todayAppointmentsRemainingCount}
                 todayRevenue={dailyRevenue}
                 tomorrowUnconfirmedCount={tomorrowUnconfirmedCount}
+                tomorrowUnconfirmedAppointments={tomorrowUnconfirmedAppointments}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 openPatientRecord={openPatientRecord}
                 setIsModalOpen={setIsModalOpen}
                 setActiveTab={setActiveTab}
                 sendReminder={sendReminder}
+                onReschedule={openRescheduleAppointment}
                 onSchedulePatient={openScheduleSuggestion}
               />
             )}
@@ -2411,7 +2471,7 @@ export default function App() {
                       </span>
                     </div>
                     <button 
-                      onClick={() => setIsModalOpen(true)}
+                      onClick={openAppointmentModal}
                       className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100"
                       title="Nova consulta"
                     >
@@ -2554,7 +2614,7 @@ export default function App() {
                                   <select
                                     value={app.status}
                                     onChange={(e) => updateStatus(app.id, e.target.value as Appointment['status'])}
-                                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-slate-200 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0"
+                                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-slate-200 rounded text-base sm:text-base font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0"
                                   >
                                     <option value="SCHEDULED">Agendado</option>
                                     <option value="CONFIRMED">Confirmado</option>
@@ -3100,7 +3160,7 @@ export default function App() {
                                             updateStatus(weekSheetSelectedAppointment.id, e.target.value as Appointment['status']);
                                             setWeekSheetSelectedAppointment(null);
                                           }}
-                                          className="w-full px-4 py-3 text-sm bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                          className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                                         >
                                           <option value="SCHEDULED">Agendado</option>
                                           <option value="CONFIRMED">Confirmado</option>
@@ -3400,7 +3460,7 @@ export default function App() {
                                             updateStatus(weekSheetSelectedAppointment.id, e.target.value as Appointment['status']);
                                             setWeekSheetSelectedAppointment(null);
                                           }}
-                                          className="w-full px-4 py-3 text-sm bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                          className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                                         >
                                           <option value="SCHEDULED">Agendado</option>
                                           <option value="CONFIRMED">Confirmado</option>
@@ -3670,7 +3730,7 @@ export default function App() {
                                                     updateStatus(app.id, e.target.value as Appointment['status']);
                                                     setMonthSheetSelectedDay(null);
                                                   }}
-                                                  className="px-2 py-1 text-xs bg-white border border-slate-200 rounded font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                                  className="px-2 py-1 text-base bg-white border border-slate-200 rounded font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                                                 >
                                                   <option value="SCHEDULED">Agendado</option>
                                                   <option value="CONFIRMED">Confirmado</option>
@@ -4014,7 +4074,7 @@ export default function App() {
                               placeholder="Buscar paciente..."
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full h-10 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-full focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 transition-all text-sm"
+                              className="w-full h-10 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-full focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 transition-all text-base"
                             />
                           </div>
                           <button
@@ -4525,183 +4585,313 @@ export default function App() {
             )}
 
             {activeTab === 'configuracoes' && profile && (
-              <div className="max-w-screen-xl mx-auto space-y-8">
-                <div className="mb-8">
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Configurações</h2>
-                  <p className="text-sm text-slate-500">Gerencie seu perfil e preferências</p>
-                </div>
-                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                  <div className="flex flex-col items-center mb-10">
-                    <div className="relative group">
-                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary/5 shadow-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                        {profile.photo_url ? (
-                          <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <UserCircle size={80} />
+              <div className="max-w-2xl mx-auto space-y-6">
+
+                {/* ── PROFILE HEADER ── */}
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="h-24 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
+                  <div className="px-8 pb-8 -mt-14">
+                    <div className="flex items-end gap-5">
+                      <div className="relative group shrink-0">
+                        <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                          {profile.photo_url ? (
+                            <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <UserCircle size={64} />
+                          )}
+                        </div>
+                        <label className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all">
+                          <Camera size={14} />
+                          <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                        </label>
+                      </div>
+                      <div className="pb-1 min-w-0">
+                        <h2 className="text-xl font-bold text-slate-900 truncate">{profile.name}</h2>
+                        {user.role === 'DENTIST' && profile.specialty && (
+                          <p className="text-sm text-primary font-medium">{profile.specialty}</p>
+                        )}
+                        {user.role === 'DENTIST' && profile.cro && (
+                          <p className="text-xs text-slate-400 mt-0.5">CRO {profile.cro}</p>
                         )}
                       </div>
-                      <label className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all">
-                        <Camera size={18} />
-                        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-                      </label>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-4">Perfil do Usuário</h3>
-                    <p className="text-slate-500">Mantenha seus dados atualizados</p>
+
+                    {!isProfileEditing && (
+                      <button
+                        onClick={() => setIsProfileEditing(true)}
+                        className="mt-5 flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                      >
+                        <Pencil size={14} />
+                        Editar perfil
+                      </button>
+                    )}
                   </div>
+                </div>
 
-                  <form onSubmit={handleSaveProfile} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
-                        <input 
-                          required
-                          type="text" 
-                          value={profile.name}
-                          onChange={(e) => setProfile({...profile, name: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
-                        <input 
-                          required
-                          type="email" 
-                          value={profile.email}
-                          onChange={(e) => setProfile({...profile, email: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Telefone</label>
-                        <input 
-                          type="text" 
-                          value={profile.phone || ''}
-                          onChange={(e) => setProfile({...profile, phone: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                          placeholder="(00) 00000-0000"
-                        />
-                      </div>
-                      {user.role === 'DENTIST' && (
-                        <>
+                {/* ── VIEW MODE ── */}
+                {!isProfileEditing && (
+                  <>
+                    {/* Profile Section */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Perfil</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <UserCircle size={16} className="text-slate-300 shrink-0" />
                           <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">CRO</label>
-                            <input 
-                              type="text" 
-                              value={profile.cro || ''}
-                              onChange={(e) => setProfile({...profile, cro: e.target.value})}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                              placeholder="Ex: 12345-SP"
-                            />
+                            <p className="text-[11px] text-slate-400">Nome</p>
+                            <p className="text-sm text-slate-800 font-medium">{profile.name}</p>
                           </div>
-                          <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Especialidade</label>
-                            <input 
-                              type="text" 
-                              value={profile.specialty || ''}
-                              onChange={(e) => setProfile({...profile, specialty: e.target.value})}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                              placeholder="Ex: Ortodontia"
-                            />
+                        </div>
+                        {user.role === 'DENTIST' && (
+                          <>
+                            <div className="flex items-center gap-3">
+                              <Shield size={16} className="text-slate-300 shrink-0" />
+                              <div>
+                                <p className="text-[11px] text-slate-400">CRO</p>
+                                <p className="text-sm text-slate-800 font-medium">{profile.cro || '—'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Activity size={16} className="text-slate-300 shrink-0" />
+                              <div>
+                                <p className="text-[11px] text-slate-400">Especialidade</p>
+                                <p className="text-sm text-slate-800 font-medium">{profile.specialty || '—'}</p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        {user.role === 'DENTIST' && profile.bio && (
+                          <div className="flex items-start gap-3 pt-1">
+                            <FileText size={16} className="text-slate-300 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-[11px] text-slate-400">Bio</p>
+                              <p className="text-sm text-slate-700 leading-relaxed">{profile.bio}</p>
+                            </div>
                           </div>
-                        </>
-                      )}
-                      {user.role === 'DENTIST' && (
-                        <>
-                          <div className="md:col-span-2">
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome da Clínica</label>
-                            <input 
-                              type="text" 
-                              value={profile.clinic_name || ''}
-                              onChange={(e) => setProfile({...profile, clinic_name: e.target.value})}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                              placeholder="Ex: Clínica Sorriso Perfeito"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Endereço da Clínica</label>
-                            <input 
-                              type="text" 
-                              value={profile.clinic_address || ''}
-                              onChange={(e) => setProfile({...profile, clinic_address: e.target.value})}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                              placeholder="Rua Exemplo, 123 - Centro"
-                            />
-                          </div>
-                        </>
-                      )}
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Alterar Senha</label>
-                        <input 
-                          type="password" 
-                          value={profilePassword}
-                          onChange={(e) => setProfilePassword(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                          placeholder="Deixe em branco para manter a atual"
-                        />
+                        )}
                       </div>
                     </div>
 
+                    {/* Contact Section */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contato</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <Mail size={16} className="text-slate-300 shrink-0" />
+                          <div>
+                            <p className="text-[11px] text-slate-400">E-mail</p>
+                            <p className="text-sm text-slate-800 font-medium">{profile.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Phone size={16} className="text-slate-300 shrink-0" />
+                          <div>
+                            <p className="text-[11px] text-slate-400">Telefone</p>
+                            <p className="text-sm text-slate-800 font-medium">{profile.phone || '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Clinic Section (dentist only) */}
+                    {user.role === 'DENTIST' && (profile.clinic_name || profile.clinic_address) && (
+                      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clínica</h3>
+                        <div className="space-y-3">
+                          {profile.clinic_name && (
+                            <div className="flex items-center gap-3">
+                              <Building2 size={16} className="text-slate-300 shrink-0" />
+                              <div>
+                                <p className="text-[11px] text-slate-400">Nome</p>
+                                <p className="text-sm text-slate-800 font-medium">{profile.clinic_name}</p>
+                              </div>
+                            </div>
+                          )}
+                          {profile.clinic_address && (
+                            <div className="flex items-center gap-3">
+                              <MapPin size={16} className="text-slate-300 shrink-0" />
+                              <div>
+                                <p className="text-[11px] text-slate-400">Endereço</p>
+                                <p className="text-sm text-slate-800 font-medium">{profile.clinic_address}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── EDIT MODE ── */}
+                {isProfileEditing && (
+                  <form onSubmit={handleSaveProfile} className="space-y-6">
+                    {/* Profile Fields */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Perfil</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[11px] text-slate-400 mb-1.5 block">Nome Completo</label>
+                          <input required type="text" value={profile.name}
+                            onChange={(e) => setProfile({...profile, name: e.target.value})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm" />
+                        </div>
+                        {user.role === 'DENTIST' && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-[11px] text-slate-400 mb-1.5 block">CRO</label>
+                                <input type="text" value={profile.cro || ''}
+                                  onChange={(e) => setProfile({...profile, cro: e.target.value})}
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                                  placeholder="12345-SP" />
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-slate-400 mb-1.5 block">Especialidade</label>
+                                <input type="text" value={profile.specialty || ''}
+                                  onChange={(e) => setProfile({...profile, specialty: e.target.value})}
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                                  placeholder="Ortodontia" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-400 mb-1.5 block">Bio / Descrição Profissional</label>
+                              <textarea rows={3} value={profile.bio || ''}
+                                onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm resize-none"
+                                placeholder="Conte um pouco sobre sua trajetória..." />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Contact Fields */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contato</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[11px] text-slate-400 mb-1.5 block">E-mail</label>
+                          <input required type="email" value={profile.email}
+                            onChange={(e) => setProfile({...profile, email: e.target.value})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-400 mb-1.5 block">Telefone</label>
+                          <input type="text" value={profile.phone || ''}
+                            onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                            placeholder="(00) 00000-0000" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Clinic Fields (dentist only) */}
                     {user.role === 'DENTIST' && (
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Bio / Descrição Profissional</label>
-                        <textarea 
-                          rows={4}
-                          value={profile.bio || ''}
-                          onChange={(e) => setProfile({...profile, bio: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none resize-none"
-                          placeholder="Conte um pouco sobre sua trajetória e formação..."
-                        />
+                      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clínica</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-[11px] text-slate-400 mb-1.5 block">Nome da Clínica</label>
+                            <input type="text" value={profile.clinic_name || ''}
+                              onChange={(e) => setProfile({...profile, clinic_name: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                              placeholder="Clínica Sorriso Perfeito" />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-slate-400 mb-1.5 block">Endereço</label>
+                            <input type="text" value={profile.clinic_address || ''}
+                              onChange={(e) => setProfile({...profile, clinic_address: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                              placeholder="Rua Exemplo, 123 - Centro" />
+                          </div>
+                        </div>
                       </div>
                     )}
 
-                    <div className="flex justify-end pt-4">
-                      <button 
+                    {/* Password */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Segurança</h3>
+                      <div>
+                        <label className="text-[11px] text-slate-400 mb-1.5 block">Nova Senha</label>
+                        <input type="password" value={profilePassword}
+                          onChange={(e) => setProfilePassword(e.target.value)}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                          placeholder="Deixe em branco para manter a atual" />
+                      </div>
+                    </div>
+
+                    {/* Save / Cancel */}
+                    <div className="flex items-center gap-3 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setIsProfileEditing(false); setProfilePassword(''); fetchProfile(); }}
+                        className="px-6 py-3 rounded-2xl font-semibold text-sm text-slate-500 hover:bg-slate-100 transition-all"
+                      >
+                        Cancelar
+                      </button>
+                      <button
                         type="submit"
                         disabled={isSavingProfile}
-                        className="bg-primary text-white px-10 py-4 rounded-2xl font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                        className="bg-primary text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-[0_8px_24px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
                       >
-                        {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
+                        {isSavingProfile ? 'Salvando...' : 'Salvar alterações'}
                       </button>
                     </div>
                   </form>
+                )}
+
+                {/* ── LEGAL (minimal) ── */}
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Legal</h3>
+                    {profile.accepted_terms_at && (
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <CheckCircle2 size={12} className="text-primary" />
+                        Aceito em {new Date(profile.accepted_terms_at).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <Link to="/termos" target="_blank"
+                      className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group hover:border-primary/20 transition-all">
+                      <span className="text-xs font-semibold text-slate-600">Termos de Uso</span>
+                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" size={14} />
+                    </Link>
+                    <Link to="/privacidade" target="_blank"
+                      className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group hover:border-primary/20 transition-all">
+                      <span className="text-xs font-semibold text-slate-600">Privacidade</span>
+                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" size={14} />
+                    </Link>
+                  </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                    <FileText className="text-primary" />
-                    Informações Legais
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Link 
-                      to="/termos" 
-                      target="_blank"
-                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-primary/30 transition-all"
+                {/* ── ADMIN ── */}
+                {user?.role?.toUpperCase() === 'ADMIN' && (
+                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Administração</h3>
+                    <button
+                      onClick={() => setActiveTab('admin')}
+                      className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group hover:border-primary/20 transition-all text-left"
                     >
-                      <div>
-                        <p className="font-bold text-slate-800 text-sm">Termos de Uso</p>
-                        <p className="text-[10px] text-slate-500">Leia as regras de uso da plataforma</p>
+                      <div className="flex items-center gap-3">
+                        <UserCog size={16} className="text-slate-400" />
+                        <span className="text-xs font-semibold text-slate-600">Gerenciar Dentistas</span>
                       </div>
-                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-1 transition-all" size={16} />
-                    </Link>
-                    <Link 
-                      to="/privacidade" 
-                      target="_blank"
-                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-primary/30 transition-all"
-                    >
-                      <div>
-                        <p className="font-bold text-slate-800 text-sm">Política de Privacidade</p>
-                        <p className="text-[10px] text-slate-500">Saiba como cuidamos dos seus dados</p>
-                      </div>
-                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-1 transition-all" size={16} />
-                    </Link>
+                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" size={14} />
+                    </button>
                   </div>
-                  <div className="mt-6 p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                    <p className="text-[10px] text-primary font-bold flex items-center gap-2">
-                      <CheckCircle2 size={14} />
-                      TERMOS ACEITOS EM: {profile.accepted_terms_at ? new Date(profile.accepted_terms_at).toLocaleString('pt-BR') : 'N/A'}
-                    </p>
-                  </div>
-                </div>
+                )}
+
+                {/* ── LOGOUT (subdued) ── */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100/60 transition-all"
+                >
+                  <LogOut size={16} />
+                  Sair da conta
+                </button>
+
+                <div className="h-4" />
               </div>
             )}
           </motion.div>
@@ -4840,11 +5030,13 @@ export default function App() {
               {/* Minimal Header */}
               <div className="px-5 pt-5 pb-3 border-b border-slate-100/50">
                 <div className="flex justify-between items-center gap-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Agendar</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">{appointmentModalMode === 'reschedule' ? 'Reagendar' : 'Agendar'}</h2>
                   <button 
                     onClick={() => {
                       setIsModalOpen(false);
                       setSuggestedSlot(null);
+                      setAppointmentModalMode('schedule');
+                      setEditingAppointmentId(null);
                     }} 
                     className="w-7 h-7 rounded-full hover:bg-slate-100/50 transition-colors flex items-center justify-center shrink-0"
                   >
@@ -4903,7 +5095,7 @@ export default function App() {
                     onChange={(e) => setNewAppointment({...newAppointment, notes: e.target.value})}
                     placeholder="Procedimento..."
                     maxLength={60}
-                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
                   />
                 </div>
 
@@ -4922,7 +5114,7 @@ export default function App() {
                         setNewAppointment(prev => ({...prev, patient_id: matched.id.toString()}));
                       }
                     }}
-                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
                   />
                   {newAppointment.patient_name && !newAppointment.patient_id && (
                     <div className="mt-2 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] max-h-40 overflow-y-auto shadow-lg">
@@ -4953,14 +5145,14 @@ export default function App() {
                     type="date" 
                     value={newAppointment.date}
                     onChange={(e) => setNewAppointment({...newAppointment, date: e.target.value})}
-                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-xs font-medium text-slate-900 transition-all"
+                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-base font-medium text-slate-900 transition-all"
                   />
                   <input 
                     required
                     type="time" 
                     value={newAppointment.time}
                     onChange={(e) => setNewAppointment({...newAppointment, time: e.target.value})}
-                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-xs font-medium text-slate-900 transition-all"
+                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-base font-medium text-slate-900 transition-all"
                   />
                   <input 
                     required
@@ -4969,7 +5161,7 @@ export default function App() {
                     value={newAppointment.duration}
                     onChange={(e) => setNewAppointment({...newAppointment, duration: e.target.value})}
                     placeholder="min"
-                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-xs font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
                   />
                 </div>
 
@@ -4980,6 +5172,8 @@ export default function App() {
                     onClick={() => {
                       setIsModalOpen(false);
                       setSuggestedSlot(null);
+                      setAppointmentModalMode('schedule');
+                      setEditingAppointmentId(null);
                     }}
                     className="flex-1 py-2.5 px-4 border border-slate-200/50 text-slate-700 font-medium rounded-[10px] hover:bg-slate-50/50 active:bg-slate-100/50 transition-all text-sm backdrop-blur-sm"
                   >
@@ -4990,7 +5184,7 @@ export default function App() {
                     disabled={!newAppointment.patient_id || !newAppointment.date || !newAppointment.time}
                     className="flex-1 py-2.5 px-4 bg-primary/90 hover:bg-primary text-white font-medium rounded-[10px] active:scale-95 transition-all text-sm shadow-lg shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm"
                   >
-                    Agendar
+                    {appointmentModalMode === 'reschedule' ? 'Salvar reagendamento' : 'Agendar'}
                   </button>
                 </div>
               </form>
@@ -5032,7 +5226,7 @@ export default function App() {
                       placeholder="Nome completo"
                       value={newPatient.name}
                       onChange={(e) => setNewPatient({...newPatient, name: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
                     />
                   </div>
 
@@ -5044,7 +5238,7 @@ export default function App() {
                       placeholder="Telefone"
                       value={newPatient.phone}
                       onChange={(e) => setNewPatient({...newPatient, phone: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
                     />
                   </div>
 
@@ -5055,7 +5249,7 @@ export default function App() {
                       placeholder="E-mail (opcional)"
                       value={newPatient.email}
                       onChange={(e) => setNewPatient({...newPatient, email: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
                     />
                   </div>
 
@@ -5071,7 +5265,7 @@ export default function App() {
                           placeholder="CPF (opcional)"
                           value={newPatient.cpf}
                           onChange={(e) => setNewPatient({...newPatient, cpf: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
                         />
                       </div>
                       <div>
@@ -5079,7 +5273,7 @@ export default function App() {
                           type="date" 
                           value={newPatient.birth_date}
                           onChange={(e) => setNewPatient({...newPatient, birth_date: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
                           title="Data de Nascimento"
                         />
                       </div>
@@ -5089,7 +5283,7 @@ export default function App() {
                           placeholder="Endereço (opcional)"
                           value={newPatient.address}
                           onChange={(e) => setNewPatient({...newPatient, address: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
                         />
                       </div>
                     </div>
@@ -5909,6 +6103,9 @@ export default function App() {
           <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="pacientes" label="Pacientes" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="financeiro" label="Financeiro" icon={DollarSign} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+          {user?.role?.toUpperCase() === 'ADMIN' && (
+            <BottomNavItem id="admin" label="Dentistas" icon={UserCog} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+          )}
           <BottomNavItem id="configuracoes" label="Mais" icon={Settings} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
         </nav>
       </div>
@@ -6007,66 +6204,89 @@ function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-sans antialiased">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-[372px]"
       >
-        <div className="p-8 md:p-12">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary/20">
-              <Plus size={32} strokeWidth={3} />
-            </div>
+        <motion.div
+          className="mb-11"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <h1 className="text-[26px] font-semibold text-[#0F1211] tracking-[-0.4px] leading-[1.2] mb-2.5">
+            Redefinir sua senha
+          </h1>
+          <p className="text-[15px] text-[#8B918E] leading-relaxed">
+            Informe seu e-mail para receber as instruções de acesso.
+          </p>
+        </motion.div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-[13px] font-medium text-[#4B5250] mb-2">E-mail</label>
+            <input
+              type="email"
+              required
+              placeholder="voce@clinica.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+            />
           </div>
-          <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Recuperar Senha</h1>
-            <p className="text-slate-500">Digite seu e-mail para receber as instruções</p>
-          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="email" 
-                  required
-                  placeholder="exemplo@clinica.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                />
-              </div>
-            </div>
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, y: -2 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="text-[13px] text-red-400"
+            >
+              {error}
+            </motion.p>
+          )}
 
-            {error && (
-              <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm">
-                <AlertCircle size={18} />
-                {error}
-              </div>
-            )}
+          {message && (
+            <motion.p
+              initial={{ opacity: 0, y: -2 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="text-[13px] text-[#2E6B53]"
+            >
+              {message}
+            </motion.p>
+          )}
 
-            {message && (
-              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center gap-3 text-primary text-sm">
-                <CheckCircle2 size={18} />
-                {message}
-              </div>
-            )}
-
-            <button 
+          <div className="pt-3">
+            <motion.button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+              whileHover={{ scale: loading ? 1 : 1.005 }}
+              whileTap={{ scale: loading ? 1 : 0.98 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
+              className="w-full h-[48px] bg-[#264E36] hover:bg-[#1E4230] disabled:hover:bg-[#264E36] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(38,78,54,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(38,78,54,0.14),0_1px_2px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] duration-[160ms] ease-in-out"
+              style={{ willChange: 'transform' }}
             >
-              {loading ? 'Enviando...' : 'Enviar Instruções'}
-            </button>
-          </form>
+              {loading ? 'Enviando...' : 'Enviar instruções'}
+            </motion.button>
+            <p className="text-center text-[11px] text-[#C0C7C3] mt-3.5">Ambiente seguro · Dados criptografados</p>
+          </div>
+        </form>
 
-          <div className="mt-8 text-center">
-            <Link to="/" className="text-xs text-primary font-bold hover:underline">
+        <div className="mt-14 space-y-6">
+          <div className="text-center">
+            <Link to="/" className="text-[13px] text-[#8B918E] hover:text-[#4B5250] transition-colors duration-200">
               Voltar para o login
             </Link>
+          </div>
+
+          <div className="flex justify-center items-center gap-3 text-[11px] text-[#C0C7C3]">
+            <Link to="/termos" className="hover:text-[#8B918E] transition-colors duration-200">Termos</Link>
+            <span>·</span>
+            <Link to="/privacidade" className="hover:text-[#8B918E] transition-colors duration-200">Privacidade</Link>
           </div>
         </div>
       </motion.div>

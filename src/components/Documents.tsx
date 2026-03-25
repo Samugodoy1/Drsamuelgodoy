@@ -525,7 +525,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                               type="text" 
                               value={item.medication}
                               onChange={(e) => updatePrescriptionItem(i, 'medication', e.target.value)}
-                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-sm text-[#0F172A] shadow-sm"
+                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-base text-[#0F172A] shadow-sm"
                               placeholder="Ex: Amoxicilina 500mg"
                             />
                           </div>
@@ -535,7 +535,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                               type="text" 
                               value={item.dosage}
                               onChange={(e) => updatePrescriptionItem(i, 'dosage', e.target.value)}
-                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-sm text-[#0F172A] shadow-sm"
+                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-base text-[#0F172A] shadow-sm"
                               placeholder="Ex: Tomar 1 comprimido a cada 8 horas"
                             />
                           </div>
@@ -557,7 +557,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                         rows={3}
                         value={prescription.instructions || ''}
                         onChange={(e) => setPrescription({...prescription, instructions: e.target.value})}
-                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-sm text-[#0F172A] shadow-sm"
+                        className="w-full p-4 bg-[#F8FAFC] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-base text-[#0F172A] shadow-sm"
                         placeholder="Orientações sobre alimentação, repouso, etc."
                       />
                     </div>
@@ -625,7 +625,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                               type="text" 
                               value={item.procedure}
                               onChange={(e) => updateBudgetItem(i, 'procedure', e.target.value)}
-                              className="w-full p-2.5 bg-white border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
+                              className="w-full p-2.5 bg-white border-none rounded-xl text-base outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
                             />
                           </div>
                           <div className="w-32">
@@ -634,7 +634,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                               type="number" 
                               value={item.value}
                               onChange={(e) => updateBudgetItem(i, 'value', e.target.value)}
-                              className="w-full p-2.5 bg-white border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
+                              className="w-full p-2.5 bg-white border-none rounded-xl text-base outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
                             />
                           </div>
                           <button 

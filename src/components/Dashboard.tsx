@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,16 @@ interface SchedulingSuggestion {
   };
 }
 
+interface ReminderAppointment {
+  id: number;
+  patient_id: number;
+  patient_name: string;
+  start_time: string;
+  end_time: string;
+  notes?: string;
+  status: string;
+}
+
 interface DashboardProps {
   user: any;
   patients: any[];
@@ -58,6 +68,7 @@ interface DashboardProps {
   todayAppointmentsTotalCount: number;
   todayAppointmentsRemainingCount: number;
   tomorrowUnconfirmedCount: number;
+  tomorrowUnconfirmedAppointments: ReminderAppointment[];
   todayRevenue: number;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
@@ -66,7 +77,7 @@ interface DashboardProps {
   setActiveTab: (tab: any) => void;
   sendReminder: (appointment: any) => void;
   onReschedule?: (appointment: any) => void;
-  onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string) => void;
+  onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -111,6 +122,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   nextAppointments = [],
   todayAppointmentsRemainingCount = 0,
   tomorrowUnconfirmedCount = 0,
+  tomorrowUnconfirmedAppointments = [],
   todayRevenue = 0,
   openPatientRecord,
   setActiveTab,
@@ -121,6 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +168,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const nextPatient = nextAppointments[0];
   const otherAppointments = nextAppointments.slice(1, 5);
+
+  const openReminderModal = () => {
+    if (tomorrowUnconfirmedAppointments.length === 0) return;
+    setIsReminderModalOpen(true);
+  };
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -754,7 +772,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="flex gap-2 mt-4">
                     <motion.button
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => onSchedulePatient?.(sug.patient.patient_id, sug.suggested_slot.date, sug.suggested_slot.start, sug.suggested_slot.end)}
+                      onClick={() => onSchedulePatient?.(sug.patient.patient_id, sug.suggested_slot.date, sug.suggested_slot.start, sug.suggested_slot.end, sug.procedure)}
                       className="flex-1 flex items-center justify-center gap-2 bg-violet-600 text-white py-3 rounded-2xl text-[13px] font-bold shadow-[0_4px_16px_rgba(109,40,217,0.15)] hover:bg-violet-700 transition-colors"
                     >
                       <CalendarPlus size={14} />
@@ -796,11 +814,91 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <motion.button
               whileTap={{ scale: 0.97, opacity: 0.9 }}
               transition={{ duration: 0.2 }}
+              onClick={openReminderModal}
               className="bg-primary text-white px-8 py-4 rounded-[999px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.1)] w-full sm:w-auto"
             >
               Enviar lembretes
             </motion.button>
           </div>
+
+          <AnimatePresence>
+            {isReminderModalOpen && (
+              <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsReminderModalOpen(false)}
+                  className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 24 }}
+                  transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative w-full sm:max-w-xl bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden border border-white/30 max-h-[88vh] flex flex-col"
+                >
+                  <div className="px-6 pt-6 pb-4 border-b border-[#C6C6C8]/20 flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Confirmações de amanhã</h4>
+                      <p className="text-[14px] text-[#8E8E93] mt-1">
+                        {tomorrowUnconfirmedAppointments.length} paciente{tomorrowUnconfirmedAppointments.length === 1 ? '' : 's'} aguardando mensagem de confirmação
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsReminderModalOpen(false)}
+                      className="w-9 h-9 rounded-full bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E] transition-colors flex items-center justify-center shrink-0"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto px-4 py-4 space-y-3">
+                    {tomorrowUnconfirmedAppointments.map((appointment) => {
+                      const startTime = new Date(appointment.start_time);
+                      return (
+                        <div
+                          key={appointment.id}
+                          className="rounded-[24px] border border-[#C6C6C8]/15 bg-[#FCFCFD] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{appointment.patient_name}</p>
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700">
+                                Pendente
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1.5 text-[13px] text-[#8E8E93] font-medium flex-wrap">
+                              <span>{startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span>•</span>
+                              <span>{appointment.notes || 'Consulta'}</span>
+                            </div>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => sendReminder(appointment)}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[18px] bg-primary text-white text-[13px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.1)]"
+                          >
+                            <MessageCircle size={15} />
+                            Enviar confirmação
+                          </motion.button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="px-6 py-4 border-t border-[#C6C6C8]/20 bg-white">
+                    <button
+                      onClick={() => setIsReminderModalOpen(false)}
+                      className="w-full h-[46px] rounded-[16px] bg-[#F2F2F7] text-[#4B5250] text-[14px] font-medium hover:bg-[#E9E9EE] transition-colors"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </section>
       )}
 

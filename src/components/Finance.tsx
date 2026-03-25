@@ -191,7 +191,59 @@ export function Finance({
     [pendingItems]
   );
 
-  const visiblePending = useMemo(() => pendingItems.slice(0, 3), [pendingItems]);
+  const pendingPatientGroups = useMemo(() => {
+    const groups = new Map<number, {
+      patientId: number;
+      patientName: string;
+      totalAmount: number;
+      items: typeof pendingItems;
+      planIds: number[];
+    }>();
+
+    pendingItems.forEach((item) => {
+      const existing = groups.get(item.patient_id);
+
+      if (existing) {
+        existing.totalAmount += Number(item.amount);
+        existing.items.push(item);
+        if (!existing.planIds.includes(item.plan_id)) {
+          existing.planIds.push(item.plan_id);
+        }
+        return;
+      }
+
+      groups.set(item.patient_id, {
+        patientId: item.patient_id,
+        patientName: item.patient_name || 'Paciente não identificado',
+        totalAmount: Number(item.amount),
+        items: [item],
+        planIds: [item.plan_id],
+      });
+    });
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      items: [...group.items].sort((left, right) => new Date(`${left.due_date}T12:00:00`).getTime() - new Date(`${right.due_date}T12:00:00`).getTime()),
+    }));
+  }, [pendingItems]);
+
+  const visiblePendingGroups = useMemo(() => pendingPatientGroups.slice(0, 3), [pendingPatientGroups]);
+
+  const hiddenPendingGroupsCount = useMemo(
+    () => Math.max(pendingPatientGroups.length - visiblePendingGroups.length, 0),
+    [pendingPatientGroups.length, visiblePendingGroups.length]
+  );
+
+  const handlePendingGroupAction = (group: (typeof pendingPatientGroups)[number]) => {
+    const matchingPlan = paymentPlans.find((plan) => group.planIds.includes(plan.id));
+
+    if (matchingPlan) {
+      onViewInstallments(matchingPlan);
+      return;
+    }
+
+    openPatientRecord(group.patientId);
+  };
 
   const sortedTransactions = useMemo(
     () => [...transactions].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()),
@@ -576,21 +628,50 @@ export function Finance({
             <p className="text-[14px] leading-relaxed text-slate-400">Cobranças que merecem atenção agora.</p>
           </div>
 
-          <div className="space-y-3">
-            {visiblePending.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0 transition-colors duration-200 hover:border-amber-200">
-                <div className="min-w-0">
-                  <p className="text-[15px] font-medium text-slate-800 truncate leading-snug">{item.patient_name}</p>
-                  <p className="text-[14px] text-slate-400 truncate leading-relaxed">{item.procedure}</p>
-                </div>
+          <div className="space-y-4">
+            {visiblePendingGroups.map((group) => (
+              <div
+                key={group.patientId}
+                className="rounded-[24px] border border-slate-100 bg-white/88 px-5 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+              >
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 flex-1 space-y-3.5">
+                    <div className="space-y-1">
+                      <p className="text-[16px] font-semibold text-slate-900 truncate leading-snug">{group.patientName}</p>
+                      <p className="text-[13px] font-medium text-slate-500 leading-relaxed">
+                        {group.items.length} pendência{group.items.length !== 1 ? 's' : ''} • {currency(group.totalAmount)} aguardando pagamento
+                      </p>
+                    </div>
 
-                <div className="text-right shrink-0">
-                  <p className="text-[15px] font-semibold text-slate-900">{currency(Number(item.amount))}</p>
-                  <p className="text-[12px] text-amber-700/85">Cobrar</p>
+                    <div className="space-y-2.5">
+                      {group.items.map((item) => (
+                        <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                          <p className="text-[14px] text-slate-500 leading-snug">{item.procedure}</p>
+                          <p className="text-[14px] font-semibold text-slate-900 tabular-nums">{currency(Number(item.amount))}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 md:pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handlePendingGroupAction(group)}
+                      className="w-full md:w-auto rounded-full bg-amber-50 px-4 py-2.5 text-[13px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                    >
+                      {group.items.length > 1 ? 'Cobrar tudo' : 'Cobrar'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {hiddenPendingGroupsCount > 0 && (
+            <p className="text-[13px] text-slate-400 leading-relaxed">
+              +{hiddenPendingGroupsCount} paciente{hiddenPendingGroupsCount !== 1 ? 's' : ''} ainda aguardando cobrança.
+            </p>
+          )}
         </section>
       )}
 
@@ -613,8 +694,6 @@ export function Finance({
         </div>
 
         <div className="space-y-7">
-          {recentSections.length > 0 && <div aria-hidden="true" className="h-[14vh] min-h-16" />}
-
           {showAllOlderTransactions ? (
             <div className="space-y-6">
               {allTransactionGroups.map((group, groupIndex) => (

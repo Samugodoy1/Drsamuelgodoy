@@ -1106,7 +1106,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                                     (event.currentTarget as HTMLInputElement).blur();
                                   }
                                 }}
-                                className="w-full sm:w-24 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 min-h-[40px]"
+                                className="w-full sm:w-24 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-base font-medium text-slate-700 outline-none focus:border-slate-400 min-h-[40px]"
                                 aria-label="Valor do procedimento"
                               />
                             </label>
