@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
   ArrowDownRight,
+  ArrowRight,
   ArrowUpRight,
   CalendarDays,
   CheckCheck,
@@ -12,8 +13,11 @@ import {
   MoreHorizontal,
   Plus,
   Printer,
+  Rocket,
   Tag,
+  Target,
   Trash2,
+  TrendingUp,
   UserRound,
   WalletCards,
   X,
@@ -83,6 +87,7 @@ interface FinanceProps {
   installments: Installment[];
   financialSummary: any;
   patients: Array<{ id: number; name: string }>;
+  todayAppointmentsCount: number;
   apiFetch: (url: string, options?: any) => Promise<Response>;
   onOpenTransactionModal: (type: 'INCOME' | 'EXPENSE') => void;
   onDeleteTransaction: (id: number) => void;
@@ -94,6 +99,8 @@ interface FinanceProps {
   onViewInstallments: (plan: PaymentPlan) => void;
   openPatientRecord: (id: number) => void;
   formatDate: (d: string) => string;
+  setActiveTab: (tab: string) => void;
+  setIsModalOpen: (open: boolean) => void;
 }
 
 const currency = (value: number) =>
@@ -108,6 +115,7 @@ export function Finance({
   installments,
   financialSummary,
   patients,
+  todayAppointmentsCount,
   apiFetch,
   onOpenTransactionModal,
   onDeleteTransaction,
@@ -119,6 +127,8 @@ export function Finance({
   onViewInstallments,
   openPatientRecord,
   formatDate,
+  setActiveTab,
+  setIsModalOpen,
 }: FinanceProps) {
   void financialSummary;
   void patients;
@@ -178,6 +188,156 @@ export function Finance({
   );
 
   const netProfit = monthRevenue - monthExpenses;
+
+  // ─── Previous month data for comparison ──────────────────────────────
+  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  const prevMonthRevenue = useMemo(
+    () =>
+      transactions
+        .filter((t) => {
+          if (t.type !== 'INCOME') return false;
+          const date = t.date?.split('T')[0];
+          if (!date) return false;
+          const [year, month] = date.split('-').map(Number);
+          return year === prevYear && month === prevMonth + 1;
+        })
+        .reduce((sum, t) => sum + Number(t.amount), 0),
+    [transactions, prevMonth, prevYear]
+  );
+
+  const prevMonthExpenses = useMemo(
+    () =>
+      transactions
+        .filter((t) => {
+          if (t.type !== 'EXPENSE') return false;
+          const date = t.date?.split('T')[0];
+          if (!date) return false;
+          const [year, month] = date.split('-').map(Number);
+          return year === prevYear && month === prevMonth + 1;
+        })
+        .reduce((sum, t) => sum + Number(t.amount), 0),
+    [transactions, prevMonth, prevYear]
+  );
+
+  // ─── Smart financial analysis ────────────────────────────────────────
+  const financeAnalysis = useMemo(() => {
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const monthProgress = dayOfMonth / daysInMonth;
+    const projectedRevenue = monthProgress > 0.1 ? monthRevenue / monthProgress : 0;
+    const revenueGrowth = prevMonthRevenue > 0 ? ((monthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : 0;
+    const profitMargin = monthRevenue > 0 ? (netProfit / monthRevenue) * 100 : 0;
+    const isStartOfMonth = dayOfMonth <= 5;
+    const isEndOfMonth = dayOfMonth >= daysInMonth - 3;
+    const freeSlots = Math.max(8 - todayAppointmentsCount, 0);
+    const gap = prevMonthRevenue > 0 ? prevMonthRevenue - monthRevenue : 0;
+
+    let headline = '';
+    let headlineIcon: 'rocket' | 'check' | 'target' | 'chart' = 'check';
+    let headlineColor = 'text-emerald-600';
+    let subtitle = '';
+    let ctaLabel = '';
+    let ctaAction: 'agenda' | 'schedule' | 'patients' | 'income' | null = null;
+
+    // ── Case 1: Zero revenue ──
+    if (monthRevenue === 0 && isStartOfMonth) {
+      headline = 'Mês novo. Sua primeira consulta define o ritmo 💪';
+      headlineIcon = 'rocket';
+      headlineColor = 'text-primary';
+      subtitle = prevMonthRevenue > 0
+        ? `Mês passado foram ${currency(prevMonthRevenue)}. Bora superar?`
+        : 'Registre a primeira receita e veja a projeção do mês';
+      ctaLabel = freeSlots > 0 ? `Agendar consulta · ${freeSlots} horários livres` : 'Agendar consulta';
+      ctaAction = 'schedule';
+    } else if (monthRevenue === 0) {
+      headline = freeSlots > 0
+        ? `Você tem ${freeSlots} horários livres hoje. Cada um é faturamento`
+        : 'Sua agenda pode gerar receita agora';
+      headlineIcon = 'target';
+      headlineColor = 'text-amber-600';
+      subtitle = prevMonthRevenue > 0
+        ? `Faltam ${currency(prevMonthRevenue)} pra alcançar o mês passado`
+        : 'Uma consulta registrada e a projeção já aparece aqui';
+      ctaLabel = freeSlots > 0 ? 'Preencher agenda' : 'Registrar receita';
+      ctaAction = freeSlots > 0 ? 'schedule' : 'income';
+
+    // ── Case 2: Revenue dropping ──
+    } else if (prevMonthRevenue > 0 && revenueGrowth < -10) {
+      const pctDown = Math.round(Math.abs(revenueGrowth));
+      headline = `Caiu ${pctDown}%. Dá pra recuperar ainda este mês`;
+      headlineIcon = 'target';
+      headlineColor = 'text-amber-600';
+      if (freeSlots > 0) {
+        subtitle = `${freeSlots} horários livres hoje · Faltam ${currency(Math.round(gap))} pro mês anterior`;
+        ctaLabel = 'Preencher horários de hoje';
+        ctaAction = 'schedule';
+      } else {
+        subtitle = `Faltam ${currency(Math.round(gap))} pra igualar o mês passado`;
+        ctaLabel = 'Ver agenda da semana';
+        ctaAction = 'agenda';
+      }
+
+    // ── Case 3: Growing fast ──
+    } else if (revenueGrowth > 20) {
+      headline = `+${Math.round(revenueGrowth)}% vs. mês passado. Tá voando 🔥`;
+      headlineIcon = 'rocket';
+      headlineColor = 'text-emerald-600';
+      subtitle = projectedRevenue > 0
+        ? `Projeção: ${currency(Math.round(projectedRevenue))} · Margem: ${Math.round(profitMargin)}%`
+        : `Lucro líquido: ${currency(netProfit)}`;
+      if (freeSlots >= 3) {
+        ctaLabel = `Ainda tem ${freeSlots} horários hoje`;
+        ctaAction = 'schedule';
+      }
+
+    // ── Case 4: Growing steadily ──
+    } else if (revenueGrowth > 0) {
+      headline = `+${Math.round(revenueGrowth)}% acima do anterior. Continue assim`;
+      headlineIcon = 'chart';
+      headlineColor = 'text-emerald-600';
+      subtitle = projectedRevenue > prevMonthRevenue
+        ? `Projeção: ${currency(Math.round(projectedRevenue))} · ${Math.round(((projectedRevenue - prevMonthRevenue) / prevMonthRevenue) * 100)}% acima`
+        : `Lucro líquido: ${currency(netProfit)} · Margem: ${Math.round(profitMargin)}%`;
+      if (freeSlots >= 3) {
+        ctaLabel = `${freeSlots} encaixes disponíveis hoje`;
+        ctaAction = 'schedule';
+      }
+
+    // ── Case 5: End of month push ──
+    } else if (isEndOfMonth && monthRevenue > 0) {
+      headline = 'Reta final. Cada encaixe conta pro resultado';
+      headlineIcon = 'target';
+      headlineColor = 'text-primary';
+      subtitle = freeSlots > 0
+        ? `${freeSlots} horários livres hoje · Projeção: ${currency(Math.round(projectedRevenue))}`
+        : `Projeção final: ${currency(Math.round(projectedRevenue))}`;
+      if (freeSlots > 0) {
+        ctaLabel = 'Encaixar pacientes agora';
+        ctaAction = 'schedule';
+      }
+
+    // ── Case 6: Default – all good ──
+    } else {
+      headline = 'Tudo certo. Seu consultório tá faturando';
+      headlineIcon = 'check';
+      headlineColor = 'text-emerald-600';
+      if (monthExpenses > 0) {
+        subtitle = `Lucro: ${currency(netProfit)} · Margem: ${Math.round(profitMargin)}%`;
+      } else if (projectedRevenue > 0) {
+        subtitle = `Projeção do mês: ${currency(Math.round(projectedRevenue))}`;
+      } else {
+        subtitle = `${currency(monthRevenue)} faturados em ${dayOfMonth} dia${dayOfMonth !== 1 ? 's' : ''}`;
+      }
+      if (freeSlots >= 3) {
+        ctaLabel = `Ainda dá tempo: ${freeSlots} horários livres`;
+        ctaAction = 'schedule';
+      }
+    }
+
+    return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction };
+  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount]);
 
   const pendingItems = useMemo(() => insights?.pendingInstallments || [], [insights]);
 
@@ -599,24 +759,59 @@ export function Finance({
         }`}
       >
         {pendingTotal > 0 ? (
-          <div className="space-y-3">
-            <p className="text-[13px] font-semibold text-slate-600 flex items-center gap-2 leading-relaxed">
-              <AlertTriangle size={18} className="text-amber-600" />
-              Tem um ponto pedindo atenção por aqui
-            </p>
-            <p className="text-[48px] md:text-[56px] leading-[0.95] font-bold tracking-[-0.04em] text-slate-900">{currency(monthRevenue)}</p>
-            <p className="text-[13px] leading-relaxed text-amber-700/80 font-medium">
-              {currency(pendingTotal)} aguardando pagamento • {pendingPatientCount} paciente{pendingPatientCount !== 1 ? 's' : ''}
-            </p>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-[13px] font-semibold text-amber-700 flex items-center gap-2 leading-relaxed">
+                <AlertTriangle size={18} className="text-amber-600" />
+                {currency(pendingTotal)} parado esperando cobrança
+              </p>
+              <p className="text-[48px] md:text-[56px] leading-[0.95] font-bold tracking-[-0.04em] text-slate-900">{currency(monthRevenue)}</p>
+              <p className="text-[13px] leading-relaxed text-amber-700/80 font-medium">
+                {pendingPatientCount} paciente{pendingPatientCount !== 1 ? 's' : ''} com pendência · Cobrar agora aumenta seu mês
+              </p>
+            </div>
+            {financeAnalysis.ctaAction && (
+              <button
+                onClick={() => {
+                  if (financeAnalysis.ctaAction === 'schedule') setIsModalOpen(true);
+                  else if (financeAnalysis.ctaAction === 'agenda') setActiveTab('agenda');
+                  else if (financeAnalysis.ctaAction === 'patients') setActiveTab('pacientes');
+                  else if (financeAnalysis.ctaAction === 'income') onOpenTransactionModal('INCOME');
+                }}
+                className="flex items-center gap-2 text-[13px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-4 py-2.5 rounded-full transition-colors"
+              >
+                {financeAnalysis.ctaLabel}
+                <ArrowRight size={14} />
+              </button>
+            )}
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className="text-[13px] font-semibold text-slate-600 flex items-center gap-2 leading-relaxed">
-              <CheckCheck size={18} className="text-emerald-600" />
-              Tudo sob controle por aqui 👌
-            </p>
-            <p className="text-[48px] md:text-[56px] leading-[0.95] font-bold tracking-[-0.04em] text-slate-900">{currency(monthRevenue)}</p>
-            <p className="text-[13px] leading-relaxed text-emerald-700/80 font-medium">Tudo recebido</p>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <p className={`text-[13px] font-semibold flex items-center gap-2 leading-relaxed ${financeAnalysis.headlineColor}`}>
+                {financeAnalysis.headlineIcon === 'rocket' && <Rocket size={18} />}
+                {financeAnalysis.headlineIcon === 'check' && <CheckCheck size={18} />}
+                {financeAnalysis.headlineIcon === 'target' && <Target size={18} />}
+                {financeAnalysis.headlineIcon === 'chart' && <TrendingUp size={18} />}
+                {financeAnalysis.headline}
+              </p>
+              <p className="text-[48px] md:text-[56px] leading-[0.95] font-bold tracking-[-0.04em] text-slate-900">{currency(monthRevenue)}</p>
+              <p className="text-[13px] leading-relaxed text-slate-500 font-medium">{financeAnalysis.subtitle}</p>
+            </div>
+            {financeAnalysis.ctaAction && financeAnalysis.ctaLabel && (
+              <button
+                onClick={() => {
+                  if (financeAnalysis.ctaAction === 'schedule') setIsModalOpen(true);
+                  else if (financeAnalysis.ctaAction === 'agenda') setActiveTab('agenda');
+                  else if (financeAnalysis.ctaAction === 'patients') setActiveTab('pacientes');
+                  else if (financeAnalysis.ctaAction === 'income') onOpenTransactionModal('INCOME');
+                }}
+                className="flex items-center gap-2 text-[13px] font-bold text-primary bg-primary/10 hover:bg-primary/15 px-4 py-2.5 rounded-full transition-colors"
+              >
+                {financeAnalysis.ctaLabel}
+                <ArrowRight size={14} />
+              </button>
+            )}
           </div>
         )}
       </section>

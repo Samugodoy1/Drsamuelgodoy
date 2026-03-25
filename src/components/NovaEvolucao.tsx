@@ -331,97 +331,96 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
   };
 
   return (
-    <div className="fixed inset-0 bg-[#F7F8FA] z-50 flex flex-col font-sans text-[#0F172A] antialiased">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-100 px-6 h-20 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
+    <div className="fixed inset-0 bg-[#FAFAFA] z-50 flex flex-col font-sans antialiased">
+      {/* ── Header ── */}
+      <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between shrink-0 safe-area-top">
+        <div className="flex items-center gap-3 min-w-0">
           <button 
             onClick={() => onClose ? onClose() : navigate(-1)}
-            className="p-2 hover:bg-slate-50 rounded-xl text-[#64748B] transition-all"
+            className="p-2 -ml-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all shrink-0"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={20} />
           </button>
-          <div>
-            <h2 className="text-lg font-bold text-[#0F172A] tracking-tight">Nova Evolução Clínica</h2>
-            <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest">Atendimento em tempo real</p>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">Nova Evolução</h2>
+            <p className="text-[10px] text-slate-400 font-medium hidden sm:block">Descreva o atendimento naturalmente</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => onClose ? onClose() : navigate(-1)}
-            className="px-6 py-2.5 text-sm font-bold text-[#64748B] hover:bg-slate-50 rounded-xl transition-all border-none"
+            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all hidden sm:block"
           >
             Cancelar
           </button>
           <button 
             onClick={handleSave}
             disabled={isSaving || (inputText.trim() === '' && blocks.length === 0)}
-            className="bg-[#22C55E] hover:bg-[#16A34A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2.5 px-8 rounded-xl shadow-sm flex items-center gap-2 transition-all active:scale-95 text-sm border-none"
+            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 px-5 sm:px-6 rounded-xl flex items-center gap-2 transition-all active:scale-95 text-xs sm:text-sm"
           >
-            {saved ? <Check size={18} /> : isSaving ? (
+            {saved ? <Check size={16} /> : isSaving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
-              'Salvar Evolução'
+              'Salvar'
             )}
           </button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden flex">
-        {/* Main Editor Area */}
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-3xl mx-auto space-y-8">
-            {/* Blocks Area - Real-time interpretation */}
-            <div className="flex flex-wrap gap-3 min-h-[48px]">
-              <AnimatePresence mode="popLayout">
-                {blocks.map((block) => (
-                  <motion.div
-                    key={block.id}
-                    layout
-                    initial={{ scale: 0.98, opacity: 0, y: 5 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.98, opacity: 0, y: -5 }}
-                    className={`group relative flex items-center gap-3 px-5 py-3 rounded-2xl shadow-sm border-none ${
-                      block.type === 'regiao' 
-                        ? 'bg-slate-100 text-[#64748B]' 
-                        : 'bg-emerald-50 text-[#22C55E]'
-                    }`}
-                  >
-                    <block.icon size={16} />
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">{block.label}</span>
-                      <span className="text-sm font-bold tracking-tight">{block.value}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              
-              {blocks.length === 0 && inputText.length > 0 && (
-                <div className="py-2">
-                  <p className="text-[#94A3B8] text-[11px] font-medium italic">Interpretando intenção clínica...</p>
-                </div>
-              )}
-            </div>
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-4 sm:space-y-6">
 
-            {/* Notepad Area */}
-            <div className="relative bg-white rounded-[32px] shadow-sm p-8 min-h-[450px] flex flex-col border-none">
-              <div className="flex items-center gap-2 text-[#22C55E] mb-6">
-                <Sparkles size={18} />
-                <span className="text-[10px] font-bold uppercase tracking-widest">Bloco de Notas Inteligente</span>
+          {/* Interpreted Blocks */}
+          {(blocks.length > 0 || (inputText.length > 0 && blocks.length === 0)) && (
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={14} className="text-primary" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Interpretação em tempo real</span>
               </div>
-              
-              <textarea
-                ref={inputRef}
-                value={inputText}
-                onChange={handleInputChange}
-                placeholder="Descreva o atendimento naturalmente... (ex: Realizei restauração no dente 12 com resina composta A2)"
-                className="flex-1 w-full bg-transparent border-none focus:ring-0 text-[#0F172A] text-xl leading-relaxed placeholder:text-slate-200 font-medium resize-none"
-              />
-              
-              {/* Quick Actions */}
-              <div className="mt-8 pt-6 border-t border-slate-50 flex flex-wrap gap-2">
-                <p className="w-full text-[10px] font-bold text-[#64748B] uppercase tracking-widest mb-2">Sugestões de Fluxo</p>
+
+              <div className="flex flex-wrap gap-2">
+                <AnimatePresence mode="popLayout">
+                  {blocks.map((block) => (
+                    <motion.div
+                      key={block.id}
+                      layout
+                      initial={{ scale: 0.95, opacity: 0, y: 4 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      exit={{ scale: 0.95, opacity: 0 }}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold ${block.color}`}
+                    >
+                      <block.icon size={13} />
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-bold uppercase tracking-wider opacity-60 leading-none">{block.label}</span>
+                        <span className="text-[11px] font-bold leading-tight mt-0.5">{block.value}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                
+                {blocks.length === 0 && inputText.length > 0 && (
+                  <p className="text-slate-300 text-[11px] font-medium italic py-1">Interpretando...</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Text Area Card ── */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col min-h-[280px] sm:min-h-[360px]">
+            <textarea
+              ref={inputRef}
+              value={inputText}
+              onChange={handleInputChange}
+              placeholder="Descreva o atendimento naturalmente...&#10;&#10;Ex: Realizei restauração no dente 12 com resina composta A2"
+              className="flex-1 w-full bg-transparent border-none focus:ring-0 text-slate-900 text-base sm:text-lg leading-relaxed placeholder:text-slate-200 font-medium resize-none outline-none"
+            />
+            
+            {/* Quick Flow Suggestions */}
+            <div className="mt-4 pt-4 border-t border-slate-50">
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-2.5">Fluxos rápidos</p>
+              <div className="flex flex-wrap gap-2">
                 {[
                   { label: 'Endodontia', text: 'canal 15 acess odontometr preparo lima 15 20 25 obturac 21 ' },
                   { label: 'Restauração', text: '15 restaurac resin A2 poliment ' },
@@ -431,7 +430,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
                   <button
                     key={item.label}
                     onClick={() => setInputText(prev => prev + (prev ? ' ' : '') + item.text)}
-                    className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-[#64748B] text-xs font-bold rounded-full transition-all border-none"
+                    className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-500 text-[11px] font-semibold rounded-lg transition-all active:scale-95"
                   >
                     + {item.label}
                   </button>
@@ -439,58 +438,40 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right Sidebar - Help/Info */}
-        <div className="w-80 bg-white border-l border-slate-100 p-8 hidden lg:block overflow-y-auto">
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-widest mb-4">Como funciona</h3>
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#22C55E] flex items-center justify-center shrink-0 font-bold text-xs">
-                    1
+          {/* ── How it works (collapsible on mobile via simple display) ── */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Como funciona</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { n: '1', text: 'Escreva o que foi feito de forma natural', color: 'bg-primary/5 text-primary' },
+                { n: '2', text: 'Procedimentos, dentes e materiais são identificados', color: 'bg-blue-50 text-blue-600' },
+                { n: '3', text: 'Os blocos organizam o histórico clínico', color: 'bg-violet-50 text-violet-600' },
+              ].map(step => (
+                <div key={step.n} className="flex items-start gap-3">
+                  <div className={`w-6 h-6 rounded-lg ${step.color} flex items-center justify-center shrink-0 text-[10px] font-bold`}>
+                    {step.n}
                   </div>
-                  <p className="text-xs text-[#64748B] leading-relaxed font-medium">Escreva o que foi feito de forma natural, como se estivesse contando a um colega.</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium">{step.text}</p>
                 </div>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold text-xs">
-                    2
-                  </div>
-                  <p className="text-xs text-[#64748B] leading-relaxed font-medium">Nossa IA identifica automaticamente procedimentos, dentes e materiais utilizados.</p>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 font-bold text-xs">
-                    3
-                  </div>
-                  <p className="text-xs text-[#64748B] leading-relaxed font-medium">Os blocos gerados acima organizam seu histórico clínico de forma estruturada.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-8 border-t border-slate-50">
-              <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-widest mb-4">Dica do Especialista</h3>
-              <div className="bg-slate-50 rounded-2xl p-5">
-                <p className="text-[11px] text-[#64748B] leading-relaxed italic font-medium">
-                  "Você pode citar o número do dente (ex: 12 ou dente 12) e o material (ex: resina A2) para uma evolução mais precisa."
-                </p>
-              </div>
+              ))}
             </div>
           </div>
+
         </div>
       </div>
 
-      {/* Success Message */}
+      {/* ── Success Toast ── */}
       <AnimatePresence>
         {saved && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#0F172A] text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-[60] border-none"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 z-[60]"
           >
-            <div className="w-2 h-2 bg-[#22C55E] rounded-full animate-pulse" />
-            <span className="text-sm font-bold">Evolução salva com sucesso</span>
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-xs font-bold">Evolução salva com sucesso</span>
           </motion.div>
         )}
       </AnimatePresence>

@@ -284,7 +284,7 @@ const StatusBadge = ({ app, now }: { app: Appointment; now: Date }) => {
   );
 };
 
-const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpdateAnamnesis, onAddEvolution, onAddTransaction, dentistName, onOpenSidebar, apiFetch, setAppActiveTab, navigate }: any) => {
+const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpdateAnamnesis, onAddEvolution, onAddTransaction, onOpenSidebar, apiFetch, setAppActiveTab, navigate }: any) => {
   const { id } = useParams();
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -2080,7 +2080,6 @@ export default function App() {
                 onUpdateAnamnesis={handleUpdateAnamnesis}
                 onAddEvolution={addEvolution}
                 onAddTransaction={handleAddTransaction}
-                dentistName={profile?.name || ''}
                 onOpenSidebar={() => setIsSidebarOpen(true)}
                 apiFetch={apiFetch}
                 setAppActiveTab={setActiveTab}
@@ -2445,6 +2444,7 @@ export default function App() {
                 nextAppointments={nextAppointments}
                 todayAppointmentsTotalCount={todayAppointmentsTotalCount}
                 todayAppointmentsRemainingCount={todayAppointmentsRemainingCount}
+                totalAppointmentsCount={appointments.length}
                 todayRevenue={dailyRevenue}
                 tomorrowUnconfirmedCount={tomorrowUnconfirmedCount}
                 tomorrowUnconfirmedAppointments={tomorrowUnconfirmedAppointments}
@@ -2483,7 +2483,7 @@ export default function App() {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex bg-slate-100 p-1 rounded-full">
                       <button 
-                        onClick={() => setAgendaFocusMode(true)}
+                        onClick={() => { setAgendaFocusMode(true); setAgendaViewMode('day'); }}
                         className={`px-6 py-2 text-[13px] font-bold rounded-full transition-all flex items-center gap-2 ${agendaFocusMode ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
                       >
                         <Activity size={16} />
@@ -2563,7 +2563,24 @@ export default function App() {
                       const filtered = getFilteredAppointments();
 
                       if (filtered.length === 0 && agendaViewMode === 'day') {
-                        return (
+                        return patients.length === 0 ? (
+                          <div className="py-16 sm:py-24 text-center space-y-5">
+                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+                              <Calendar className="text-slate-300" size={28} />
+                            </div>
+                            <div>
+                              <p className="text-lg font-semibold text-slate-800">Sua agenda começa com um paciente</p>
+                              <p className="text-sm text-slate-400 mt-1">Adicione seu primeiro paciente para começar a agendar consultas.</p>
+                            </div>
+                            <button 
+                              onClick={() => setActiveTab('pacientes')}
+                              className="mt-2 bg-primary text-white px-6 py-2.5 rounded-[30px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
+                            >
+                              <UserPlus size={16} />
+                              Adicionar paciente
+                            </button>
+                          </div>
+                        ) : (
                           <div className="p-20 text-center">
                             <Calendar className="mx-auto text-slate-200 mb-4" size={64} />
                             <p className="text-slate-500 font-medium">Nenhum agendamento encontrado para este período.</p>
@@ -4298,7 +4315,26 @@ export default function App() {
                           );
                         })}
 
-                        {patientCards.length === 0 && (
+                        {patientCards.length === 0 && patients.length === 0 && !searchTerm && (
+                          <div className="col-span-full bg-white rounded-3xl border border-slate-100 shadow-sm p-10 sm:p-14 text-center space-y-5">
+                            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                              <UserPlus size={28} className="text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-lg font-semibold text-slate-800">Comece adicionando seu primeiro paciente</p>
+                              <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">Cadastre um paciente para acessar prontuário, odontograma, agenda e financeiro.</p>
+                            </div>
+                            <button
+                              onClick={() => setIsPatientModalOpen(true)}
+                              className="mt-2 bg-primary text-white px-7 py-3 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
+                            >
+                              <UserPlus size={16} />
+                              Adicionar paciente
+                            </button>
+                          </div>
+                        )}
+
+                        {patientCards.length === 0 && (patients.length > 0 || !!searchTerm) && (
                           <div className="col-span-full bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
                             <Users size={36} className="mx-auto text-slate-200 mb-3" />
                             <p className="text-slate-600 font-medium">Nenhum paciente encontrado para este filtro.</p>
@@ -4318,6 +4354,7 @@ export default function App() {
                 installments={installments}
                 financialSummary={financialSummary}
                 patients={patients}
+                todayAppointmentsCount={todayAppointmentsTotalCount}
                 apiFetch={apiFetch}
                 onOpenTransactionModal={(type) => {
                   setTransactionType(type);
@@ -4341,6 +4378,8 @@ export default function App() {
                 }}
                 openPatientRecord={openPatientRecord}
                 formatDate={formatDate}
+                setActiveTab={setActiveTab}
+                setIsModalOpen={setIsModalOpen}
               />
             )}
 
@@ -5139,30 +5178,41 @@ export default function App() {
                 </div>
 
                 {/* SEÇÃO 3: Data, Hora, Duração */}
-                <div className="grid grid-cols-3 gap-2">
-                  <input 
-                    required
-                    type="date" 
-                    value={newAppointment.date}
-                    onChange={(e) => setNewAppointment({...newAppointment, date: e.target.value})}
-                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-base font-medium text-slate-900 transition-all"
-                  />
-                  <input 
-                    required
-                    type="time" 
-                    value={newAppointment.time}
-                    onChange={(e) => setNewAppointment({...newAppointment, time: e.target.value})}
-                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-base font-medium text-slate-900 transition-all"
-                  />
-                  <input 
-                    required
-                    type="number" 
-                    min="1"
-                    value={newAppointment.duration}
-                    onChange={(e) => setNewAppointment({...newAppointment, duration: e.target.value})}
-                    placeholder="min"
-                    className="w-full px-3 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[10px] focus:ring-1 focus:ring-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium mb-1 block">Data</label>
+                    <input 
+                      required
+                      type="date" 
+                      value={newAppointment.date}
+                      onChange={(e) => setNewAppointment({...newAppointment, date: e.target.value})}
+                      className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
+                    />
+                  </div>
+                  <div className="grid grid-cols-[1fr_100px] gap-3">
+                    <div>
+                      <label className="text-[11px] text-slate-400 font-medium mb-1 block">Horário</label>
+                      <input 
+                        required
+                        type="time" 
+                        value={newAppointment.time}
+                        onChange={(e) => setNewAppointment({...newAppointment, time: e.target.value})}
+                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-slate-400 font-medium mb-1 block">Duração</label>
+                      <input 
+                        required
+                        type="number" 
+                        min="1"
+                        value={newAppointment.duration}
+                        onChange={(e) => setNewAppointment({...newAppointment, duration: e.target.value})}
+                        placeholder="30 min"
+                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Buttons */}

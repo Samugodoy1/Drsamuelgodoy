@@ -50,13 +50,7 @@ import {
 import { uploadPatientFile, uploadProfilePhoto, uploadPatientPhoto } from '../server/controllers/uploadController.js';
 import { deleteFile } from '../server/controllers/fileController.js';
 import { upload } from '../server/services/cloudinaryService.js';
-import { 
-  getDocuments, 
-  getDocumentById, 
-  createDocument, 
-  deleteDocument 
-} from '../server/controllers/documentController.js';
-import { generateDocumentPDF } from '../server/controllers/pdfController.js';
+
 import {
   getPatientsIntelligence,
   getDashboardData,
@@ -148,13 +142,6 @@ app.post(['/profile/photo', '/api/profile/photo'], upload.single('file'), upload
 
 // Files
 app.delete(['/files/:id', '/api/files/:id'], deleteFile);
-
-// Documents
-app.get(['/documents', '/api/documents'], getDocuments);
-app.get(['/documents/:id', '/api/documents/:id'], getDocumentById);
-app.get(['/documents/:id/pdf', '/api/documents/:id/pdf'], generateDocumentPDF);
-app.post(['/documents', '/api/documents'], createDocument);
-app.delete(['/documents/:id', '/api/documents/:id'], deleteDocument);
 
 // Intelligence
 app.get(['/intelligence/patients', '/api/intelligence/patients'], getPatientsIntelligence);

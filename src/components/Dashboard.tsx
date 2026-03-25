@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X, UserPlus, ArrowRight, Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -67,6 +67,7 @@ interface DashboardProps {
   nextAppointments: any[];
   todayAppointmentsTotalCount: number;
   todayAppointmentsRemainingCount: number;
+  totalAppointmentsCount: number;
   tomorrowUnconfirmedCount: number;
   tomorrowUnconfirmedAppointments: ReminderAppointment[];
   todayRevenue: number;
@@ -119,12 +120,15 @@ function openWhatsApp(phone: string, name: string) {
 
 export const Dashboard: React.FC<DashboardProps> = ({
   user,
+  patients = [],
   nextAppointments = [],
   todayAppointmentsRemainingCount = 0,
+  totalAppointmentsCount = 0,
   tomorrowUnconfirmedCount = 0,
   tomorrowUnconfirmedAppointments = [],
   todayRevenue = 0,
   openPatientRecord,
+  setIsModalOpen,
   setActiveTab,
   sendReminder,
   onReschedule,
@@ -439,6 +443,325 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────
+
+  // ─── Onboarding: reactive progress-driven experience ─────────────────
+  const hasPatients = patients.length > 0;
+  const hasAppointments = totalAppointmentsCount > 0;
+  const onboardingKey = `odontohub_onboarding_done_${user?.id ?? 'unknown'}`;
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem(onboardingKey) === '1');
+  // Track if user was in onboarding flow this session (missing patients or appointments on first render)
+  const wasInOnboarding = useRef(!hasPatients || !hasAppointments);
+  // Show onboarding if: missing steps OR (both done but user was in flow this session and hasn't dismissed)
+  const showOnboarding = !onboardingDismissed && (
+    !hasPatients || !hasAppointments || wasInOnboarding.current
+  );
+
+  const completedSteps = (hasPatients ? 1 : 0) + (hasAppointments ? 1 : 0);
+  const step3Active = hasPatients && hasAppointments;
+  const totalSteps = 3;
+
+  const getOnboardingMessage = () => {
+    if (!hasPatients) return 'Configure em 2 minutos e comece a faturar com agenda organizada.';
+    if (!hasAppointments) return 'Você tem pacientes. Agora preencha sua agenda e pare de perder horários.';
+    return 'Sua clínica já tem oportunidades esperando por você.';
+  };
+
+  if (showOnboarding) {
+    return (
+      <div className="flex flex-col gap-8 pb-32 pt-10 px-2 max-w-2xl mx-auto">
+        {/* Header */}
+        <header className="space-y-1.5 px-2">
+          <h1 className="text-[28px] font-bold tracking-tight text-[#1C1C1E]">
+            {timeGreeting.text}, {getGreetingName()} <span className="text-[14px] align-middle">{timeGreeting.emoji}</span>
+          </h1>
+          <p className="text-[17px] font-medium text-[#8E8E93]">
+            {getOnboardingMessage()}
+          </p>
+        </header>
+
+        {/* Progress indicator */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mx-2 flex items-center gap-3"
+        >
+          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-primary rounded-full"
+              initial={{ width: '0%' }}
+              animate={{ width: `${Math.max((completedSteps / totalSteps) * 100, 8)}%` }}
+              transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }}
+            />
+          </div>
+          <span className="text-[12px] font-bold text-[#8E8E93] shrink-0">
+            {completedSteps} de {totalSteps}
+          </span>
+        </motion.div>
+
+        {/* ── Step 1: Add patient ── */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.35 }}
+          className="space-y-3"
+        >
+          <div className="px-2 flex items-center gap-2">
+            {hasPatients ? (
+              <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                <Check size={12} className="text-white" strokeWidth={3} />
+              </div>
+            ) : (
+              <div className="w-5 h-5 rounded-full border-2 border-primary" />
+            )}
+            <span className="text-[11px] font-bold text-primary uppercase tracking-widest">
+              Passo 1
+            </span>
+            {hasPatients && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-[11px] font-bold text-primary/60 ml-1"
+              >
+                Concluído
+              </motion.span>
+            )}
+          </div>
+          <motion.div
+            animate={{ opacity: hasPatients ? 0.55 : 1 }}
+            transition={{ duration: 0.25 }}
+            className={`bg-white rounded-[28px] border shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5 ${
+              hasPatients ? 'border-primary/20' : 'border-slate-100'
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-primary/10 rounded-[18px] flex items-center justify-center shrink-0">
+                {hasPatients ? (
+                  <Check size={22} className="text-primary" />
+                ) : (
+                  <UserPlus size={22} className="text-primary" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
+                  {hasPatients ? 'Paciente cadastrado' : 'Prontuário, odontograma e financeiro em um só lugar'}
+                </h3>
+                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
+                  {hasPatients
+                    ? `${patients.length} paciente${patients.length > 1 ? 's' : ''} no sistema. Prontuário, odontograma e histórico já disponíveis.`
+                    : 'Sem fichas soltas. Cadastre e tenha tudo organizado para atender, cobrar e acompanhar.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Preview: what a patient record looks like */}
+            {!hasPatients && (
+              <>
+                <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">M</div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#1C1C1E]">Maria Silva</p>
+                      <p className="text-[11px] text-[#8E8E93]">Última visita: há 3 dias · Em tratamento</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Prontuário</span>
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Odontograma</span>
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Evolução</span>
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Financeiro</span>
+                  </div>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setActiveTab('pacientes')}
+                  className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
+                >
+                  Cadastrar primeiro paciente
+                  <ArrowRight size={15} />
+                </motion.button>
+              </>
+            )}
+          </motion.div>
+        </motion.section>
+
+        {/* ── Step 2: Schedule first appointment ── */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.35 }}
+          className="space-y-3"
+        >
+          <div className="px-2 flex items-center gap-2">
+            {hasAppointments ? (
+              <div className="w-5 h-5 bg-violet-500 rounded-full flex items-center justify-center">
+                <Check size={12} className="text-white" strokeWidth={3} />
+              </div>
+            ) : (
+              <div className={`w-5 h-5 rounded-full border-2 ${hasPatients ? 'border-violet-500' : 'border-slate-200'}`} />
+            )}
+            <span className={`text-[11px] font-bold uppercase tracking-widest ${
+              hasPatients ? 'text-violet-600' : 'text-slate-300'
+            }`}>
+              Passo 2
+            </span>
+            {hasAppointments && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-[11px] font-bold text-violet-400 ml-1"
+              >
+                Concluído
+              </motion.span>
+            )}
+          </div>
+          <motion.div
+            animate={{ opacity: hasAppointments ? 0.55 : hasPatients ? 1 : 0.45 }}
+            transition={{ duration: 0.25 }}
+            className={`bg-white rounded-[28px] border shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5 ${
+              hasAppointments ? 'border-violet-200' : hasPatients ? 'border-slate-100' : 'border-slate-50'
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-violet-50 rounded-[18px] flex items-center justify-center shrink-0">
+                {hasAppointments ? (
+                  <Check size={22} className="text-violet-500" />
+                ) : (
+                  <Calendar size={22} className="text-violet-500" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
+                  {hasAppointments ? 'Agenda ativa' : 'Você tem horários livres hoje'}
+                </h3>
+                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
+                  {hasAppointments
+                    ? 'Agenda funcionando. Lembretes e confirmações automáticas já ativas.'
+                    : hasPatients
+                      ? `Você pode encaixar até 8 pacientes hoje. Agende a primeira consulta e o sistema cuida dos lembretes.`
+                      : 'Cada horário vazio é faturamento perdido. Preencha a agenda e o sistema avisa seus pacientes automaticamente.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Preview: what the agenda looks like */}
+            {hasPatients && !hasAppointments && (
+              <>
+                <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2 border border-slate-100/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">Prévia da sua agenda</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      { time: '09:00', name: patients[0]?.name?.split(' ')[0] || 'Paciente', proc: 'Avaliação', color: 'bg-primary/10 text-primary' },
+                      { time: '10:30', name: '—', proc: 'Horário livre', color: 'bg-slate-100 text-slate-400' },
+                      { time: '14:00', name: '—', proc: 'Horário livre', color: 'bg-slate-100 text-slate-400' },
+                    ].map((row, i) => (
+                      <div key={i} className="flex items-center gap-3 py-1.5">
+                        <span className="text-[12px] font-bold text-[#1C1C1E] w-10 shrink-0">{row.time}</span>
+                        <div className={`flex-1 px-3 py-2 rounded-xl text-[12px] font-medium ${row.color}`}>
+                          {row.name} · {row.proc}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <motion.button
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15, duration: 0.25 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center gap-2.5 bg-violet-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(109,40,217,0.15)] hover:bg-violet-700 transition-all"
+                >
+                  Agendar primeira consulta
+                  <ArrowRight size={15} />
+                </motion.button>
+              </>
+            )}
+          </motion.div>
+        </motion.section>
+
+        {/* ── Step 3: Intelligence ── */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+          className="space-y-3"
+        >
+          <div className="px-2 flex items-center gap-2">
+            <div className={`w-5 h-5 rounded-full border-2 ${step3Active ? 'border-amber-500' : 'border-slate-200'}`} />
+            <span className={`text-[11px] font-bold uppercase tracking-widest ${
+              step3Active ? 'text-amber-600' : 'text-slate-300'
+            }`}>
+              Passo 3
+            </span>
+          </div>
+          <motion.div
+            animate={{ opacity: step3Active ? 0.85 : hasPatients ? 0.5 : 0.35 }}
+            transition={{ duration: 0.25 }}
+            className="bg-white rounded-[28px] border border-slate-50 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-amber-50 rounded-[18px] flex items-center justify-center shrink-0">
+                <Sparkles size={22} className="text-amber-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">Oportunidades que você está perdendo</h3>
+                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
+                  {step3Active
+                    ? 'O sistema já encontrou oportunidades. Veja pacientes para recuperar, encaixes para preencher e quanto pode faturar.'
+                    : 'Pacientes sumindo, horários vagos, cobranças esquecidas — o sistema encontra tudo e mostra o que fazer.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Preview: what intelligence looks like */}
+            <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
+              <div className="flex items-center gap-2.5 py-1">
+                <div className="w-2 h-2 bg-rose-400 rounded-full animate-pulse shrink-0" />
+                <p className="text-[12px] text-[#636366] font-medium">Você pode recuperar 3 pacientes que sumiram</p>
+              </div>
+              <div className="flex items-center gap-2.5 py-1">
+                <div className="w-2 h-2 bg-violet-400 rounded-full shrink-0" />
+                <p className="text-[12px] text-[#636366] font-medium">Encaixe sugerido: João, terça às 14h</p>
+              </div>
+              <div className="flex items-center gap-2.5 py-1">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
+                <p className="text-[12px] text-[#636366] font-medium">Potencial da semana: R$ 4.200 em agenda</p>
+              </div>
+            </div>
+
+            {step3Active && (
+              <>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+                  <TrendingUp size={18} className="text-emerald-600 shrink-0" />
+                  <p className="text-[13px] font-semibold text-emerald-700">Hoje você pode faturar até R$ 1.200 com sua agenda atual</p>
+                </div>
+                <motion.button
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.3 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    localStorage.setItem(onboardingKey, '1');
+                    setOnboardingDismissed(true);
+                  }}
+                  className="flex items-center gap-2.5 bg-amber-500 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(245,158,11,0.15)] hover:bg-amber-600 transition-all"
+                >
+                  Ver oportunidades agora
+                  <ArrowRight size={15} />
+                </motion.button>
+              </>
+            )}
+          </motion.div>
+        </motion.section>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-14 pb-32 pt-10 px-2 max-w-2xl mx-auto">

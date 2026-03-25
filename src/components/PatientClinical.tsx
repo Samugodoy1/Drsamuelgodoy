@@ -12,7 +12,9 @@ import {
   CreditCard,
   FileText,
   Info,
+  Loader2,
   Phone,
+  Trash2,
   User,
   UserRound,
   WalletCards,
@@ -1460,6 +1462,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                 </button>
               </div>
             )}
+
           </aside>
           )}
         </div>
