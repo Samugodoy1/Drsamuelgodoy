@@ -1,19 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useParams, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { 
-  Users, 
-  Calendar, 
-  ClipboardList, 
-  DollarSign, 
-  Plus, 
+import {
+  Users,
+  Calendar,
+  CalendarPlus,
+  CalendarDays,
+  ClipboardList,
+  DollarSign,
+  Plus,
   Search,
   ChevronRight,
   ChevronLeft,
   MessageCircle,
   Clock,
   CheckCircle2,
+  CheckCircle,
+  Check,
   AlertCircle,
+  AlertTriangle,
   LogOut,
   Settings,
   Image as ImageIcon,
@@ -23,27 +28,22 @@ import {
   Printer,
   Upload,
   FileText,
-  UserPlus,
-  UserCircle,
-  Menu,
-  CheckCircle,
-  AlertTriangle,
-  Camera,
-  UserCog,
-  Sun,
-  Moon,
-  Download,
-  X,
-  List,
-  Activity,
-  Check,
-  CalendarDays,
-  Pencil,
-  Mail,
   Phone,
   MapPin,
   Building2,
-  Shield
+  Shield,
+  Home,
+  Sparkles,
+  Activity,
+  UserCog,
+  UserCircle,
+  X,
+  List,
+  UserPlus,
+  Camera,
+  Pencil,
+  Mail,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -504,7 +504,7 @@ export default function App() {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [patientListFilter, setPatientListFilter] = useState<'all' | 'action-needed' | 'at-risk' | 'no-appointment' | 'in-treatment' | 'overdue'>('all');
+  const [patientListFilter, setPatientListFilter] = useState<'all' | 'action-needed' | 'at-risk' | 'no-appointment' | 'in-treatment' | 'overdue' | 'leads'>('all');
   const [patientActionsToday, setPatientActionsToday] = useState<Set<number>>(new Set());
   const [patientsInlineFeedback, setPatientsInlineFeedback] = useState('');
   const [patientIntelligence, setPatientIntelligence] = useState<any[]>([]);
@@ -588,13 +588,54 @@ export default function App() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
-  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error', celebration?: boolean } | null>(null);
   const [confirmation, setConfirmation] = useState<{ message: string, onConfirm: () => void } | null>(null);
+  const [guideDismissedUntil, setGuideDismissedUntil] = useState<string | null>(null);
 
-  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
+  const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false) => {
+    setNotification({ message, type, celebration });
+    setTimeout(() => setNotification(null), celebration ? 4500 : 3000);
   };
+
+  // ─── Implicit Onboarding: milestone tracking ─────────────────────────
+  const milestoneKey = (key: string) => `odontohub_milestone_${user?.id ?? 'x'}_${key}`;
+  const hasMilestone = (key: string) => localStorage.getItem(milestoneKey(key)) === '1';
+  const setMilestone = (key: string) => localStorage.setItem(milestoneKey(key), '1');
+
+  const getGuideStep = (): { message: string; action: string; tab?: string; onClick?: () => void } | null => {
+    if (guideDismissedUntil === activeTab) return null;
+    if (!user) return null;
+    if (patients.length === 0) {
+      if (activeTab === 'pacientes') return null; // already there
+      return {
+        message: 'Comece cadastrando seu primeiro paciente',
+        action: 'Ir para Pacientes',
+        tab: 'pacientes',
+      };
+    }
+    if (appointments.length === 0) {
+      if (activeTab === 'agenda') return null;
+      return {
+        message: 'Agora agende a primeira consulta',
+        action: 'Ir para Agenda',
+        tab: 'agenda',
+      };
+    }
+    if (!hasMilestone('recordOpened')) {
+      if (activeTab === 'prontuario') return null;
+      return {
+        message: 'Explore o prontuário de um paciente — tudo fica reunido ali',
+        action: 'Ver Pacientes',
+        tab: 'pacientes',
+      };
+    }
+    return null;
+  };
+
+  // Reset guide dismiss when user navigates to a different tab
+  useEffect(() => {
+    setGuideDismissedUntil(null);
+  }, [activeTab]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -1378,13 +1419,20 @@ export default function App() {
     // 3. revisao       – daysSinceLastVisit > 90  (only when nextVisitDate is null)
     // 4. em_dia        – otherwise
 
-    type AttentionKey = 'overdue' | 'review' | 'up-to-date';
-    type PatientStatus = 'em_tratamento' | 'atrasado' | 'revisao' | 'em_dia';
+    type AttentionKey = 'overdue' | 'review' | 'up-to-date' | 'lead';
+    type PatientStatus = 'em_tratamento' | 'atrasado' | 'revisao' | 'em_dia' | 'lead';
     let attentionKey: AttentionKey;
     let status: PatientStatus;
     let clinicalStatus: string;
 
-    if (nextVisitDate !== null && now <= nextVisitDate) {
+    // Lead: never visited, no future appointments, no active treatment plan
+    const isLead = !isInRecallProgram && nextVisitDate === null && !hasActiveTreatment;
+
+    if (isLead) {
+      status       = 'lead';
+      attentionKey = 'lead';
+      clinicalStatus = 'Lead';
+    } else if (nextVisitDate !== null && now <= nextVisitDate) {
       status       = 'em_tratamento';
       attentionKey = 'up-to-date';
       clinicalStatus = 'Em tratamento';
@@ -1417,6 +1465,7 @@ export default function App() {
       'overdue':    { key: 'overdue',    label: 'Atrasado',        dot: 'bg-rose-500',    tone: 'text-rose-700 bg-rose-50 border-rose-100' },
       'review':     { key: 'review',     label: 'Revisão próxima', dot: 'bg-amber-400',   tone: 'text-amber-700 bg-amber-50 border-amber-100' },
       'up-to-date': { key: 'up-to-date', label: 'Em dia',          dot: 'bg-emerald-500', tone: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+      'lead':       { key: 'lead',       label: 'Lead',            dot: 'bg-violet-500',  tone: 'text-violet-700 bg-violet-50 border-violet-100' },
     };
 
     return {
@@ -1431,6 +1480,7 @@ export default function App() {
       isInRecallProgram,
       daysSinceLastVisit,
       status,
+      isLead,
     };
   };
 
@@ -1648,7 +1698,12 @@ export default function App() {
         fetchData();
 
         setNewAppointment({ patient_id: '', patient_name: '', dentist_id: '', date: '', time: '', duration: '', notes: '' });
-        showNotification(isReschedule ? 'Reagendamento salvo com sucesso!' : 'Agendamento realizado com sucesso!');
+        const isFirstAppointment = appointments.length === 0 && !isReschedule;
+        showNotification(
+          isReschedule ? 'Reagendamento salvo com sucesso!' : isFirstAppointment ? '🎉 Primeira consulta agendada! Sua agenda está ativa.' : 'Agendamento realizado com sucesso!',
+          'success',
+          isFirstAppointment
+        );
       } else {
         showNotification(data.error || 'Erro ao realizar agendamento', 'error');
       }
@@ -1672,7 +1727,12 @@ export default function App() {
         fetchData();
         
         setNewPatient({ name: '', cpf: '', birth_date: '', phone: '', email: '', address: '' });
-        showNotification('Paciente cadastrado com sucesso!');
+        const isFirst = patients.length === 0;
+        showNotification(
+          isFirst ? '🎉 Primeiro paciente cadastrado! Agora agende uma consulta.' : 'Paciente cadastrado com sucesso!',
+          'success',
+          isFirst
+        );
       } else {
         const data = await res.json();
         showNotification(data.error || 'Erro ao cadastrar paciente', 'error');
@@ -1796,6 +1856,7 @@ export default function App() {
       const res = await apiFetch(`/api/patients/${id}`);
       const data = await res.json();
       setSelectedPatient(data);
+      setMilestone('recordOpened');
       navigate(`/prontuario/${id}`);
     } catch (error) {
       console.error('Error fetching patient record:', error);
@@ -2064,7 +2125,7 @@ export default function App() {
                 </button>
               </div>
               <nav className="space-y-2 flex-1">
-                <SidebarItem id="dashboard" icon={ClipboardList} label="Dashboard" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
+                <SidebarItem id="dashboard" icon={Home} label="Início" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="agenda" icon={Calendar} label="Agenda" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
@@ -2319,7 +2380,7 @@ export default function App() {
         </div>
 
         <nav className="space-y-2 flex-1">
-          <SidebarItem id="dashboard" icon={ClipboardList} label="Dashboard" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
+          <SidebarItem id="dashboard" icon={Home} label="Início" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="agenda" icon={Calendar} label="Agenda" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
@@ -2369,6 +2430,50 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 pb-36 md:pb-8">
+        {/* ── Floating Guide Banner ── */}
+        {(() => {
+          const guide = getGuideStep();
+          if (!guide) return null;
+          return (
+            <motion.div
+              key={guide.message}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-screen-xl mx-auto px-0 md:px-4 mb-4 no-print"
+            >
+              <div className="flex items-center gap-3 bg-primary/5 border border-primary/10 rounded-2xl px-5 py-3.5">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <Sparkles size={16} className="text-primary" />
+                </div>
+                <p className="text-[13px] font-medium text-slate-700 flex-1">
+                  {guide.message}
+                </p>
+                <button
+                  onClick={() => {
+                    if (guide.tab) {
+                      setGuideDismissedUntil(null);
+                      setActiveTab(guide.tab as any);
+                      navigate('/');
+                    }
+                    guide.onClick?.();
+                  }}
+                  className="shrink-0 bg-primary text-white px-4 py-2 rounded-xl text-[12px] font-bold hover:opacity-90 transition-all"
+                >
+                  {guide.action}
+                </button>
+                <button
+                  onClick={() => setGuideDismissedUntil(activeTab)}
+                  className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors p-1"
+                  title="Fechar dica"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </motion.div>
+          );
+        })()}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -2441,6 +2546,7 @@ export default function App() {
               <Dashboard 
                 user={user}
                 patients={patients}
+                appointments={appointments}
                 nextAppointments={nextAppointments}
                 todayAppointmentsTotalCount={todayAppointmentsTotalCount}
                 todayAppointmentsRemainingCount={todayAppointmentsRemainingCount}
@@ -2464,11 +2570,16 @@ export default function App() {
                 {/* Clean Header */}
                 <div className="flex flex-col gap-4 mb-6 no-print">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Agenda</h2>
-                      <span className="text-sm font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                        {selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                      </span>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Agenda</h2>
+                        <span className="text-sm font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                          {selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                      {appointments.length <= 3 && (
+                        <p className="text-[13px] text-slate-400">Organize seus horários e envie lembretes automáticos</p>
+                      )}
                     </div>
                     <button 
                       onClick={openAppointmentModal}
@@ -2564,31 +2675,52 @@ export default function App() {
 
                       if (filtered.length === 0 && agendaViewMode === 'day') {
                         return patients.length === 0 ? (
-                          <div className="py-16 sm:py-24 text-center space-y-5">
-                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
-                              <Calendar className="text-slate-300" size={28} />
+                          <div className="py-12 sm:py-20 text-center space-y-6 max-w-md mx-auto">
+                            <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mx-auto">
+                              <Calendar className="text-violet-400" size={28} />
                             </div>
-                            <div>
-                              <p className="text-lg font-semibold text-slate-800">Sua agenda começa com um paciente</p>
-                              <p className="text-sm text-slate-400 mt-1">Adicione seu primeiro paciente para começar a agendar consultas.</p>
+                            <div className="space-y-2">
+                              <p className="text-lg font-bold text-slate-800">Sua agenda começa com um paciente</p>
+                              <p className="text-sm text-slate-500 leading-relaxed">Cadastre seu primeiro paciente e depois agende a consulta. O sistema envia lembretes automáticos por WhatsApp.</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-100 text-left">
+                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Como vai ficar sua agenda:</p>
+                              {[
+                                { time: '09:00', label: 'Maria \u2022 Avalia\u00e7\u00e3o', active: true },
+                                { time: '10:30', label: 'Hor\u00e1rio livre', active: false },
+                                { time: '14:00', label: 'Jo\u00e3o \u2022 Limpeza', active: true },
+                              ].map((row, i) => (
+                                <div key={i} className="flex items-center gap-3 py-1">
+                                  <span className="text-[12px] font-bold text-slate-400 w-10">{row.time}</span>
+                                  <div className={`flex-1 px-3 py-2 rounded-xl text-[12px] font-medium ${row.active ? 'bg-primary/10 text-primary' : 'bg-white text-slate-300 border border-dashed border-slate-200'}`}>
+                                    {row.label}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                             <button 
                               onClick={() => setActiveTab('pacientes')}
-                              className="mt-2 bg-primary text-white px-6 py-2.5 rounded-[30px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
+                              className="bg-primary text-white px-6 py-3 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
                             >
                               <UserPlus size={16} />
-                              Adicionar paciente
+                              Cadastrar primeiro paciente
                             </button>
                           </div>
                         ) : (
-                          <div className="p-20 text-center">
-                            <Calendar className="mx-auto text-slate-200 mb-4" size={64} />
-                            <p className="text-slate-500 font-medium">Nenhum agendamento encontrado para este período.</p>
+                          <div className="py-12 sm:py-16 text-center space-y-5 max-w-md mx-auto">
+                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+                              <Calendar className="text-slate-300" size={28} />
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-lg font-bold text-slate-800">Nenhum agendamento neste dia</p>
+                              <p className="text-sm text-slate-500">Clique no bot\u00e3o abaixo para agendar uma consulta r\u00e1pida. Voc\u00ea escolhe o paciente, data e hor\u00e1rio.</p>
+                            </div>
                             <button 
                               onClick={openAppointmentModal}
-                              className="mt-4 bg-primary text-white px-6 py-2.5 rounded-[30px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
+                              className="bg-primary text-white px-6 py-3 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
                             >
-                              Agendar agora
+                              <Plus size={16} />
+                              Agendar consulta
                             </button>
                           </div>
                         );
@@ -4013,6 +4145,7 @@ export default function App() {
                     .map(patient => ({ patient, meta: getPatientCardMeta(patient), intel: intelMap.get(patient.id) || null }))
                     .filter(({ meta, intel }) => {
                       if (patientListFilter === 'all') return true;
+                      if (patientListFilter === 'leads') return meta.isLead;
                       if (patientListFilter === 'action-needed') return intel?.priority === 'HIGH';
                       if (patientListFilter === 'at-risk') return intel?.status === 'ABANDONO' || intel?.status === 'ATENCAO';
                       if (patientListFilter === 'no-appointment') return intel ? !intel.has_future_appointment : !meta.nextVisitDate;
@@ -4039,9 +4172,11 @@ export default function App() {
                   const totalActionNeeded = patientIntelligence.filter((pi: any) => pi.priority === 'HIGH').length;
                   const totalAtRisk = patientIntelligence.filter((pi: any) => pi.status === 'ABANDONO' || pi.status === 'ATENCAO').length;
                   const totalNoAppointment = patientIntelligence.filter((pi: any) => !pi.has_future_appointment && pi.status !== 'FINALIZADO').length;
+                  const totalLeads = allMetas.filter(x => x.meta.isLead).length;
 
                   const filterChips = [
                     { key: 'all', label: 'Todos', count: 0 },
+                    { key: 'leads', label: 'Leads', count: totalLeads },
                     { key: 'action-needed', label: 'Preciso agir', count: totalActionNeeded },
                     { key: 'at-risk', label: 'Em risco', count: totalAtRisk },
                     { key: 'no-appointment', label: 'Sem agendamento', count: totalNoAppointment },
@@ -4082,7 +4217,12 @@ export default function App() {
                     <>
                       {/* ── Header ── */}
                       <div className="flex flex-col gap-4 mb-2">
-                        <h3 className="text-2xl font-bold tracking-tight text-slate-900">Pacientes</h3>
+                        <div className="flex flex-col gap-0.5">
+                          <h3 className="text-2xl font-bold tracking-tight text-slate-900">Pacientes</h3>
+                          {patients.length <= 3 && (
+                            <p className="text-[13px] text-slate-400">Cadastro, prontuário e acompanhamento dos seus pacientes</p>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-full">
                           <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -4185,7 +4325,9 @@ export default function App() {
                                   ? 'bg-rose-100 text-rose-600'
                                   : chip.key === 'at-risk'
                                     ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-slate-200 text-slate-600'
+                                    : chip.key === 'leads'
+                                      ? 'bg-violet-100 text-violet-600'
+                                      : 'bg-slate-200 text-slate-600'
                               }`}>
                                 {chip.count}
                               </span>
@@ -4221,7 +4363,9 @@ export default function App() {
                           const stCfg = intelStatus ? statusConfig[intelStatus] : null;
                           const priCfg = intelPriority ? priorityConfig[intelPriority] : null;
 
-                          const urgencyLabel = intelStatus === 'ABANDONO'
+                          const urgencyLabel = meta.isLead
+                            ? 'Novo cadastro · Agende a 1ª consulta'
+                            : intelStatus === 'ABANDONO'
                             ? `${daysAgo != null ? `${daysAgo}d sem visita` : meta.lastVisitLabel}`
                             : intelStatus === 'ATENCAO'
                             ? `Sem agendamento · ${meta.lastVisitLabel}`
@@ -4233,7 +4377,7 @@ export default function App() {
                               ? `Revisão · ${meta.lastVisitLabel}`
                               : meta.lastVisitLabel;
 
-                          const borderColor = intelPriority === 'HIGH' ? 'border-l-rose-500 border-rose-100' : intelStatus === 'ATENCAO' ? 'border-l-amber-400 border-amber-50' : intelStatus === 'ABANDONO' ? 'border-l-rose-400 border-rose-50' : intelStatus === 'EM_TRATAMENTO' ? 'border-l-sky-400 border-slate-100' : 'border-l-transparent border-slate-100 hover:border-slate-200';
+                          const borderColor = meta.isLead ? 'border-l-violet-500 border-violet-100' : intelPriority === 'HIGH' ? 'border-l-rose-500 border-rose-100' : intelStatus === 'ATENCAO' ? 'border-l-amber-400 border-amber-50' : intelStatus === 'ABANDONO' ? 'border-l-rose-400 border-rose-50' : intelStatus === 'EM_TRATAMENTO' ? 'border-l-sky-400 border-slate-100' : 'border-l-transparent border-slate-100 hover:border-slate-200';
 
                           return (
                             <div
@@ -4262,13 +4406,24 @@ export default function App() {
                                 >
                                   <div className="flex items-center gap-2 mb-1">
                                     <p className="text-[15px] font-semibold text-slate-900 truncate leading-tight">{patient.name}</p>
-                                    {priCfg && (
+                                    {meta.isLead && (
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-500 text-white ring-1 ring-violet-200 shrink-0">
+                                        Lead
+                                      </span>
+                                    )}
+                                    {!meta.isLead && priCfg && (
                                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${priCfg.bg} ${priCfg.text} ring-1 ${priCfg.ring} shrink-0`}>
                                         {priCfg.label}
                                       </span>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2 flex-wrap">
+                                    {meta.isLead && !stCfg && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-50 text-violet-700">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                                        Lead
+                                      </span>
+                                    )}
                                     {stCfg && (
                                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${stCfg.bg} ${stCfg.text}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${stCfg.dot}`} />
@@ -4290,47 +4445,79 @@ export default function App() {
 
                               {/* Icon actions */}
                               <div className="flex items-center gap-1 shrink-0 px-3 border-l border-slate-50">
-                                <button
-                                  type="button"
-                                  title={isActed ? 'Agendamento iniciado' : 'Agendar consulta'}
-                                  onClick={() => handleScheduleFromCard(patient)}
-                                  className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors ${
-                                    isActed
-                                      ? 'text-emerald-600 bg-emerald-50'
-                                      : 'text-slate-400 hover:text-primary hover:bg-primary/8'
-                                  }`}
-                                >
-                                  {isActed ? <Check size={16} /> : <Calendar size={16} />}
-                                </button>
-                                <button
-                                  type="button"
-                                  title="Contatar via WhatsApp"
-                                  onClick={() => contactPatientOnWhatsApp(patient)}
-                                  className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                >
-                                  <MessageCircle size={16} />
-                                </button>
+                                {meta.isLead ? (
+                                  <button
+                                    type="button"
+                                    title="Agendar 1ª consulta"
+                                    onClick={() => handleScheduleFromCard(patient)}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 text-white text-[11px] font-bold hover:bg-violet-600 transition-colors active:scale-95"
+                                  >
+                                    <CalendarPlus size={14} />
+                                    <span className="hidden sm:inline">1ª consulta</span>
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      title={isActed ? 'Agendamento iniciado' : 'Agendar consulta'}
+                                      onClick={() => handleScheduleFromCard(patient)}
+                                      className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors ${
+                                        isActed
+                                          ? 'text-emerald-600 bg-emerald-50'
+                                          : 'text-slate-400 hover:text-primary hover:bg-primary/8'
+                                      }`}
+                                    >
+                                      {isActed ? <Check size={16} /> : <Calendar size={16} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Contatar via WhatsApp"
+                                      onClick={() => contactPatientOnWhatsApp(patient)}
+                                      className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                    >
+                                      <MessageCircle size={16} />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           );
                         })}
 
                         {patientCards.length === 0 && patients.length === 0 && !searchTerm && (
-                          <div className="col-span-full bg-white rounded-3xl border border-slate-100 shadow-sm p-10 sm:p-14 text-center space-y-5">
-                            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                              <UserPlus size={28} className="text-primary" />
+                          <div className="col-span-full bg-white rounded-3xl border border-slate-100 shadow-sm p-8 sm:p-12 space-y-6">
+                            <div className="text-center space-y-3">
+                              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                                <UserPlus size={28} className="text-primary" />
+                              </div>
+                              <p className="text-lg font-bold text-slate-800">Cadastre seu primeiro paciente</p>
+                              <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">Cada paciente ganha automaticamente: prontuário digital, odontograma, histórico de evolução e controle financeiro.</p>
                             </div>
-                            <div>
-                              <p className="text-lg font-semibold text-slate-800">Comece adicionando seu primeiro paciente</p>
-                              <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">Cadastre um paciente para acessar prontuário, odontograma, agenda e financeiro.</p>
+                            <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-100 max-w-sm mx-auto">
+                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">O que você vai ver:</p>
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">M</div>
+                                <div>
+                                  <p className="text-[13px] font-semibold text-slate-800">Maria Silva</p>
+                                  <p className="text-[11px] text-slate-400">Em tratamento · Última visita: há 3 dias</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 flex-wrap">
+                                {['Prontuário', 'Odontograma', 'Evolução', 'Financeiro'].map(tag => (
+                                  <span key={tag} className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-400 border border-slate-100">{tag}</span>
+                                ))}
+                              </div>
                             </div>
-                            <button
-                              onClick={() => setIsPatientModalOpen(true)}
-                              className="mt-2 bg-primary text-white px-7 py-3 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
-                            >
-                              <UserPlus size={16} />
-                              Adicionar paciente
-                            </button>
+                            <div className="text-center">
+                              <button
+                                onClick={() => setIsPatientModalOpen(true)}
+                                className="bg-primary text-white px-7 py-3.5 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 inline-flex items-center gap-2 text-sm"
+                              >
+                                <Plus size={16} />
+                                Cadastrar paciente
+                              </button>
+                              <p className="text-[11px] text-slate-400 mt-3">Só precisa de nome e telefone</p>
+                            </div>
                           </div>
                         )}
 
@@ -6149,7 +6336,7 @@ export default function App() {
       <div className="fixed bottom-0 left-0 right-0 z-50 tablet-l:hidden no-print">
         {/* Bottom Navigation */}
         <nav className="bg-white/80 backdrop-blur-xl border-t border-[#C6C6C8]/30 px-2 pt-2 pb-6 flex justify-around items-center">
-          <BottomNavItem id="dashboard" label="Início" icon={ClipboardList} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+          <BottomNavItem id="dashboard" label="Início" icon={Home} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="pacientes" label="Pacientes" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="financeiro" label="Financeiro" icon={DollarSign} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
@@ -6163,17 +6350,35 @@ export default function App() {
       <AnimatePresence>
         {notification && (
           <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 50, scale: notification.celebration ? 0.9 : 1 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50 }}
-            className={`fixed bottom-8 right-8 z-[100] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${
-              notification.type === 'success' 
+            transition={notification.celebration ? { type: 'spring', stiffness: 300, damping: 20 } : undefined}
+            className={`fixed z-[100] flex items-center gap-3 border ${
+              notification.celebration
+                ? 'bottom-12 left-1/2 -translate-x-1/2 px-8 py-5 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] bg-white border-primary/20'
+                : 'bottom-8 right-8 px-6 py-4 rounded-2xl shadow-2xl'
+            } ${
+              !notification.celebration && notification.type === 'success' 
                 ? 'bg-primary border-primary/20 text-white' 
-                : 'bg-rose-600 border-rose-500 text-white'
+                : !notification.celebration 
+                  ? 'bg-rose-600 border-rose-500 text-white'
+                  : ''
             }`}
           >
-            {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-            <span className="font-bold text-sm">{notification.message}</span>
+            {notification.celebration ? (
+              <>
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <CheckCircle size={22} className="text-primary" />
+                </div>
+                <span className="font-bold text-[15px] text-slate-800">{notification.message}</span>
+              </>
+            ) : (
+              <>
+                {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+                <span className="font-bold text-sm">{notification.message}</span>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

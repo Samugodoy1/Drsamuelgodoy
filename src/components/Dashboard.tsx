@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X, UserPlus, ArrowRight, Check } from 'lucide-react';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -64,6 +64,7 @@ interface ReminderAppointment {
 interface DashboardProps {
   user: any;
   patients: any[];
+  appointments: any[];
   nextAppointments: any[];
   todayAppointmentsTotalCount: number;
   todayAppointmentsRemainingCount: number;
@@ -121,6 +122,7 @@ function openWhatsApp(phone: string, name: string) {
 export const Dashboard: React.FC<DashboardProps> = ({
   user,
   patients = [],
+  appointments = [],
   nextAppointments = [],
   todayAppointmentsRemainingCount = 0,
   totalAppointmentsCount = 0,
@@ -444,14 +446,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
-  // ─── Onboarding: reactive progress-driven experience ─────────────────
+  // ─── Onboarding: welcome + guided setup ──────────────────────────────
   const hasPatients = patients.length > 0;
   const hasAppointments = totalAppointmentsCount > 0;
   const onboardingKey = `odontohub_onboarding_done_${user?.id ?? 'unknown'}`;
+  const welcomeKey = `odontohub_welcome_seen_${user?.id ?? 'unknown'}`;
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem(onboardingKey) === '1');
-  // Track if user was in onboarding flow this session (missing patients or appointments on first render)
+  const [welcomeSeen, setWelcomeSeen] = useState(() => localStorage.getItem(welcomeKey) === '1');
   const wasInOnboarding = useRef(!hasPatients || !hasAppointments);
-  // Show onboarding if: missing steps OR (both done but user was in flow this session and hasn't dismissed)
   const showOnboarding = !onboardingDismissed && (
     !hasPatients || !hasAppointments || wasInOnboarding.current
   );
@@ -460,13 +462,149 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const step3Active = hasPatients && hasAppointments;
   const totalSteps = 3;
 
-  const getOnboardingMessage = () => {
-    if (!hasPatients) return 'Configure em 2 minutos e comece a faturar com agenda organizada.';
-    if (!hasAppointments) return 'Você tem pacientes. Agora preencha sua agenda e pare de perder horários.';
-    return 'Sua clínica já tem oportunidades esperando por você.';
-  };
+  // ─── Welcome Screen (first contact — before onboarding) ────────────
+  if (!welcomeSeen && !hasPatients && !hasAppointments && !onboardingDismissed) {
+    return (
+      <div className="flex flex-col gap-10 pb-32 pt-8 px-2 max-w-2xl mx-auto">
+        {/* Identity */}
+        <motion.header
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center space-y-4 pt-6"
+        >
+          <div className="w-16 h-16 bg-primary rounded-[20px] flex items-center justify-center text-white shadow-lg shadow-primary/20 mx-auto">
+            <Stethoscope size={32} />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-[32px] font-bold tracking-tight text-[#1C1C1E]">
+              Bem-vindo ao OdontoHub
+            </h1>
+            <p className="text-[17px] text-[#8E8E93] leading-relaxed max-w-md mx-auto">
+              Seu consultório organizado em um só lugar: pacientes, agenda, prontuários e financeiro.
+            </p>
+          </div>
+        </motion.header>
 
+        {/* How it works — the mental model */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
+          className="space-y-4"
+        >
+          <h2 className="text-[13px] font-bold text-[#8E8E93] uppercase tracking-widest px-2">
+            Como funciona
+          </h2>
+          <div className="bg-white rounded-[24px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] divide-y divide-slate-50">
+            {[
+              {
+                icon: <UserPlus size={20} className="text-primary" />,
+                bg: 'bg-primary/10',
+                title: 'Cadastre seus pacientes',
+                desc: 'Prontuário, odontograma e histórico completo em um só lugar.',
+              },
+              {
+                icon: <Calendar size={20} className="text-violet-600" />,
+                bg: 'bg-violet-50',
+                title: 'Organize sua agenda',
+                desc: 'Agende consultas e o sistema envia lembretes automáticos.',
+              },
+              {
+                icon: <ClipboardList size={20} className="text-sky-600" />,
+                bg: 'bg-sky-50',
+                title: 'Atenda e registre',
+                desc: 'Evolução clínica, procedimentos e plano de tratamento.',
+              },
+              {
+                icon: <DollarSign size={20} className="text-emerald-600" />,
+                bg: 'bg-emerald-50',
+                title: 'Controle financeiro',
+                desc: 'Receitas, despesas e parcelamentos sem planilha.',
+              },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-4 p-5">
+                <div className={`w-10 h-10 ${item.bg} rounded-[14px] flex items-center justify-center shrink-0`}>
+                  {item.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold text-[#1C1C1E]">{item.title}</p>
+                  <p className="text-[13px] text-[#8E8E93] mt-0.5">{item.desc}</p>
+                </div>
+                <div className="flex items-center justify-center w-6 h-6 bg-slate-50 rounded-full text-[11px] font-bold text-[#8E8E93] shrink-0 mt-1">
+                  {i + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* Navigation guide */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="space-y-4"
+        >
+          <h2 className="text-[13px] font-bold text-[#8E8E93] uppercase tracking-widest px-2">
+            Onde encontrar cada coisa
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: <Users size={18} />, label: 'Pacientes', desc: 'Cadastro e prontuário', color: 'text-primary', bg: 'bg-primary/5 border-primary/10' },
+              { icon: <Calendar size={18} />, label: 'Agenda', desc: 'Consultas do dia', color: 'text-violet-600', bg: 'bg-violet-50/50 border-violet-100' },
+              { icon: <DollarSign size={18} />, label: 'Financeiro', desc: 'Receitas e despesas', color: 'text-emerald-600', bg: 'bg-emerald-50/50 border-emerald-100' },
+              { icon: <FileText size={18} />, label: 'Documentos', desc: 'Atestados e receitas', color: 'text-sky-600', bg: 'bg-sky-50/50 border-sky-100' },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.35 + i * 0.05 }}
+                className={`rounded-[18px] border p-4 space-y-2 ${item.bg}`}
+              >
+                <span className={item.color}>{item.icon}</span>
+                <p className="text-[14px] font-bold text-[#1C1C1E]">{item.label}</p>
+                <p className="text-[11px] text-[#8E8E93]">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+          className="px-2 pt-4"
+        >
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              localStorage.setItem(welcomeKey, '1');
+              setWelcomeSeen(true);
+            }}
+            className="w-full flex items-center justify-center gap-3 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all"
+          >
+            Começar a usar o OdontoHub
+            <ArrowRight size={18} />
+          </motion.button>
+          <p className="text-center text-[12px] text-[#8E8E93] mt-3">
+            Leva menos de 2 minutos para configurar
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ─── Onboarding Steps (after welcome, before setup is complete) ────
   if (showOnboarding) {
+    const getOnboardingMessage = () => {
+      if (!hasPatients) return 'Vamos configurar seu consultório. Comece cadastrando seu primeiro paciente.';
+      if (!hasAppointments) return 'Ótimo! Agora agende a primeira consulta para ativar sua agenda.';
+      return 'Tudo pronto! Seu consultório está configurado.';
+    };
+
     return (
       <div className="flex flex-col gap-8 pb-32 pt-10 px-2 max-w-2xl mx-auto">
         {/* Header */}
@@ -544,12 +682,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
-                  {hasPatients ? 'Paciente cadastrado' : 'Prontuário, odontograma e financeiro em um só lugar'}
+                  {hasPatients ? 'Paciente cadastrado' : 'Cadastre seu primeiro paciente'}
                 </h3>
                 <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
                   {hasPatients
-                    ? `${patients.length} paciente${patients.length > 1 ? 's' : ''} no sistema. Prontuário, odontograma e histórico já disponíveis.`
-                    : 'Sem fichas soltas. Cadastre e tenha tudo organizado para atender, cobrar e acompanhar.'
+                    ? `${patients.length} paciente${patients.length > 1 ? 's' : ''} no sistema. Clique em "Pacientes" no menu lateral para gerenciar.`
+                    : 'Clique no botão abaixo ou acesse "Pacientes" no menu lateral. Prontuário, odontograma e financeiro ficam organizados automaticamente.'
                   }
                 </p>
               </div>
@@ -633,14 +771,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
-                  {hasAppointments ? 'Agenda ativa' : 'Você tem horários livres hoje'}
+                  {hasAppointments ? 'Agenda ativa' : 'Agende a primeira consulta'}
                 </h3>
                 <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
                   {hasAppointments
-                    ? 'Agenda funcionando. Lembretes e confirmações automáticas já ativas.'
+                    ? 'Sua agenda está funcionando. Acesse "Agenda" no menu lateral para ver e gerenciar consultas.'
                     : hasPatients
-                      ? `Você pode encaixar até 8 pacientes hoje. Agende a primeira consulta e o sistema cuida dos lembretes.`
-                      : 'Cada horário vazio é faturamento perdido. Preencha a agenda e o sistema avisa seus pacientes automaticamente.'
+                      ? 'Clique no botão abaixo ou acesse "Agenda" no menu lateral. O sistema envia lembretes automaticamente para seus pacientes.'
+                      : 'Primeiro cadastre um paciente (passo 1), depois você poderá agendar consultas aqui.'
                   }
                 </p>
               </div>
@@ -709,11 +847,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Sparkles size={22} className="text-amber-500" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">Oportunidades que você está perdendo</h3>
+                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">Pronto! Explore seu painel</h3>
                 <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
                   {step3Active
-                    ? 'O sistema já encontrou oportunidades. Veja pacientes para recuperar, encaixes para preencher e quanto pode faturar.'
-                    : 'Pacientes sumindo, horários vagos, cobranças esquecidas — o sistema encontra tudo e mostra o que fazer.'
+                    ? 'Seu consultório está configurado. A tela de Início mostra seus próximos atendimentos, pacientes que precisam de atenção e sugestões inteligentes.'
+                    : 'Após configurar pacientes e agenda, esta tela mostrará tudo que você precisa saber no dia: próximos atendimentos, alertas e oportunidades.'
                   }
                 </p>
               </div>
@@ -738,8 +876,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {step3Active && (
               <>
                 <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-3">
-                  <TrendingUp size={18} className="text-emerald-600 shrink-0" />
-                  <p className="text-[13px] font-semibold text-emerald-700">Hoje você pode faturar até R$ 1.200 com sua agenda atual</p>
+                  <Check size={18} className="text-emerald-600 shrink-0" />
+                  <p className="text-[13px] font-semibold text-emerald-700">Consultório configurado! Você já pode usar o sistema normalmente.</p>
                 </div>
                 <motion.button
                   initial={{ opacity: 0, y: 4 }}
@@ -750,9 +888,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     localStorage.setItem(onboardingKey, '1');
                     setOnboardingDismissed(true);
                   }}
-                  className="flex items-center gap-2.5 bg-amber-500 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(245,158,11,0.15)] hover:bg-amber-600 transition-all"
+                  className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
                 >
-                  Ver oportunidades agora
+                  Ir para o painel principal
                   <ArrowRight size={15} />
                 </motion.button>
               </>
@@ -802,6 +940,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </motion.div>
       )}
 
+      {/* 1.8 QUICK ACTIONS — always-visible primary actions */}
+      <section className="px-1 -mt-4">
+        <div className="flex gap-3">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setActiveTab('pacientes')}
+            className="flex-1 flex items-center justify-center gap-2.5 bg-white border border-slate-100 rounded-[18px] py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-primary/20 transition-all"
+          >
+            <Plus size={16} className="text-primary" />
+            <span className="text-[13px] font-bold text-[#1C1C1E]">Novo Paciente</span>
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setIsModalOpen(true)}
+            className="flex-1 flex items-center justify-center gap-2.5 bg-white border border-slate-100 rounded-[18px] py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-violet-200 transition-all"
+          >
+            <CalendarPlus size={16} className="text-violet-600" />
+            <span className="text-[13px] font-bold text-[#1C1C1E]">Nova Consulta</span>
+          </motion.button>
+        </div>
+      </section>
+
       {/* 2. INTELLIGENCE STATS — Compact summary */}
       {intelligence && !loading && statChips.length > 0 && (
         <section className="px-2">
@@ -815,6 +975,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </section>
       )}
+
+      {/* Leads panel removed — using patient list for lead management */}
 
       {/* 3. NEEDS ACTION TODAY — "What should I do now?" */}
       {intelligence && intelligence.needsActionToday.length > 0 && (
@@ -915,12 +1077,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.div>
         </section>
       ) : (
-        <section className="ios-card flex flex-col items-center justify-center py-24 text-center rounded-[32px]">
-          <div className="w-20 h-20 bg-[#F2F2F7] rounded-full flex items-center justify-center text-[#8E8E93] mb-8">
+        <section className="ios-card flex flex-col items-center justify-center py-16 text-center rounded-[32px] space-y-6">
+          <div className="w-20 h-20 bg-[#F2F2F7] rounded-full flex items-center justify-center text-[#8E8E93]">
             <Calendar size={36} />
           </div>
-          <p className="text-[19px] font-semibold text-[#1C1C1E]">Nenhuma consulta para agora</p>
-          <p className="text-[15px] text-[#8E8E93] mt-2">Sua agenda está livre no momento</p>
+          <div className="space-y-2">
+            <p className="text-[19px] font-semibold text-[#1C1C1E]">Nenhuma consulta para agora</p>
+            <p className="text-[15px] text-[#8E8E93]">Sua agenda está livre no momento</p>
+          </div>
+          <div className="flex gap-3">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-[16px] text-[13px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.1)]"
+            >
+              <CalendarPlus size={15} />
+              Agendar consulta
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setActiveTab('agenda')}
+              className="flex items-center gap-2 bg-[#F2F2F7] text-[#1C1C1E] px-5 py-3 rounded-[16px] text-[13px] font-bold"
+            >
+              Ver agenda completa
+            </motion.button>
+          </div>
         </section>
       )}
 
