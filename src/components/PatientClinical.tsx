@@ -233,6 +233,13 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [isUploadingClinicalImage, setIsUploadingClinicalImage] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+
+  // Auto-dismiss upload feedback
+  useEffect(() => {
+    if (!uploadFeedback) return;
+    const timer = setTimeout(() => setUploadFeedback(null), 3500);
+    return () => clearTimeout(timer);
+  }, [uploadFeedback]);
   const [isEditingAnamnese, setIsEditingAnamnese] = useState(false);
   const [anamneseForm, setAnamneseForm] = useState({ medical_history: '', allergies: '', medications: '' });
   const [isSavingAnamnese, setIsSavingAnamnese] = useState(false);
@@ -990,10 +997,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       }
 
       await onRefreshPatient?.();
-      setUploadFeedback('Foto do paciente atualizada.');
+      setUploadFeedback('Foto atualizada.');
     } catch (error) {
       console.error('Error uploading patient profile image:', error);
-      setUploadFeedback('Não foi possível enviar a foto do paciente.');
+      setUploadFeedback('Não foi possível enviar a foto.');
     } finally {
       setIsUploadingProfilePhoto(false);
       event.target.value = '';
@@ -1039,10 +1046,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
       await onRefreshPatient?.();
       setInfoTab('imagens');
-      setUploadFeedback('Imagem/RX anexada com sucesso.');
+      setUploadFeedback('Imagem anexada.');
     } catch (error) {
       console.error('Error uploading patient clinical image:', error);
-      const message = error instanceof Error ? error.message : 'Não foi possível anexar imagem/RX.';
+      const message = error instanceof Error ? error.message : 'Não foi possível enviar a imagem.';
       setUploadFeedback(message);
     } finally {
       setIsUploadingClinicalImage(false);
@@ -1111,6 +1118,13 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       : 'Mapeie a condição dentária primeiro para orientar o próximo procedimento.';
   const primaryActionButtonLabel = primaryTreatment ? 'Abrir tratamento atual' : 'Ir para odontograma';
 
+  const greetingText = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  })();
+
   const iosCard =
     'bg-white/92 border border-slate-200/70 shadow-[0_8px_24px_rgba(15,23,42,0.05)]';
   const iosSubtleCard =
@@ -1118,130 +1132,157 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
   return (
     <div className="min-h-screen bg-[#F7F7F8] pb-24 text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-white/60 bg-[#F4F7F6]/90 backdrop-blur-2xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="rounded-[30px] border border-slate-200/70 bg-white/88 px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
-            <div className="flex items-start justify-between gap-3">
+      <header className="sticky top-0 z-40 border-b border-slate-100/60 ios-glass-heavy">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-3">
+          <div className="rounded-[26px] border border-slate-200/60 bg-white/95 px-4 py-3.5 sm:px-5 shadow-[0_6px_24px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]">
+
+            {/* ── Row 1: identidade + ações ── */}
+            <div className="flex items-center gap-3">
+              {/* Voltar */}
               <button
-                onClick={() => {
-                  setAppActiveTab('pacientes');
-                  appNavigate('/pacientes');
-                }}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors duration-200 hover:text-slate-900"
+                onClick={() => { setAppActiveTab('pacientes'); appNavigate('/pacientes'); }}
+                className="shrink-0 h-9 w-9 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 transition-colors hover:text-slate-900 active:scale-[0.94]"
                 aria-label="Voltar para pacientes"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={16} />
               </button>
 
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.08em] uppercase ${clinicalBadge.className}`}>
-                {clinicalBadge.label}
-              </span>
-            </div>
-
-            <div className="mt-4 flex items-center gap-3 min-w-0">
-              <div className="relative w-13 h-13 sm:w-14 sm:h-14 shrink-0">
-                <div className="w-full h-full rounded-[20px] overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-200/80">
+              {/* Avatar */}
+              <div className="relative shrink-0 group">
+                <div className="w-12 h-12 rounded-[16px] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/80 flex items-center justify-center shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-shadow duration-300 group-hover:shadow-[0_4px_12px_rgba(15,23,42,0.1)]">
                   {patient?.photo_url ? (
                     <img src={patient.photo_url} alt={patient?.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <span className="text-slate-700 font-bold text-base">
-                      {String(patient?.name || 'P')
-                        .split(' ')
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((n: string) => n[0].toUpperCase())
-                        .join('')}
+                    <span className="text-slate-700 font-bold text-sm select-none">
+                      {String(patient?.name || 'P').split(' ').filter(Boolean).slice(0, 2).map((n: string) => n[0].toUpperCase()).join('')}
                     </span>
                   )}
                 </div>
-
                 <button
                   type="button"
                   onClick={() => profilePhotoInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:text-slate-900 disabled:opacity-60"
-                  aria-label="Enviar foto do paciente"
                   disabled={isUploadingProfilePhoto}
+                  className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 shadow-sm transition-colors hover:text-slate-900 disabled:opacity-60"
+                  aria-label="Enviar foto"
                 >
-                  <Camera size={13} />
+                  <Camera size={10} />
                 </button>
-
-                <input
-                  ref={profilePhotoInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePhotoUpload}
-                  className="hidden"
-                />
+                <input ref={profilePhotoInputRef} type="file" accept="image/*" onChange={handleProfilePhotoUpload} className="hidden" />
               </div>
 
+              {/* Nome + badge + idade */}
               <div className="min-w-0 flex-1">
-                <h1 className="text-[27px] sm:text-[32px] leading-[1.04] tracking-[-0.03em] font-semibold text-slate-950 truncate">{patient?.name}</h1>
-                <p className="mt-1 text-sm text-slate-500">{age !== null ? `${age} anos` : 'Idade n/i'}</p>
+                <p className="text-[10px] text-slate-400 font-medium tracking-wide mb-0.5">{greetingText}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-[19px] sm:text-[22px] font-bold tracking-[-0.025em] text-slate-950 leading-tight truncate">
+                    {patient?.name}
+                  </h1>
+                  <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-[0.07em] uppercase transition-all duration-300 ${clinicalBadge.className}`}>
+                    {clinicalBadge.label}
+                  </span>
+                </div>
+                <p className="text-[12px] text-slate-400 mt-0.5 font-medium">
+                  {age !== null ? `${age} anos` : 'Idade n/i'}
+                  {treatmentInProgress.length > 0 && (
+                    <span className="ml-1.5 text-slate-200">·</span>
+                  )}
+                  {treatmentInProgress.length > 0 && (
+                    <span className="ml-1.5 tabular-nums">{treatmentInProgress.length} procedimento{treatmentInProgress.length !== 1 ? 's' : ''} ativo{treatmentInProgress.length !== 1 ? 's' : ''}</span>
+                  )}
+                </p>
               </div>
-            </div>
 
-            <div className="mt-5 border-t border-slate-100 pt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Próximo passo</p>
-                <p className="mt-2 text-[22px] sm:text-[26px] leading-[1.12] tracking-[-0.03em] font-semibold text-slate-950">{primaryActionTitle}</p>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{primaryActionHelper}</p>
-                {upcomingAppointment && (
-                  <p className="mt-3 text-xs font-medium text-slate-400">
-                    Próxima consulta em {formatDate(upcomingAppointment.start_time)} às {formatTime(upcomingAppointment.start_time)}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-0.5">
+              {/* Ações compactas */}
+              <div className="shrink-0 flex items-center gap-1.5">
+                <div className="hidden sm:inline-flex items-center rounded-full border border-slate-200/60 bg-slate-50/80 p-0.5 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]">
                   <button
                     type="button"
                     onClick={() => setIsFocusMode(true)}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
-                      isFocusMode ? 'bg-slate-950 text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Foco
-                  </button>
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 ease-out ${isFocusMode ? 'bg-white text-slate-900 shadow-[0_1px_4px_rgba(15,23,42,0.08)]' : 'text-slate-400 hover:text-slate-600'}`}
+                  >Foco</button>
                   <button
                     type="button"
                     onClick={() => setIsFocusMode(false)}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
-                      !isFocusMode ? 'bg-slate-950 text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Completo
-                  </button>
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 ease-out ${!isFocusMode ? 'bg-white text-slate-900 shadow-[0_1px_4px_rgba(15,23,42,0.08)]' : 'text-slate-400 hover:text-slate-600'}`}
+                  >Geral</button>
                 </div>
-
-                <button
-                  onClick={() => {
-                    if (primaryTreatment) {
-                      setHighlightedTreatmentId(primaryTreatment.id);
-                      window.setTimeout(() => setHighlightedTreatmentId(null), 2200);
-                    }
-                    focusOdontogram();
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-slate-900 active:scale-[0.98]"
-                >
-                  <Activity size={15} />
-                  {primaryActionButtonLabel}
-                </button>
                 <button
                   onClick={() => setIsAddingEvolution(true)}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:text-slate-900"
+                  className="h-9 w-9 flex items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-500 transition-all duration-200 hover:text-slate-900 hover:border-slate-300 hover:shadow-sm ios-press"
+                  title="Nova evolução"
                 >
-                  <Plus size={14} />
-                  Evolução
+                  <Plus size={15} />
                 </button>
                 <button
                   onClick={openImagesTab}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:text-slate-900"
+                  className="h-9 w-9 flex items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-500 transition-all duration-200 hover:text-slate-900 hover:border-slate-300 hover:shadow-sm ios-press"
+                  title="Imagens/RX"
                 >
-                  <Camera size={14} />
-                  Imagens
+                  <Camera size={15} />
                 </button>
               </div>
+            </div>
+
+            {/* ── Row 2: tira de contexto — próximo passo ── */}
+            <div className="mt-3">
+              {primaryTreatment ? (
+                <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-gradient-to-r from-slate-50 to-slate-50/60 border border-slate-200/60 transition-all duration-300 hover:border-slate-300/70">
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-breathe ${resolveProcedureCategory(primaryTreatment.procedure).dotCls}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-0.5">Próximo passo</p>
+                    <p className="text-[13px] font-semibold text-slate-900 truncate">
+                      {primaryTreatment.procedure}{primaryTreatment.tooth_number ? ` · dente ${primaryTreatment.tooth_number}` : ''}
+                    </p>
+                  </div>
+                  {upcomingAppointment && (
+                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-slate-400 font-medium shrink-0">
+                      <Calendar size={10} className="text-slate-300" />
+                      {formatDate(upcomingAppointment.start_time)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => {
+                      setHighlightedTreatmentId(primaryTreatment.id);
+                      window.setTimeout(() => setHighlightedTreatmentId(null), 2200);
+                      focusOdontogram();
+                    }}
+                    className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-950 text-white text-[12px] font-semibold hover:bg-slate-800 active:scale-[0.95] transition-all duration-200 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
+                  >
+                    Abrir
+                  </button>
+                </div>
+              ) : upcomingAppointment ? (
+                <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-gradient-to-r from-sky-50 to-sky-50/60 border border-sky-200/60 transition-all duration-300 hover:border-sky-300/70">
+                  <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0 animate-breathe" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-sky-500 mb-0.5">Próxima consulta</p>
+                    <p className="text-[13px] font-semibold text-slate-900">{formatDate(upcomingAppointment.start_time)} às {formatTime(upcomingAppointment.start_time)}</p>
+                  </div>
+                  <button
+                    onClick={focusOdontogram}
+                    className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-950 text-white text-[12px] font-semibold hover:bg-slate-800 active:scale-[0.97] transition-all duration-150"
+                  >
+                    Ver dentes
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-slate-50 border border-slate-200/60">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0" />
+                  <p className="text-[13px] text-slate-500 flex-1 font-medium">Nenhum tratamento ativo · comece pelo odontograma</p>
+                  <button
+                    onClick={focusOdontogram}
+                    className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-950 text-white text-[12px] font-semibold hover:bg-slate-800 active:scale-[0.97] transition-all duration-150"
+                  >
+                    Ver dentes
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Focus toggle mobile */}
+            <div className="mt-2.5 sm:hidden flex gap-1 p-0.5 bg-slate-50/80 rounded-2xl border border-slate-200/60 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]">
+              <button type="button" onClick={() => setIsFocusMode(true)} className={`flex-1 py-1.5 rounded-xl text-[11px] font-semibold transition-all duration-200 ease-out ${isFocusMode ? 'bg-white text-slate-900 shadow-[0_1px_4px_rgba(15,23,42,0.08)]' : 'text-slate-400'}`}>Foco</button>
+              <button type="button" onClick={() => setIsFocusMode(false)} className={`flex-1 py-1.5 rounded-xl text-[11px] font-semibold transition-all duration-200 ease-out ${!isFocusMode ? 'bg-white text-slate-900 shadow-[0_1px_4px_rgba(15,23,42,0.08)]' : 'text-slate-400'}`}>Geral</button>
             </div>
           </div>
         </div>
@@ -1249,17 +1290,18 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-6">
 
-        <section ref={odontogramRef} className="rounded-[30px] p-4 sm:p-5 border border-slate-200/70 bg-white/92 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+        <section ref={odontogramRef} className="rounded-[30px] p-4 sm:p-5 border border-slate-200/60 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-500 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-[24px] sm:text-[28px] font-semibold tracking-[-0.02em] text-slate-950">Odontograma</h2>
               {activeToothNumbers.length > 0 && (
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-breathe" />
                   {activeToothNumbers.length} dente{activeToothNumbers.length !== 1 ? 's' : ''} em tratamento
                 </p>
               )}
             </div>
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/70">Interativo</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 bg-slate-50/80 px-2.5 py-1.5 rounded-full border border-slate-200/60 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">Interativo</span>
           </div>
 
           <div className="rounded-[26px] p-1.5 sm:p-2 bg-slate-50/70 ring-1 ring-slate-100/80">
@@ -1280,7 +1322,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
         <div className={`grid grid-cols-1 gap-6 ${isFocusMode ? '' : 'xl:grid-cols-[1.7fr_1fr]'}`}>
           <div className="space-y-6">
-            <section className="rounded-[28px] border border-slate-200/70 bg-white/92 p-5 sm:p-6 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[28px] border border-slate-200/60 bg-white/95 p-5 sm:p-6 shadow-[0_10px_28px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-500 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg sm:text-xl font-semibold tracking-[-0.02em] text-slate-950">Tratamento atual</h3>
@@ -1311,10 +1353,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                             ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
                             : 'bg-slate-50 text-slate-400 border border-slate-200 hover:text-slate-600 hover:border-slate-300'
                       }`}
-                      title={allPaid ? 'Todos pagos' : allActive ? 'Cobrar antes de executar (ativo)' : 'Ativar cobrança antecipada'}
+                      title={allPaid ? 'Orçamento quitado' : allActive ? 'Cobrar antes de executar (ativo)' : 'Exigir pagamento antes de executar'}
                     >
                       {allPaid ? (
-                        <><Check size={11} /> Todos pagos</>
+                        <><Check size={11} /> Quitado</>
                       ) : allActive ? (
                         <><Lock size={11} /> Cobrar antes</>
                       ) : (
@@ -1341,17 +1383,18 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     return (
                       <div
                         key={item.id}
-                        className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between ${
+                        className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all duration-300 ease-out sm:flex-row sm:items-center sm:justify-between ios-hover-lift ${
                           isPrepaid
-                            ? 'border-emerald-200 bg-emerald-50/20 shadow-[0_4px_14px_rgba(16,185,129,0.06)]'
+                            ? 'border-emerald-200/80 bg-gradient-to-r from-emerald-50/30 to-emerald-50/10 shadow-[0_4px_14px_rgba(16,185,129,0.05)]'
                             : isPriority
-                              ? 'border-slate-200 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]'
-                              : 'border-slate-100 bg-slate-50/60 hover:border-slate-200'
+                              ? 'border-slate-200/80 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)]'
+                              : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'
                         } ${
                           highlightedTreatmentId === item.id
-                            ? 'ring-2 ring-indigo-200 shadow-[0_6px_20px_rgba(99,102,241,0.08)]'
+                            ? 'ring-2 ring-indigo-200/70 shadow-[0_6px_20px_rgba(99,102,241,0.1)] animate-glow-pulse'
                             : ''
                         }`}
+                        style={{ animationDelay: `${idx * 50}ms` }}
                       >
                         <div className="min-w-0 flex-1">
                           {/* row 1: procedure name */}
@@ -1423,10 +1466,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
                         <button
                           onClick={() => setSelectedTreatmentAction(item)}
-                          className={`w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 active:scale-[0.97] ${
+                          className={`w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 ios-press ${
                             isPriority
-                              ? 'bg-slate-950 text-white hover:bg-slate-800 hover:scale-[1.01]'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:scale-[1.01]'
+                              ? 'bg-slate-950 text-white hover:bg-slate-800 shadow-[0_2px_8px_rgba(15,23,42,0.15)]'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
                           }`}
                         >
                           Continuar
@@ -1437,14 +1480,14 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                 ) : (
                   <div className={`rounded-2xl py-10 text-center ${iosSubtleCard}`}>
                     <div className="flex flex-col items-center gap-3 px-4">
-                      <div className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500">
+                      <div className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 animate-gentle-float shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
                         <Clock3 size={18} />
                       </div>
                       <p className="text-slate-800 text-sm font-bold">Nenhum tratamento ativo no momento</p>
-                      <p className="text-slate-600 text-xs">Inicie pelo odontograma para planejar o próximo passo clínico.</p>
+                      <p className="text-slate-500 text-xs leading-relaxed max-w-[240px]">Inicie pelo odontograma para planejar o próximo passo clínico.</p>
                       <button
                         onClick={focusOdontogram}
-                        className="mt-1 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-700 hover:bg-slate-100 hover:shadow-sm hover:scale-[1.01] transition-all duration-200 active:scale-[0.98]"
+                        className="mt-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-700 hover:bg-slate-50 hover:shadow-sm hover:border-slate-300 ios-press transition-all duration-200"
                       >
                         Adicionar tratamento
                       </button>
@@ -1452,7 +1495,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   </div>
                 )}
 
-                {/* Pagar orçamento completo */}
+                {/* Receber pelo orçamento completo */}
                 {(() => {
                   const unpaid = treatmentInProgress.filter(
                     (item: any) => !(item.requires_prepayment && item.prepayment_confirmed)
@@ -1463,7 +1506,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   return allPaid ? (
                     <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 px-4 py-3">
                       <Check size={14} className="text-emerald-600 shrink-0" />
-                      <p className="text-[13px] font-semibold text-emerald-700">Orçamento completo pago</p>
+                      <p className="text-[13px] font-semibold text-emerald-700">Orçamento quitado</p>
                     </div>
                   ) : (
                     <button
@@ -1476,7 +1519,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                           <CreditCard size={14} className="text-slate-600" />
                         </div>
                         <div className="text-left min-w-0">
-                          <p className="text-[13px] font-bold text-slate-800">Pagar orçamento completo</p>
+                          <p className="text-[13px] font-bold text-slate-800">Receber pelo orçamento completo</p>
                           <p className="text-[11px] text-slate-500">{unpaid.length} procedimento{unpaid.length !== 1 ? 's' : ''} pendente{unpaid.length !== 1 ? 's' : ''}</p>
                         </div>
                       </div>
@@ -1490,20 +1533,20 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             </section>
 
             {!isFocusMode && (
-            <section className="rounded-[24px] border border-slate-200/70 bg-white/92 p-4 sm:p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[24px] border border-slate-200/60 bg-white/95 p-4 sm:p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-500 hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
               {/* ── Header ── */}
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900">Evolução clínica</h3>
                   {timelineItems.length > 0 && (
-                    <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                    <p className="text-[11px] text-slate-400 mt-0.5 font-medium tabular-nums">
                       {timelineItems.length} registro{timelineItems.length !== 1 ? 's' : ''}
                     </p>
                   )}
                 </div>
                 <button
                   onClick={() => setIsAddingEvolution(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 active:scale-[0.96] transition-all duration-150"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 ios-press transition-all duration-200 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
                 >
                   <Plus size={11} />
                   Registrar
@@ -1548,14 +1591,14 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                           >
                             {/* colored dot on vertical line */}
                             <div className="relative z-10 flex-shrink-0 w-[30px] flex items-center justify-center mt-[15px]">
-                              <div className={`w-[11px] h-[11px] rounded-full ring-[3px] ring-white shadow-sm ${cat.dotCls}`} />
+                              <div className={`w-[11px] h-[11px] rounded-full ring-[3px] ring-white shadow-sm transition-transform duration-300 hover:scale-125 ${cat.dotCls}`} />
                             </div>
 
                             {/* card */}
-                            <div className={`flex-1 min-w-0 rounded-[18px] bg-white border border-slate-200/80 border-l-[3px] ${cat.borderCls} p-3.5 shadow-[0_1px_6px_rgba(15,23,42,0.04)] transition-shadow duration-200 hover:shadow-[0_3px_12px_rgba(15,23,42,0.07)] ${isNewlyAdded ? 'ring-2 ring-blue-300/50 shadow-[0_4px_16px_rgba(99,102,241,0.1)]' : ''}`}>
+                            <div className={`flex-1 min-w-0 rounded-[18px] bg-white border border-slate-200/70 border-l-[3px] ${cat.borderCls} p-3.5 shadow-[0_1px_4px_rgba(15,23,42,0.03)] transition-all duration-300 ease-out hover:shadow-[0_4px_16px_rgba(15,23,42,0.06)] hover:translate-y-[-1px] ${isNewlyAdded ? 'ring-2 ring-blue-200/60 shadow-[0_4px_16px_rgba(99,102,241,0.08)] animate-glow-pulse' : ''}`}>
                               {/* row 1: category tag + date */}
                               <div className="flex items-center justify-between gap-2 mb-2">
-                                <span className={`inline-flex text-[10px] font-extrabold uppercase tracking-[0.07em] px-2 py-0.5 rounded-full ${cat.tagCls}`}>
+                                <span className={`inline-flex text-[10px] font-extrabold uppercase tracking-[0.07em] px-2 py-0.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.03)] ${cat.tagCls}`}>
                                   {cat.label}
                                 </span>
                                 <span className="text-[11px] text-slate-400 font-medium tabular-nums shrink-0">{formatDate(item.date)}</span>
@@ -1599,14 +1642,14 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               ) : (
                 <div className={`rounded-2xl py-10 text-center ${iosSubtleCard}`}>
                   <div className="flex flex-col items-center gap-3 px-4">
-                    <div className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500">
+                    <div className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 animate-gentle-float shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
                       <FileText size={18} />
                     </div>
                     <p className="text-slate-800 text-sm font-bold">Ainda não há evoluções registradas</p>
-                    <p className="text-slate-600 text-xs">Registre a primeira evolução para iniciar o histórico clínico.</p>
+                    <p className="text-slate-500 text-xs leading-relaxed max-w-[260px]">Registre a primeira evolução para iniciar o histórico clínico do paciente.</p>
                     <button
                       onClick={() => setIsAddingEvolution(true)}
-                      className="mt-1 px-3.5 py-2 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-900 hover:scale-[1.01] transition-all duration-200 active:scale-[0.98]"
+                      className="mt-2 px-4 py-2.5 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-900 ios-press transition-all duration-200 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
                     >
                       Nova evolução
                     </button>
@@ -1618,7 +1661,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
           </div>
 
           {!isFocusMode && (
-          <aside ref={infoPanelRef} className={`${iosCard} rounded-[26px] p-4 sm:p-5 h-fit xl:sticky xl:top-[112px]`}>
+          <aside ref={infoPanelRef} className={`${iosCard} rounded-[26px] p-4 sm:p-5 h-fit xl:sticky xl:top-[112px] transition-shadow duration-500 hover:shadow-[0_12px_32px_rgba(15,23,42,0.07)]`}>
             {(() => {
               const hasAllergy = (() => {
                 const val = patient?.anamnesis?.allergies;
@@ -1635,15 +1678,15 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               ];
 
               return (
-                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-50 rounded-2xl mb-4 border border-slate-200/70">
+                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-50/80 rounded-2xl mb-4 border border-slate-200/60 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]">
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setInfoTab(tab.id as InfoTab)}
-                      className={`relative px-2 py-2 rounded-xl text-[11px] font-semibold transition-all duration-200 ${
+                      className={`relative px-2 py-2 rounded-xl text-[11px] font-semibold transition-all duration-250 ease-out ${
                         infoTab === tab.id
-                          ? 'bg-white text-slate-950 shadow-[0_4px_14px_rgba(15,23,42,0.05)]'
-                          : 'text-slate-500 hover:text-slate-700 hover:bg-white/70'
+                          ? 'bg-white text-slate-950 shadow-[0_2px_8px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)]'
+                          : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
                       }`}
                     >
                       {tab.label}
@@ -1731,7 +1774,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     <button
                       onClick={saveAnamnese}
                       disabled={isSavingAnamnese}
-                      className="w-full py-2.5 rounded-xl bg-slate-950 text-white text-[13px] font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2"
+                      className="w-full py-2.5 rounded-xl bg-slate-950 text-white text-[13px] font-semibold hover:bg-slate-800 ios-press transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
                     >
                       {isSavingAnamnese ? (
                         <><Loader2 size={14} className="animate-spin" /> Salvando...</>
@@ -1790,8 +1833,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   { label: 'E-mail', value: patient?.email, icon: <Info size={13} /> },
                   { label: 'Data de nascimento', value: patient?.birth_date ? formatDate(patient.birth_date) : null, icon: <Calendar size={13} /> },
                 ].map(({ label, value, icon }) => (
-                  <div key={label} className="flex items-center gap-3 px-3.5 py-3 rounded-[16px] bg-slate-50 border border-slate-200/70">
-                    <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                  <div key={label} className="flex items-center gap-3 px-3.5 py-3 rounded-[16px] bg-slate-50/80 border border-slate-200/60 transition-all duration-300 ease-out hover:bg-white hover:border-slate-300/70 hover:shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+                    <div className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                       {icon}
                     </div>
                     <div className="min-w-0">
@@ -1815,7 +1858,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                       className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                     >
                       <Camera size={12} />
-                      {isUploadingClinicalImage ? 'Enviando...' : 'Upload RX/Imagem'}
+                {isUploadingClinicalImage ? 'Enviando...' : 'Adicionar imagem / RX'}
                     </button>
                   </div>
                   <input
@@ -1834,7 +1877,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                       href={file.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-3 rounded-[18px] bg-slate-50 border border-slate-200/70 transition-all duration-200 hover:bg-white hover:border-slate-300 hover:shadow-sm active:scale-[0.98]"
+                      className="flex items-center gap-3 p-3 rounded-[18px] bg-slate-50/80 border border-slate-200/60 transition-all duration-300 ease-out hover:bg-white hover:border-slate-300 hover:shadow-[0_4px_16px_rgba(15,23,42,0.06)] hover:translate-y-[-1px] ios-press-gentle"
                     >
                       <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
                         {(file.file_url || '').toLowerCase().endsWith('.pdf')
@@ -1848,11 +1891,19 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     </a>
                   ))
                 ) : (
-                  <div className="p-8 rounded-[20px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Nenhuma imagem/RX anexada</div>
+                  <div className="p-8 rounded-[20px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Sem imagens ou RX ainda</div>
                 )}
 
                 {uploadFeedback && (
-                  <p className="text-xs text-slate-500 px-1">{uploadFeedback}</p>
+                  <motion.p
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="text-xs text-slate-500 px-1 flex items-center gap-1.5"
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {uploadFeedback}
+                  </motion.p>
                 )}
               </div>
             )}
@@ -1898,8 +1949,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                             <p className="text-[11px] text-slate-400">falta {remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                           )}
                         </div>
-                        <div className="mt-2 h-2 rounded-full bg-slate-200/80 overflow-hidden">
-                          <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                        <div className="mt-2 h-[6px] rounded-full bg-slate-200/60 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-700 ease-out" style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     </div>
@@ -1943,9 +1994,11 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
                 {/* Movimentações do paciente */}
                 {isLoadingFinancial ? (
-                  <div className="p-6 rounded-[18px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">
-                    <Loader2 size={18} className="animate-spin mx-auto mb-2 text-slate-400" />
-                    Carregando...
+                  <div className="p-6 rounded-[18px] text-center text-sm text-slate-500 bg-slate-50/80 border border-slate-200/60">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 mx-auto mb-3 flex items-center justify-center">
+                      <Loader2 size={18} className="animate-spin text-slate-400" />
+                    </div>
+                    <p className="text-[13px] font-medium text-slate-400">Buscando dados...</p>
                   </div>
                 ) : (patientFinancial?.transactions || []).length > 0 ? (
                   <div>
@@ -1974,7 +2027,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     </div>
                   </div>
                 ) : !isLoadingFinancial && patientFinancial ? (
-                  <div className="p-6 rounded-[18px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Nenhuma movimentação registrada</div>
+                  <div className="p-6 rounded-[18px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Nenhuma movimentação ainda</div>
                 ) : null}
 
                 <button
@@ -1982,7 +2035,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     setAppActiveTab('financeiro');
                     appNavigate('/financeiro');
                   }}
-                  className="w-full mt-2 px-4 py-2.5 rounded-xl bg-slate-950 text-white text-sm font-semibold hover:bg-slate-900 hover:scale-[1.01] transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+                  className="w-full mt-2 px-4 py-2.5 rounded-xl bg-slate-950 text-white text-sm font-semibold hover:bg-slate-900 ios-press transition-all duration-200 flex items-center justify-center gap-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
                 >
                   <CreditCard size={15} /> Abrir financeiro
                 </button>
@@ -2013,16 +2066,19 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       )}
 
       {selectedTreatmentAction && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[210] flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-[6px] p-0 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedTreatmentAction(null); }}>
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="w-full max-w-lg rounded-[28px] border border-slate-200/70 bg-white p-5 sm:p-6 shadow-[0_28px_70px_rgba(15,23,42,0.18)]"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+            className="w-full sm:max-w-lg rounded-t-[28px] sm:rounded-[28px] border border-slate-200/60 bg-white p-5 sm:p-6 shadow-[0_-8px_40px_rgba(15,23,42,0.12),0_28px_70px_rgba(15,23,42,0.18)] max-h-[85vh] overflow-y-auto"
           >
+            {/* iOS drag handle */}
+            <div className="ios-drag-handle sm:hidden" />
+
             <div className="mb-5">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">Continuar tratamento</p>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">O que fazer agora?</p>
               <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">{selectedTreatmentAction.procedure}</h3>
               {selectedTreatmentAction.tooth_number && (
                 <span className="mt-2 inline-flex text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
@@ -2039,48 +2095,48 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                       <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
                         <Lock size={13} className="text-amber-600" />
                       </div>
-                      <p className="text-sm font-bold text-amber-900">Pagamento antecipado exigido</p>
+                      <p className="text-sm font-bold text-amber-900">Aguardando pagamento</p>
                     </div>
                     <p className="text-xs text-amber-700 leading-relaxed pl-9">
-                      Este procedimento exige pagamento antes da execução.
+                      Confirme o recebimento antes de executar.
                       {Number(selectedTreatmentAction.value) > 0 && (
-                        <> Valor: <strong>R$ {Number(selectedTreatmentAction.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></>
+                        <> Valor: <strong>{Number(selectedTreatmentAction.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></>
                       )}
                     </p>
                   </div>
                   <button
                     onClick={() => confirmPrepayment(selectedTreatmentAction)}
-                    className="w-full rounded-[18px] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all duration-200 hover:bg-emerald-100 hover:shadow-sm active:scale-[0.99]"
+                    className="w-full rounded-[18px] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all duration-200 hover:bg-emerald-100/80 hover:shadow-sm ios-press-gentle"
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
                         <Check size={13} className="text-emerald-700" />
                       </div>
-                      <p className="text-sm font-bold text-emerald-900">Confirmar pagamento recebido</p>
+                      <p className="text-sm font-bold text-emerald-900">Pagamento recebido — pode prosseguir</p>
                     </div>
-                    <p className="text-xs text-emerald-700 mt-1 pl-9 leading-relaxed">Registra o recebimento e libera o procedimento para conclusão.</p>
                   </button>
                 </>
               ) : (
                 <button
                   onClick={() => handleCompleteTreatment(selectedTreatmentAction)}
-                  className="w-full rounded-[18px] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all duration-200 hover:bg-emerald-100 hover:shadow-sm active:scale-[0.99]"
+                  className="w-full rounded-[18px] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all duration-200 hover:bg-emerald-100/80 hover:shadow-sm ios-press-gentle"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
                       <CheckCircle2 size={14} className="text-emerald-700" />
                     </div>
-                    <p className="text-sm font-bold text-emerald-900">Concluir procedimento atual</p>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900">Procedimento concluído</p>
+                      {selectedTreatmentAction.requires_prepayment && selectedTreatmentAction.prepayment_confirmed && (
+                        <p className="text-[11px] text-emerald-600 mt-0.5 flex items-center gap-1"><Check size={9} /> Pagamento já confirmado</p>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-emerald-700 mt-1 pl-9 leading-relaxed">Move para execução concluída e registra na evolução clínica.</p>
-                  {selectedTreatmentAction.requires_prepayment && selectedTreatmentAction.prepayment_confirmed && (
-                    <p className="text-[10px] text-emerald-600 mt-1.5 pl-9 flex items-center gap-1"><Check size={10} /> Pagamento já confirmado</p>
-                  )}
                 </button>
               )}
 
               <div className="rounded-[18px] border border-slate-200/70 bg-slate-50 p-4">
-                <p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Converter para outro procedimento</p>
+                <p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Mudar o procedimento</p>
                 <div className="grid grid-cols-2 gap-2">
                   {['Restauracao', 'Canal', 'Extracao', 'Coroa', 'Implante']
                     .filter((proc) => proc !== selectedTreatmentAction.procedure)
@@ -2088,7 +2144,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                       <button
                         key={proc}
                         onClick={() => handleConvertTreatment(selectedTreatmentAction, proc)}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-semibold text-slate-800 transition-all duration-200 hover:bg-white hover:shadow-sm hover:border-slate-300 active:scale-[0.98]"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-semibold text-slate-800 transition-all duration-200 hover:bg-slate-50 hover:shadow-sm hover:border-slate-300 ios-press"
                       >
                         {proc}
                       </button>
@@ -2100,7 +2156,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setSelectedTreatmentAction(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 ios-press"
               >
                 Fechar
               </button>
@@ -2122,17 +2178,19 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
           { key: 'Transferência', label: 'Transferência', icon: <ArrowUpRight size={16} />, desc: 'TED/DOC' },
         ];
         return (
-          <div className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-[220] flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-[6px] p-0 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPaymentModal(false); }}>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md rounded-[28px] border border-slate-200/70 bg-white p-5 sm:p-6 shadow-[0_28px_70px_rgba(15,23,42,0.18)]"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+              className="w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] border border-slate-200/60 bg-white p-5 sm:p-6 shadow-[0_-8px_40px_rgba(15,23,42,0.12),0_28px_70px_rgba(15,23,42,0.18)] max-h-[85vh] overflow-y-auto"
             >
+              {/* iOS drag handle */}
+              <div className="ios-drag-handle sm:hidden" />
               <div className="mb-5">
                 <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">Pagamento</p>
-                <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">Pagar orçamento completo</h3>
+                <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">Receber pagamento</h3>
                 <div className="mt-3 flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-slate-50 border border-slate-200/70">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] text-slate-500 font-medium">{unpaid.length} procedimento{unpaid.length !== 1 ? 's' : ''} pendente{unpaid.length !== 1 ? 's' : ''}</p>
@@ -2153,7 +2211,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                       setShowPaymentModal(false);
                       await confirmPrepaymentAll(m.key);
                     }}
-                    className="w-full rounded-[16px] border border-slate-200/70 bg-white px-4 py-3.5 flex items-center gap-3 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm active:scale-[0.98]"
+                    className="w-full rounded-[16px] border border-slate-200/60 bg-white px-4 py-3.5 flex items-center gap-3 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm ios-press-gentle"
                   >
                     <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
                       {m.icon}
@@ -2170,7 +2228,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 ios-press"
                 >
                   Cancelar
                 </button>

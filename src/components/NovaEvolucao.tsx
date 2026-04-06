@@ -331,33 +331,33 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
   };
 
   return (
-    <div className="fixed inset-0 bg-[#FAFAFA] z-50 flex flex-col font-sans antialiased">
+    <div className="fixed inset-0 bg-[#F7F7F8] z-50 flex flex-col font-sans antialiased">
       {/* ── Header ── */}
-      <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between shrink-0 safe-area-top">
+      <header className="ios-glass-heavy border-b border-slate-100/60 px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between shrink-0 safe-area-top shadow-[0_1px_3px_rgba(15,23,42,0.03)]">
         <div className="flex items-center gap-3 min-w-0">
           <button 
             onClick={() => onClose ? onClose() : navigate(-1)}
-            className="p-2 -ml-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all shrink-0"
+            className="p-2 -ml-2 hover:bg-slate-100/80 rounded-xl text-slate-400 transition-all ios-press shrink-0"
           >
             <ChevronLeft size={20} />
           </button>
           <div className="min-w-0">
             <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">Nova Evolução</h2>
-            <p className="text-[10px] text-slate-400 font-medium hidden sm:block">Descreva o atendimento naturalmente</p>
+            <p className="text-[10px] text-slate-400 font-medium hidden sm:block">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
           <button 
             onClick={() => onClose ? onClose() : navigate(-1)}
-            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all hidden sm:block"
+            className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-100/80 rounded-xl transition-all hidden sm:block ios-press"
           >
             Cancelar
           </button>
           <button 
             onClick={handleSave}
             disabled={isSaving || (inputText.trim() === '' && blocks.length === 0)}
-            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 px-5 sm:px-6 rounded-xl flex items-center gap-2 transition-all active:scale-95 text-xs sm:text-sm"
+            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 px-5 sm:px-6 rounded-xl flex items-center gap-2 transition-all ios-press text-xs sm:text-sm shadow-[0_2px_8px_rgba(12,155,114,0.25)]"
           >
             {saved ? <Check size={16} /> : isSaving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -374,9 +374,11 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
 
           {/* Interpreted Blocks */}
           {(blocks.length > 0 || (inputText.length > 0 && blocks.length === 0)) && (
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5">
+            <div className="bg-white/95 rounded-2xl sm:rounded-3xl border border-slate-100/80 shadow-[0_4px_16px_rgba(15,23,42,0.04)] p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3">
-                <Sparkles size={14} className="text-primary" />
+                <div className="w-5 h-5 rounded-md bg-primary/8 flex items-center justify-center">
+                  <Sparkles size={12} className="text-primary" />
+                </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Interpretação em tempo real</span>
               </div>
 
@@ -386,10 +388,11 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
                     <motion.div
                       key={block.id}
                       layout
-                      initial={{ scale: 0.95, opacity: 0, y: 4 }}
+                      initial={{ scale: 0.9, opacity: 0, y: 6 }}
                       animate={{ scale: 1, opacity: 1, y: 0 }}
-                      exit={{ scale: 0.95, opacity: 0 }}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold ${block.color}`}
+                      exit={{ scale: 0.9, opacity: 0 }}
+                      transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${block.color}`}
                     >
                       <block.icon size={13} />
                       <div className="flex flex-col">
@@ -401,14 +404,17 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
                 </AnimatePresence>
                 
                 {blocks.length === 0 && inputText.length > 0 && (
-                  <p className="text-slate-300 text-[11px] font-medium italic py-1">Interpretando...</p>
+                  <div className="flex items-center gap-2 py-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-breathe" />
+                    <p className="text-slate-300 text-[11px] font-medium italic">Interpretando...</p>
+                  </div>
                 )}
               </div>
             </div>
           )}
 
           {/* ── Text Area Card ── */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col min-h-[280px] sm:min-h-[360px]">
+          <div className="bg-white/95 rounded-2xl sm:rounded-3xl border border-slate-100/80 shadow-[0_4px_16px_rgba(15,23,42,0.04)] p-4 sm:p-6 flex flex-col min-h-[280px] sm:min-h-[360px]">
             <textarea
               ref={inputRef}
               value={inputText}
@@ -417,22 +423,29 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
               className="flex-1 w-full bg-transparent border-none focus:ring-0 text-slate-900 text-base sm:text-lg leading-relaxed placeholder:text-slate-200 font-medium resize-none outline-none"
             />
             
+            {/* Character count */}
+            {inputText.length > 0 && (
+              <div className="flex justify-end mb-2">
+                <span className="text-[10px] font-medium text-slate-300 tabular-nums">{inputText.length} caracteres</span>
+              </div>
+            )}
+
             {/* Quick Flow Suggestions */}
             <div className="mt-4 pt-4 border-t border-slate-50">
               <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-2.5">Fluxos rápidos</p>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { label: 'Endodontia', text: 'canal 15 acess odontometr preparo lima 15 20 25 obturac 21 ' },
-                  { label: 'Restauração', text: '15 restaurac resin A2 poliment ' },
-                  { label: 'Profilaxia', text: 'avaliac raspag tartar profilax ' },
-                  { label: 'Cirurgia', text: '38 anestes sindesmot luxac extrac sutur ' },
+                  { label: 'Endodontia', text: 'canal 15 acess odontometr preparo lima 15 20 25 obturac 21 ', icon: '🦷' },
+                  { label: 'Restauração', text: '15 restaurac resin A2 poliment ', icon: '✨' },
+                  { label: 'Profilaxia', text: 'avaliac raspag tartar profilax ', icon: '🧹' },
+                  { label: 'Cirurgia', text: '38 anestes sindesmot luxac extrac sutur ', icon: '🔪' },
                 ].map(item => (
                   <button
                     key={item.label}
                     onClick={() => setInputText(prev => prev + (prev ? ' ' : '') + item.text)}
-                    className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-500 text-[11px] font-semibold rounded-lg transition-all active:scale-95"
+                    className="px-3 py-1.5 bg-slate-50/80 hover:bg-slate-100 text-slate-500 text-[11px] font-semibold rounded-lg transition-all ios-press border border-slate-100/60"
                   >
-                    + {item.label}
+                    <span className="mr-1">{item.icon}</span> {item.label}
                   </button>
                 ))}
               </div>
@@ -440,16 +453,16 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
           </div>
 
           {/* ── How it works (collapsible on mobile via simple display) ── */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5">
+          <div className="bg-white/95 rounded-2xl sm:rounded-3xl border border-slate-100/80 shadow-[0_4px_16px_rgba(15,23,42,0.04)] p-4 sm:p-5">
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Como funciona</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { n: '1', text: 'Escreva o que foi feito de forma natural', color: 'bg-primary/5 text-primary' },
+                { n: '1', text: 'Escreva o que foi feito de forma natural', color: 'bg-primary/8 text-primary' },
                 { n: '2', text: 'Procedimentos, dentes e materiais são identificados', color: 'bg-blue-50 text-blue-600' },
                 { n: '3', text: 'Os blocos organizam o histórico clínico', color: 'bg-violet-50 text-violet-600' },
-              ].map(step => (
-                <div key={step.n} className="flex items-start gap-3">
-                  <div className={`w-6 h-6 rounded-lg ${step.color} flex items-center justify-center shrink-0 text-[10px] font-bold`}>
+              ].map((step, idx) => (
+                <div key={step.n} className="flex items-start gap-3 animate-fade-in-up" style={{ animationDelay: `${idx * 80}ms` }}>
+                  <div className={`w-6 h-6 rounded-lg ${step.color} flex items-center justify-center shrink-0 text-[10px] font-bold shadow-[0_1px_2px_rgba(0,0,0,0.04)]`}>
                     {step.n}
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed font-medium">{step.text}</p>
@@ -465,13 +478,16 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
       <AnimatePresence>
         {saved && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 z-[60]"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl text-white px-6 py-3.5 rounded-2xl shadow-[0_8px_30px_rgba(15,23,42,0.3)] flex items-center gap-2.5 z-[60]"
           >
-            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-xs font-bold">Evolução salva com sucesso</span>
+            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+              <Check size={11} className="text-white" />
+            </div>
+            <span className="text-[13px] font-semibold">Evolução salva com sucesso</span>
           </motion.div>
         )}
       </AnimatePresence>

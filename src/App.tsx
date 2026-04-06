@@ -185,7 +185,7 @@ interface Appointment {
   dentist_name: string;
   start_time: string;
   end_time: string;
-  status: 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'IN_PROGRESS' | 'FINISHED';
+  status: 'SCHEDULED' | 'CONFIRMED' | 'CANCELLED' | 'IN_PROGRESS' | 'FINISHED' | 'NO_SHOW';
   notes?: string;
 }
 
@@ -250,15 +250,19 @@ const StatusBadge = ({ app, now }: { app: Appointment; now: Date }) => {
   let icon = null;
 
   if (app.status === 'IN_PROGRESS') {
-    label = 'Em Atendimento';
+    label = 'Atendendo';
     style = 'bg-primary/10 text-primary border-primary/20';
     icon = <Activity size={10} className="animate-pulse" />;
   } else if (app.status === 'FINISHED') {
     label = 'Finalizado';
     style = 'bg-slate-100 text-slate-500 border-slate-200';
-  } else if (app.status === 'CANCELLED') {
+  } else if (app.status === 'NO_SHOW') {
     label = 'Faltou';
     style = 'bg-rose-50 text-rose-500 border-rose-100';
+    icon = <AlertCircle size={10} />;
+  } else if (app.status === 'CANCELLED') {
+    label = 'Cancelado';
+    style = 'bg-slate-100 text-slate-400 border-slate-200';
     icon = <AlertCircle size={10} />;
   } else if (diffInMinutes < 0 && app.status === 'SCHEDULED') {
     label = 'Atrasado';
@@ -321,12 +325,12 @@ const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpda
     <div className="flex-1 flex items-center justify-center bg-slate-50">
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-500 font-medium">Carregando prontuário...</p>
+        <p className="text-slate-500 font-medium">Abrindo prontuário...</p>
       </div>
     </div>
   );
   
-  if (!patient) return <div className="p-8 text-center">Paciente não encontrado.</div>;
+  if (!patient) return <div className="p-8 text-center">Prontuário não encontrado.</div>;
   
   return (
     <PatientClinical 
@@ -1480,7 +1484,7 @@ export default function App() {
     }
 
     const attentionStatusMap: Record<AttentionKey, { key: AttentionKey; label: string; dot: string; tone: string }> = {
-      'overdue':    { key: 'overdue',    label: 'Atrasado',        dot: 'bg-rose-500',    tone: 'text-rose-700 bg-rose-50 border-rose-100' },
+      'overdue':    { key: 'overdue',    label: 'Sem visita há tempo', dot: 'bg-rose-500',    tone: 'text-rose-700 bg-rose-50 border-rose-100' },
       'review':     { key: 'review',     label: 'Revisão próxima', dot: 'bg-amber-400',   tone: 'text-amber-700 bg-amber-50 border-amber-100' },
       'up-to-date': { key: 'up-to-date', label: 'Em dia',          dot: 'bg-emerald-500', tone: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
       'lead':       { key: 'lead',       label: 'Lead',            dot: 'bg-violet-500',  tone: 'text-violet-700 bg-violet-50 border-violet-100' },
@@ -2546,7 +2550,7 @@ export default function App() {
                       </div>
                     ))}
                   {patients.filter(p => (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).length === 0 && (
-                    <p className="text-center py-4 text-slate-400 text-sm">Nenhum paciente encontrado.</p>
+                    <p className="text-center py-4 text-slate-400 text-sm">Nenhum resultado.</p>
                   )}
                   {patients.filter(p => (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).length > 5 && (
                     <button 
@@ -2659,8 +2663,8 @@ export default function App() {
                   <div className="divide-y divide-slate-100">
                     {(() => {
                       const getFilteredAppointments = () => {
-                        // Always include FINISHED so completed appointments remain visible across day/week/month views.
-                        const effectiveStatusFilter = [...statusFilter, 'FINISHED'].filter((v, i, a) => a.indexOf(v) === i);
+                        // Always include FINISHED, NO_SHOW and CANCELLED so status changes remain visible across all views.
+                        const effectiveStatusFilter = [...statusFilter, 'FINISHED', 'NO_SHOW', 'CANCELLED'].filter((v, i, a) => a.indexOf(v) === i);
                         
                         let filtered = appointments.filter(a => effectiveStatusFilter.length === 0 || effectiveStatusFilter.includes(a.status))
                           .filter(a => agendaSearchTerm === '' || (a.patient_name || '').toLowerCase().includes((agendaSearchTerm || '').toLowerCase()));
@@ -2732,7 +2736,7 @@ export default function App() {
                               <Calendar className="text-slate-300" size={28} />
                             </div>
                             <div className="space-y-2">
-                              <p className="text-lg font-bold text-slate-800">Nenhum agendamento neste dia</p>
+                              <p className="text-lg font-bold text-slate-800">Agenda livre neste dia</p>
                               <p className="text-sm text-slate-500">Sua agenda está livre. Que tal encaixar um paciente?</p>
                             </div>
                             <button 
@@ -2779,20 +2783,18 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                {!isFocusMode && (
-                                  <select
+                                <select
                                     value={app.status}
                                     onChange={(e) => updateStatus(app.id, e.target.value as Appointment['status'])}
                                     className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-slate-200 rounded text-base sm:text-base font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0"
                                   >
                                     <option value="SCHEDULED">Agendado</option>
                                     <option value="CONFIRMED">Confirmado</option>
-                                    <option value="IN_PROGRESS">Em Andamento</option>
+                                    <option value="IN_PROGRESS">Atendendo</option>
                                     <option value="FINISHED">Finalizado</option>
                                     <option value="CANCELLED">Cancelado</option>
                                     <option value="NO_SHOW">Faltou</option>
                                   </select>
-                                )}
                               </div>
 
                               {/* Action buttons */}
@@ -2854,7 +2856,7 @@ export default function App() {
                         const isToday = selectedDate.toDateString() === todayStr;
                         const todayApps = filtered.filter(a => new Date(a.start_time).toDateString() === todayStr);
                         const nextApps = todayApps
-                          .filter(a => new Date(a.start_time) > now && a.status !== 'CANCELLED' && a.status !== 'FINISHED')
+                          .filter(a => new Date(a.start_time) > now && a.status !== 'CANCELLED' && a.status !== 'FINISHED' && a.status !== 'NO_SHOW')
                           .slice(0, 3);
 
                         return (
@@ -3333,7 +3335,7 @@ export default function App() {
                                         >
                                           <option value="SCHEDULED">Agendado</option>
                                           <option value="CONFIRMED">Confirmado</option>
-                                          <option value="IN_PROGRESS">Em Andamento</option>
+                                          <option value="IN_PROGRESS">Atendendo</option>
                                           <option value="FINISHED">Finalizado</option>
                                           <option value="CANCELLED">Cancelado</option>
                                           <option value="NO_SHOW">Faltou</option>
@@ -3633,7 +3635,7 @@ export default function App() {
                                         >
                                           <option value="SCHEDULED">Agendado</option>
                                           <option value="CONFIRMED">Confirmado</option>
-                                          <option value="IN_PROGRESS">Em Andamento</option>
+                                          <option value="IN_PROGRESS">Atendendo</option>
                                           <option value="FINISHED">Finalizado</option>
                                           <option value="CANCELLED">Cancelado</option>
                                           <option value="NO_SHOW">Faltou</option>
@@ -3903,7 +3905,7 @@ export default function App() {
                                                 >
                                                   <option value="SCHEDULED">Agendado</option>
                                                   <option value="CONFIRMED">Confirmado</option>
-                                                  <option value="IN_PROGRESS">Em Andamento</option>
+                                                  <option value="IN_PROGRESS">Atendendo</option>
                                                   <option value="FINISHED">Finalizado</option>
                                                   <option value="CANCELLED">Cancelado</option>
                                                   <option value="NO_SHOW">Faltou</option>
@@ -4207,11 +4209,11 @@ export default function App() {
                   const filterChips = [
                     { key: 'all',            label: 'Todos',             count: null },
                     { key: 'leads',          label: 'Leads',             count: totalLeads },
-                    { key: 'action-needed',  label: 'Preciso agir',      count: totalActionNeeded },
+                    { key: 'action-needed',  label: 'Agir agora',        count: totalActionNeeded },
                     { key: 'at-risk',        label: 'Em risco',          count: totalAtRisk },
-                    { key: 'no-appointment', label: 'Sem agendamento',   count: totalNoAppointment },
+                    { key: 'no-appointment', label: 'Sem agenda',        count: totalNoAppointment },
                     { key: 'in-treatment',   label: 'Em tratamento',     count: totalInTreatment },
-                    { key: 'overdue',        label: 'Atrasados',         count: totalOverdue },
+                    { key: 'overdue',        label: 'Sumiram',           count: totalOverdue },
                   ].filter(chip => chip.count === null || chip.count > 0) as { key: string; label: string; count: number | null }[];
 
                   const handleScheduleFromCard = (patient: Patient) => {
@@ -4559,7 +4561,7 @@ export default function App() {
                         {patientCards.length === 0 && (patients.length > 0 || !!searchTerm) && (
                           <div className="col-span-full bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
                             <Users size={36} className="mx-auto text-slate-200 mb-3" />
-                            <p className="text-slate-600 font-medium">Nenhum paciente encontrado para este filtro.</p>
+                            <p className="text-slate-600 font-medium">Nenhum paciente neste filtro.</p>
                           </div>
                         )}
                       </div>
@@ -5456,7 +5458,7 @@ export default function App() {
                     disabled={!newAppointment.patient_id || !newAppointment.date || !newAppointment.time}
                     className="flex-1 py-2.5 px-4 bg-primary/90 hover:bg-primary text-white font-medium rounded-[10px] active:scale-95 transition-all text-sm shadow-lg shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm"
                   >
-                    {appointmentModalMode === 'reschedule' ? 'Salvar reagendamento' : 'Agendar'}
+                    {appointmentModalMode === 'reschedule' ? 'Confirmar reagendamento' : 'Agendar'}
                   </button>
                 </div>
               </form>
@@ -6040,9 +6042,9 @@ export default function App() {
                 <div className="flex justify-between items-center mb-8">
                   <div>
                     <h3 className="text-2xl font-bold text-slate-900">
-                      {transactionType === 'INCOME' ? 'Lançar receita' : 'Lançar despesa'}
+                      {transactionType === 'INCOME' ? 'Registrar entrada' : 'Registrar saída'}
                     </h3>
-                    <p className="text-sm text-slate-500">Preencha os dados da transação abaixo</p>
+                    <p className="text-sm text-slate-500">Preencha os campos abaixo</p>
                   </div>
                   <button onClick={() => setIsTransactionModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={24} className="rotate-45" />
@@ -6178,7 +6180,7 @@ export default function App() {
                           : 'bg-rose-600 shadow-rose-100 hover:bg-rose-700'
                       }`}
                     >
-                      Salvar {transactionType === 'INCOME' ? 'Receita' : 'Despesa'}
+                      Salvar {transactionType === 'INCOME' ? 'entrada' : 'saída'}
                     </button>
                   </div>
                 </form>
@@ -6801,7 +6803,8 @@ function PrintAgenda({ date, appointments, profile }: { date: Date, appointments
                   {app.status === 'SCHEDULED' ? 'Agendado' : 
                    app.status === 'CONFIRMED' ? 'Confirmado' : 
                    app.status === 'CANCELLED' ? 'Cancelado' : 
-                   app.status === 'IN_PROGRESS' ? 'Em Atendimento' : 'Finalizado'}
+                   app.status === 'NO_SHOW' ? 'Faltou' :
+                   app.status === 'IN_PROGRESS' ? 'Atendendo' : 'Finalizado'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4">

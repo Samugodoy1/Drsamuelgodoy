@@ -6,15 +6,15 @@ const syncAppointmentStatusesForDentist = async (dentistId: number) => {
     `
       UPDATE appointments
       SET status = CASE
-        WHEN end_time <= NOW() AND status <> 'FINISHED' THEN 'FINISHED'
-        WHEN start_time <= NOW() AND end_time > NOW() AND status <> 'IN_PROGRESS' THEN 'IN_PROGRESS'
+        WHEN end_time <= NOW() AND status NOT IN ('FINISHED', 'CANCELLED', 'NO_SHOW') THEN 'FINISHED'
+        WHEN start_time <= NOW() AND end_time > NOW() AND status NOT IN ('IN_PROGRESS', 'CANCELLED', 'NO_SHOW') THEN 'IN_PROGRESS'
         ELSE status
       END
       WHERE dentist_id = $1
-        AND status <> 'CANCELLED'
+        AND status NOT IN ('CANCELLED', 'NO_SHOW')
         AND (
-          (end_time <= NOW() AND status <> 'FINISHED')
-          OR (start_time <= NOW() AND end_time > NOW() AND status <> 'IN_PROGRESS')
+          (end_time <= NOW() AND status NOT IN ('FINISHED', 'CANCELLED', 'NO_SHOW'))
+          OR (start_time <= NOW() AND end_time > NOW() AND status NOT IN ('IN_PROGRESS', 'CANCELLED', 'NO_SHOW'))
         )
     `,
     [dentistId]

@@ -72,3 +72,95 @@
   from { opacity: 0.4; transform: scale(0.95); }
   to   { opacity: 1;   transform: scale(1); }
 }
+
+/* Apple-style breathing pulse for priority indicators */
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.88); }
+}
+
+/* Gentle glow pulse for highlighted elements */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.08); }
+}
+
+/* iOS-style shimmer loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Subtle float for empty state icons */
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Success checkmark draw */
+@keyframes checkDraw {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* Fade in up for staggered lists */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@layer utilities {
+  .animate-breathe {
+    animation: breathe 3.2s ease-in-out infinite;
+  }
+
+  .animate-glow-pulse {
+    animation: glowPulse 2s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  .animate-gentle-float {
+    animation: gentleFloat 3s ease-in-out infinite;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.35s ease-out both;
+  }
+
+  /* iOS-style frosted glass */
+  .ios-glass {
+    @apply bg-white/80 backdrop-blur-2xl;
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    backdrop-filter: blur(40px) saturate(180%);
+  }
+
+  .ios-glass-heavy {
+    @apply bg-white/92 backdrop-blur-3xl;
+    -webkit-backdrop-filter: blur(60px) saturate(200%);
+    backdrop-filter: blur(60px) saturate(200%);
+  }
+
+  /* Smooth spring-like interaction */
+  .ios-press {
+    @apply transition-transform duration-150 ease-out active:scale-[0.96];
+  }
+
+  .ios-press-gentle {
+    @apply transition-transform duration-200 ease-out active:scale-[0.98];
+  }
+
+  /* iOS drag handle */
+  .ios-drag-handle {
+    @apply w-9 h-[5px] rounded-full bg-slate-300/60 mx-auto mb-4;
+  }
+
+  /* Refined card hover */
+  .ios-hover-lift {
+    @apply transition-all duration-300 ease-out hover:translate-y-[-1px] hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)];
+  }
+}

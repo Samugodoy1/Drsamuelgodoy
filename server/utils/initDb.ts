@@ -91,6 +91,25 @@ export async function initDb() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Allow NO_SHOW status on appointments (drop old CHECK if it exists)
+      DO $$
+      DECLARE
+        cname TEXT;
+      BEGIN
+        SELECT con.conname INTO cname
+          FROM pg_constraint con
+          JOIN pg_class rel ON rel.oid = con.conrelid
+         WHERE rel.relname = 'appointments'
+           AND con.contype = 'c'
+           AND pg_get_constraintdef(con.oid) ILIKE '%status%'
+         LIMIT 1;
+        IF cname IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE appointments DROP CONSTRAINT %I', cname);
+          ALTER TABLE appointments ADD CONSTRAINT appointments_status_check
+            CHECK (status IN ('SCHEDULED','CONFIRMED','CANCELLED','IN_PROGRESS','FINISHED','NO_SHOW'));
+        END IF;
+      END $$;
+
       CREATE TABLE IF NOT EXISTS anamnesis (
         patient_id INTEGER PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE,
         medical_history TEXT,

@@ -905,7 +905,7 @@ export function Finance({
                       onClick={() => handlePendingGroupAction(group)}
                       className="w-full md:w-auto rounded-full bg-amber-50 px-4 py-2.5 text-[13px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
                     >
-                      {group.items.length > 1 ? 'Cobrar tudo' : 'Cobrar'}
+                      {group.items.length > 1 ? 'Cobrar de uma vez' : 'Cobrar'}
                     </button>
                   </div>
                 </div>
@@ -1093,7 +1093,7 @@ export function Finance({
                 ))
               ) : (
                 <div className="py-10 text-center space-y-2">
-                  <p className="text-slate-400 text-sm">Nenhuma movimentação encontrada.</p>
+                  <p className="text-slate-400 text-sm">Nenhuma movimentação ainda.</p>
                   <button type="button" onClick={clearFilters} className="text-[13px] font-semibold text-primary hover:underline">
                     Limpar filtros
                   </button>
@@ -1142,7 +1142,7 @@ export function Finance({
 
           {!hasActiveFilter && recentSections.length === 0 && olderTransactions.length === 0 && (
             <div className="py-8 text-center text-slate-400 text-sm">
-              Nenhuma movimentação recente.
+              Nenhuma movimentação recente ainda.
             </div>
           )}
 
@@ -1290,7 +1290,7 @@ export function Finance({
                   {
                     icon: <UserRound size={17} />,
                     label: 'Paciente',
-                    value: selectedTransaction.patient_name || 'Sem paciente vinculado',
+                    value: selectedTransaction.patient_name || 'Paciente não identificado',
                   },
                 ].map((item, index) => (
                   <div
