@@ -626,15 +626,28 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
   scoredPairs.sort((a, b) => b.score - a.score);
 
   const usedPatients = new Set<number>();
-  const usedSlotKeys = new Set<string>();
+  const assignedSlots: Array<{ date: string; startMin: number; endMin: number }> = [];
   const suggestions: SchedulingSuggestion[] = [];
+
+  function timeToMinutes(t: string): number {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  function overlapsAssigned(date: string, startStr: string, endStr: string): boolean {
+    const startMin = timeToMinutes(startStr);
+    const endMin = timeToMinutes(endStr);
+    return assignedSlots.some(s =>
+      s.date === date && startMin < s.endMin && endMin > s.startMin
+    );
+  }
 
   for (const pair of scoredPairs) {
     if (suggestions.length >= candidates.length) break;
     if (usedPatients.has(pair.candidate.patient_id)) continue;
 
-    const slotKey = `${pair.slot.date}_${pair.slot.start}`;
-    if (usedSlotKeys.has(slotKey)) continue;
+    // Check overlap against all already-assigned suggestion slots
+    if (overlapsAssigned(pair.slot.date, pair.slot.start, pair.slot.end)) continue;
 
     const behavior = behaviors.get(pair.candidate.patient_id);
     const { confidence_label, insight } = behavior
@@ -658,7 +671,11 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
     });
 
     usedPatients.add(pair.candidate.patient_id);
-    usedSlotKeys.add(slotKey);
+    assignedSlots.push({
+      date: pair.slot.date,
+      startMin: timeToMinutes(pair.slot.start),
+      endMin: timeToMinutes(pair.slot.end),
+    });
   }
 
   return suggestions;

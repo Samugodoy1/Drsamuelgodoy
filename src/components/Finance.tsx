@@ -14,6 +14,7 @@ import {
   Plus,
   Printer,
   Rocket,
+  Search,
   Tag,
   Target,
   Trash2,
@@ -21,7 +22,7 @@ import {
   UserRound,
   WalletCards,
   X,
-} from 'lucide-react';
+} from '../icons';
 
 interface Transaction {
   id: number;
@@ -138,6 +139,12 @@ export function Finance({
   const [hoveredTransactionId, setHoveredTransactionId] = useState<number | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showAllOlderTransactions, setShowAllOlderTransactions] = useState(false);
+  const [filterDate, setFilterDate] = useState<string | null>(null);
+  const [filterPatientId, setFilterPatientId] = useState<number | null>(null);
+  const [patientSearchOpen, setPatientSearchOpen] = useState(false);
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const patientSearchRef = useRef<HTMLDivElement | null>(null);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -410,14 +417,73 @@ export function Finance({
     [transactions]
   );
 
+  // ─── Filter helpers ──────────────────────────────────────────────────
+  const todayKey = now.toLocaleDateString('en-CA');
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(now.getDate() - 1);
+  const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
+
+  const hasActiveFilter = filterDate !== null || filterPatientId !== null;
+
+  const uniqueTransactionPatients = useMemo(() => {
+    const map = new Map<number, string>();
+    transactions.forEach((t) => {
+      if (t.patient_id && t.patient_name && !map.has(t.patient_id)) {
+        map.set(t.patient_id, t.patient_name);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    if (!hasActiveFilter) return sortedTransactions;
+    return sortedTransactions.filter((t) => {
+      if (filterDate) {
+        const tDate = t.date?.split('T')[0];
+        if (tDate !== filterDate) return false;
+      }
+      if (filterPatientId) {
+        if (t.patient_id !== filterPatientId) return false;
+      }
+      return true;
+    });
+  }, [sortedTransactions, filterDate, filterPatientId, hasActiveFilter]);
+
+  const filterPatientName = useMemo(
+    () => filterPatientId ? uniqueTransactionPatients.find((p) => p.id === filterPatientId)?.name || '' : '',
+    [filterPatientId, uniqueTransactionPatients]
+  );
+
+  const clearFilters = () => {
+    setFilterDate(null);
+    setFilterPatientId(null);
+    setPatientSearchOpen(false);
+    setPatientSearchQuery('');
+  };
+
+  // Close patient search on outside click
+  useEffect(() => {
+    if (!patientSearchOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (patientSearchRef.current && !patientSearchRef.current.contains(e.target as Node)) {
+        setPatientSearchOpen(false);
+        setPatientSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [patientSearchOpen]);
+
   useEffect(() => {
     setVisibleTransactionCount(TRANSACTIONS_PAGE_SIZE);
     setShowAllOlderTransactions(false);
-  }, [transactions]);
+  }, [transactions, filterDate, filterPatientId]);
 
   const visibleTransactions = useMemo(
-    () => sortedTransactions.slice(0, visibleTransactionCount),
-    [sortedTransactions, visibleTransactionCount]
+    () => filteredTransactions.slice(0, visibleTransactionCount),
+    [filteredTransactions, visibleTransactionCount]
   );
 
   const transactionIndexMap = useMemo(
@@ -425,14 +491,9 @@ export function Finance({
     [visibleTransactions]
   );
 
-  const hasMoreTransactions = visibleTransactionCount < sortedTransactions.length;
+  const hasMoreTransactions = visibleTransactionCount < filteredTransactions.length;
 
   const recentSections = useMemo(() => {
-    const todayKey = now.toLocaleDateString('en-CA');
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const yesterdayKey = yesterday.toLocaleDateString('en-CA');
-
     const todayItems = visibleTransactions.filter((transaction) => transaction.date?.split('T')[0] === todayKey);
     const yesterdayItems = visibleTransactions.filter((transaction) => transaction.date?.split('T')[0] === yesterdayKey);
 
@@ -442,14 +503,9 @@ export function Finance({
     ].filter((section) => section.items.length > 0);
 
     return sections;
-  }, [visibleTransactions, now]);
+  }, [visibleTransactions, todayKey, yesterdayKey]);
 
   const getDateGroupLabel = (dateKey: string) => {
-    const todayKey = now.toLocaleDateString('en-CA');
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const yesterdayKey = yesterday.toLocaleDateString('en-CA');
-
     if (dateKey === todayKey) return 'Hoje';
     if (dateKey === yesterdayKey) return 'Ontem';
 
@@ -457,16 +513,11 @@ export function Finance({
   };
 
   const olderTransactions = useMemo(() => {
-    const todayKey = now.toLocaleDateString('en-CA');
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const yesterdayKey = yesterday.toLocaleDateString('en-CA');
-
     return visibleTransactions.filter((transaction) => {
       const transactionKey = transaction.date?.split('T')[0];
       return transactionKey && transactionKey !== todayKey && transactionKey !== yesterdayKey;
     });
-  }, [visibleTransactions, now]);
+  }, [visibleTransactions, todayKey, yesterdayKey]);
 
   const olderTransactionsToRender = useMemo(
     () => (showAllOlderTransactions ? olderTransactions : olderTransactions.slice(0, OLDER_TRANSACTIONS_PREVIEW_COUNT)),
@@ -530,7 +581,7 @@ export function Finance({
 
         if (!entry?.isIntersecting) return;
 
-        setVisibleTransactionCount((current) => Math.min(current + TRANSACTIONS_PAGE_SIZE, sortedTransactions.length));
+        setVisibleTransactionCount((current) => Math.min(current + TRANSACTIONS_PAGE_SIZE, filteredTransactions.length));
       },
       {
         root: null,
@@ -542,7 +593,7 @@ export function Finance({
     observer.observe(loadMoreRef.current);
 
     return () => observer.disconnect();
-  }, [hasMoreTransactions, sortedTransactions.length]);
+  }, [hasMoreTransactions, filteredTransactions.length]);
 
   const criticalPlans = useMemo(() => {
     return paymentPlans
@@ -873,7 +924,7 @@ export function Finance({
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-[14px] font-semibold text-slate-900">Movimentações</h3>
-          {visibleTransactions.length > 0 && (
+          {visibleTransactions.length > 0 && !hasActiveFilter && (
             <button
               type="button"
               onClick={() => setShowAllOlderTransactions((current) => !current)}
@@ -888,8 +939,168 @@ export function Finance({
           )}
         </div>
 
+        {/* ─── Filter bar ─────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (filterDate === todayKey) { setFilterDate(null); } else { setFilterDate(todayKey); }
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
+              filterDate === todayKey
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <CalendarDays size={14} />
+            Hoje
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (filterDate === yesterdayKey) { setFilterDate(null); } else { setFilterDate(yesterdayKey); }
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
+              filterDate === yesterdayKey
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Ontem
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              dateInputRef.current?.showPicker?.();
+              dateInputRef.current?.click();
+            }}
+            className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 cursor-pointer ${
+              filterDate && filterDate !== todayKey && filterDate !== yesterdayKey
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <CalendarDays size={14} />
+            {filterDate && filterDate !== todayKey && filterDate !== yesterdayKey
+              ? new Date(`${filterDate}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+              : 'Data'}
+            <input
+              ref={dateInputRef}
+              type="date"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              value={filterDate && filterDate !== todayKey && filterDate !== yesterdayKey ? filterDate : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) setFilterDate(val);
+              }}
+            />
+          </button>
+
+          <div className="relative" ref={patientSearchRef}>
+            <button
+              type="button"
+              onClick={() => {
+                if (filterPatientId) {
+                  setFilterPatientId(null);
+                  setPatientSearchOpen(false);
+                  setPatientSearchQuery('');
+                } else {
+                  setPatientSearchOpen(!patientSearchOpen);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
+                filterPatientId
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : patientSearchOpen
+                    ? 'bg-white text-slate-800 border border-slate-300 shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <UserRound size={14} />
+              {filterPatientId ? filterPatientName : 'Paciente'}
+              {filterPatientId && <X size={12} />}
+            </button>
+
+            {patientSearchOpen && !filterPatientId && (
+              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-2xl border border-slate-200 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.12)] overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-100">
+                  <Search size={14} className="text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Buscar paciente..."
+                    value={patientSearchQuery}
+                    onChange={(e) => setPatientSearchQuery(e.target.value)}
+                    className="w-full text-[13px] text-slate-800 placeholder:text-slate-400 bg-transparent outline-none"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto py-1">
+                  {uniqueTransactionPatients
+                    .filter((p) => !patientSearchQuery || p.name.toLowerCase().includes(patientSearchQuery.toLowerCase()))
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setFilterPatientId(p.id);
+                          setPatientSearchOpen(false);
+                          setPatientSearchQuery('');
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors truncate"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  {uniqueTransactionPatients.filter((p) => !patientSearchQuery || p.name.toLowerCase().includes(patientSearchQuery.toLowerCase())).length === 0 && (
+                    <p className="px-3.5 py-3 text-[12px] text-slate-400 text-center">Nenhum paciente encontrado</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {hasActiveFilter && (
+            <>
+              <span className="text-[12px] text-slate-400 font-medium tabular-nums ml-1">
+                {filteredTransactions.length} movimentaç{filteredTransactions.length !== 1 ? 'ões' : 'ão'}
+              </span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] font-semibold text-slate-500 hover:bg-slate-100 transition-all"
+              >
+                <X size={12} />
+                Limpar
+              </button>
+            </>
+          )}
+        </div>
+
         <div className="space-y-7">
-          {showAllOlderTransactions ? (
+          {hasActiveFilter ? (
+            /* ─── Filtered view: flat grouped list ──────────────── */
+            <div className="space-y-6">
+              {allTransactionGroups.length > 0 ? (
+                allTransactionGroups.map((group, groupIndex) => (
+                  <div key={group.dateKey}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 mb-2.5">{group.label}</p>
+                    <div className="space-y-0">
+                      {group.items.map((transaction, itemIndex) => renderTransactionCard(transaction, groupIndex, itemIndex))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-10 text-center space-y-2">
+                  <p className="text-slate-400 text-sm">Nenhuma movimentação encontrada.</p>
+                  <button type="button" onClick={clearFilters} className="text-[13px] font-semibold text-primary hover:underline">
+                    Limpar filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : showAllOlderTransactions ? (
             <div className="space-y-6">
               {allTransactionGroups.map((group, groupIndex) => (
                 <div key={group.dateKey}>
@@ -929,7 +1140,7 @@ export function Finance({
             </>
           )}
 
-          {recentSections.length === 0 && olderTransactions.length === 0 && (
+          {!hasActiveFilter && recentSections.length === 0 && olderTransactions.length === 0 && (
             <div className="py-8 text-center text-slate-400 text-sm">
               Nenhuma movimentação recente.
             </div>
@@ -941,7 +1152,7 @@ export function Finance({
             </div>
           )}
 
-          {recentSections.length > 0 && <div aria-hidden="true" className="h-[40vh] min-h-40" />}
+          {(recentSections.length > 0 || (hasActiveFilter && filteredTransactions.length > 0)) && <div aria-hidden="true" className="h-[40vh] min-h-40" />}
         </div>
       </section>
 

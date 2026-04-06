@@ -6,7 +6,7 @@ export const getProfile = async (req: Request, res: Response) => {
   const user = req.user!;
   try {
     const result = await dbQuery(
-      'SELECT id, name, email, role, phone, cro, specialty, bio, photo_url, clinic_name, clinic_address FROM users WHERE id = $1',
+      'SELECT id, name, email, role, phone, cro, specialty, bio, photo_url, clinic_name, clinic_address, onboarding_done, welcome_seen FROM users WHERE id = $1',
       [user.id]
     );
     if (result.rows.length === 0) {
@@ -52,6 +52,23 @@ export const updateProfile = async (req: Request, res: Response) => {
     return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error('updateProfile error:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+};
+
+export const updateOnboarding = async (req: Request, res: Response) => {
+  const user = req.user!;
+  const { onboarding_done, welcome_seen } = req.body;
+  try {
+    if (onboarding_done === true) {
+      await dbQuery('UPDATE users SET onboarding_done = TRUE WHERE id = $1', [user.id]);
+    }
+    if (welcome_seen === true) {
+      await dbQuery('UPDATE users SET welcome_seen = TRUE WHERE id = $1', [user.id]);
+    }
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('updateOnboarding error:', error);
     return res.status(500).json({ error: 'Erro interno no servidor' });
   }
 };

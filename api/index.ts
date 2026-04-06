@@ -11,6 +11,7 @@ import {
   addEvolution, 
   updateOdontogram, 
   addToothHistory, 
+  deleteToothHistory,
   addPatientFile,
   getPatientFinancialHistory,
   updatePatient
@@ -45,7 +46,8 @@ import {
 } from '../server/controllers/adminController.js';
 import { 
   getProfile, 
-  updateProfile 
+  updateProfile,
+  updateOnboarding
 } from '../server/controllers/profileController.js';
 import { uploadPatientFile, uploadProfilePhoto, uploadPatientPhoto } from '../server/controllers/uploadController.js';
 import { deleteFile } from '../server/controllers/fileController.js';
@@ -108,6 +110,7 @@ app.put(['/patients/:id/anamnesis', '/api/patients/:id/anamnesis'], updateAnamne
 app.post(['/patients/:id/evolution', '/api/patients/:id/evolution'], addEvolution);
 app.post(['/patients/:id/odontogram', '/api/patients/:id/odontogram'], updateOdontogram);
 app.post(['/patients/:id/tooth-history', '/api/patients/:id/tooth-history'], addToothHistory);
+app.delete(['/patients/:id/tooth-history/:toothNumber', '/api/patients/:id/tooth-history/:toothNumber'], deleteToothHistory);
 app.post(['/patients/:id/files', '/api/patients/:id/files'], upload.single('file'), uploadPatientFile);
 app.post(['/patients/:id/photo', '/api/patients/:id/photo'], upload.single('file'), uploadPatientPhoto);
 app.get(['/patients/:id/financial', '/api/patients/:id/financial'], getPatientFinancialHistory);
@@ -138,6 +141,7 @@ app.delete(['/dentists/:id', '/api/dentists/:id'], deleteDentist);
 // Profile
 app.get(['/profile', '/api/profile'], getProfile);
 app.post(['/profile', '/api/profile'], updateProfile);
+app.patch(['/profile/onboarding', '/api/profile/onboarding'], updateOnboarding);
 app.post(['/profile/photo', '/api/profile/photo'], upload.single('file'), uploadProfilePhoto);
 
 // Files

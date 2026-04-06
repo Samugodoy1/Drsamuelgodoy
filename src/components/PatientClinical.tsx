@@ -6,20 +6,24 @@ import {
   ArrowUpRight,
   Calendar,
   Camera,
+  Check,
   CheckCircle2,
   Circle,
   Clock3,
   CreditCard,
   FileText,
   Info,
+  Lock,
   Loader2,
   Phone,
+  Plus,
+  Shield,
   Trash2,
   User,
   UserRound,
   WalletCards,
   Zap,
-} from 'lucide-react';
+} from '../icons';
 import { AnimatePresence, motion } from 'motion/react';
 import { NovaEvolucao } from './NovaEvolucao';
 import { Odontogram } from './Odontogram';
@@ -143,6 +147,37 @@ const resolveTimelineIcon = (label: string) => {
   return FileText;
 };
 
+const resolveProcedureCategory = (title: string) => {
+  const lower = (title || '').toLowerCase();
+  if (/canal|endo|obtur|pulp|odontometr|instrument|lima/.test(lower))
+    return { label: 'Endodontia', dotCls: 'bg-indigo-500', tagCls: 'bg-indigo-50 text-indigo-700', borderCls: 'border-l-indigo-400' };
+  if (/restaura|resina|c[aá]ri|classe|adesiv|restor/.test(lower))
+    return { label: 'Restauração', dotCls: 'bg-amber-500', tagCls: 'bg-amber-50 text-amber-700', borderCls: 'border-l-amber-400' };
+  if (/extra|exo|cirurg|sutur|anestes|exodont/.test(lower))
+    return { label: 'Cirurgia', dotCls: 'bg-rose-500', tagCls: 'bg-rose-50 text-rose-700', borderCls: 'border-l-rose-400' };
+  if (/limpeza|profilax|raspagem|t[aá]rtaro|calcul|poliment/.test(lower))
+    return { label: 'Profilaxia', dotCls: 'bg-emerald-500', tagCls: 'bg-emerald-50 text-emerald-700', borderCls: 'border-l-emerald-400' };
+  if (/avalia|consulta|retorno|anamnese|revisão|revisao/.test(lower))
+    return { label: 'Consulta', dotCls: 'bg-sky-500', tagCls: 'bg-sky-50 text-sky-700', borderCls: 'border-l-sky-400' };
+  return { label: 'Evolução', dotCls: 'bg-slate-400', tagCls: 'bg-slate-100 text-slate-600', borderCls: 'border-l-slate-300' };
+};
+
+const TIMELINE_STATUS_STYLES: Record<string, { dot: string; text: string; label: string }> = {
+  CONCLUIDO:    { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Concluído' },
+  EM_ANDAMENTO: { dot: 'bg-amber-500',   text: 'text-amber-700',   label: 'Em andamento' },
+  OBSERVACAO:   { dot: 'bg-sky-500',     text: 'text-sky-600',     label: 'Observação' },
+};
+
+const resolveTimelineMonthGroup = (dateStr: string) => {
+  if (!dateStr) return '';
+  const datePart = dateStr.split('T')[0];
+  const [year, month] = datePart.split('-');
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now = new Date();
+  const monthName = months[parseInt(month, 10) - 1] || month;
+  return String(now.getFullYear()) === year ? monthName : `${monthName} ${year}`;
+};
+
 type ClinicalEventType = 'TREATMENT_START' | 'PLAN_CHANGE' | 'PROCEDURE_COMPLETION' | 'OBSERVATION' | 'DIAGNOSIS';
 
 const resolveClinicalEventType = (entry: any): ClinicalEventType => {
@@ -189,6 +224,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [highlightedTimelineId, setHighlightedTimelineId] = useState<string | null>(null);
   const [highlightedToothNumber, setHighlightedToothNumber] = useState<number | null>(null);
   const [selectedTreatmentAction, setSelectedTreatmentAction] = useState<any | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
   const [optimisticOdontogram, setOptimisticOdontogram] = useState<Record<number, any>>({});
   const [optimisticTreatments, setOptimisticTreatments] = useState<any[]>([]);
@@ -197,6 +233,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [isUploadingClinicalImage, setIsUploadingClinicalImage] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  const [isEditingAnamnese, setIsEditingAnamnese] = useState(false);
+  const [anamneseForm, setAnamneseForm] = useState({ medical_history: '', allergies: '', medications: '' });
+  const [isSavingAnamnese, setIsSavingAnamnese] = useState(false);
   const [patientFinancial, setPatientFinancial] = useState<{ transactions: any[]; paymentPlans: any[]; installments: any[] } | null>(null);
   const [isLoadingFinancial, setIsLoadingFinancial] = useState(false);
   const infoPanelRef = useRef<HTMLElement | null>(null);
@@ -319,6 +358,132 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     }
   };
 
+  const togglePrepaymentAll = async () => {
+    const activeItems = mergedTreatmentPlan.filter((item: any) =>
+      ['APROVADO', 'PENDENTE', 'PLANEJADO'].includes(String(item.status || '').toUpperCase())
+    );
+    if (activeItems.length === 0) return;
+    const allActive = activeItems.every((item: any) => item.requires_prepayment);
+    const nextValue = !allActive;
+    const nowIso = new Date().toISOString();
+    const nextPlan = mergedTreatmentPlan.map((item: any) => {
+      const isActive = ['APROVADO', 'PENDENTE', 'PLANEJADO'].includes(String(item.status || '').toUpperCase());
+      if (!isActive) return item;
+      if (item.prepayment_confirmed) return item; // don't toggle already paid
+      return { ...item, requires_prepayment: nextValue, prepayment_confirmed: false, updated_at: nowIso };
+    });
+    setOptimisticTreatments((prev) => {
+      const ids = new Set(nextPlan.map((i: any) => i.id));
+      return [...prev.filter((i: any) => !ids.has(i.id)), ...nextPlan];
+    });
+    try {
+      await onUpdatePatient({ ...patient, treatmentPlan: nextPlan });
+    } catch (error) {
+      console.error('Error toggling prepayment:', error);
+    }
+  };
+
+  const confirmPrepayment = async (treatment: any) => {
+    const nowIso = new Date().toISOString();
+    const nextPlan = (mergedTreatmentPlan || []).map((item: any) =>
+      item.id === treatment.id
+        ? { ...item, prepayment_confirmed: true, prepayment_confirmed_at: nowIso, updated_at: nowIso }
+        : item
+    );
+    setOptimisticTreatments((prev) => {
+      const ids = new Set(nextPlan.map((i: any) => i.id));
+      return [...prev.filter((i: any) => !ids.has(i.id)), ...nextPlan];
+    });
+    try {
+      await onUpdatePatient({ ...patient, treatmentPlan: nextPlan });
+
+      // Registrar transação financeira automaticamente
+      const treatmentValue = Number(treatment.value) || 0;
+      if (treatmentValue > 0) {
+        const procedureLabel = treatment.procedure || 'Procedimento';
+        const toothLabel = treatment.tooth_number ? ` — dente ${treatment.tooth_number}` : '';
+        apiFetch('/api/finance', {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'INCOME',
+            description: `Pagamento antecipado: ${procedureLabel}${toothLabel}`,
+            category: 'Procedimentos',
+            amount: treatmentValue,
+            payment_method: 'Indefinido',
+            date: nowIso.split('T')[0],
+            status: 'PAID',
+            patient_id: patient.id,
+            procedure: procedureLabel,
+            notes: 'Pagamento recebido antes da execução do procedimento.',
+          }),
+        }).catch((err) => {
+          console.error('Error creating prepayment transaction:', err);
+        });
+      }
+    } catch (error) {
+      console.error('Error confirming prepayment:', error);
+    }
+    setSelectedTreatmentAction(null);
+  };
+
+  const confirmPrepaymentAll = async (paymentMethod: string = 'Indefinido') => {
+    const nowIso = new Date().toISOString();
+    const unpaid = mergedTreatmentPlan.filter(
+      (item: any) =>
+        ['APROVADO', 'PENDENTE', 'PLANEJADO'].includes(String(item.status || '').toUpperCase()) &&
+        !(item.requires_prepayment && item.prepayment_confirmed)
+    );
+    if (unpaid.length === 0) return;
+
+    const totalAmount = unpaid.reduce((sum: number, item: any) => sum + (Number(item.value) || 0), 0);
+
+    const nextPlan = mergedTreatmentPlan.map((item: any) => {
+      const isTarget = unpaid.some((u: any) => u.id === item.id);
+      return isTarget
+        ? { ...item, requires_prepayment: true, prepayment_confirmed: true, prepayment_confirmed_at: nowIso, updated_at: nowIso }
+        : item;
+    });
+
+    setOptimisticTreatments((prev) => {
+      const ids = new Set(nextPlan.map((i: any) => i.id));
+      return [...prev.filter((i: any) => !ids.has(i.id)), ...nextPlan];
+    });
+
+    try {
+      await onUpdatePatient({ ...patient, treatmentPlan: nextPlan });
+
+      if (totalAmount > 0) {
+        const procedures = unpaid.map((i: any) => i.procedure || 'Procedimento').join(', ');
+        apiFetch('/api/finance', {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'INCOME',
+            description: `Pagamento integral do orçamento`,
+            category: 'Procedimentos',
+            amount: totalAmount,
+            payment_method: paymentMethod,
+            date: nowIso.split('T')[0],
+            status: 'PAID',
+            patient_id: patient.id,
+            procedure: procedures,
+            notes: `Pagamento integral: ${unpaid.length} procedimento(s).`,
+          }),
+        }).then(() => {
+          if (infoTab === 'financeiro') {
+            apiFetch(`/api/patients/${patient.id}/financial`)
+              .then((r) => r.json())
+              .then((data) => setPatientFinancial(data))
+              .catch(() => {});
+          }
+        }).catch((err) => {
+          console.error('Error creating full budget payment transaction:', err);
+        });
+      }
+    } catch (error) {
+      console.error('Error confirming full budget prepayment:', error);
+    }
+  };
+
   const handleOdontogramStatusChange = (toothNumber: number, toothData: any) => {
     setOptimisticOdontogram((prev) => ({ ...prev, [toothNumber]: toothData }));
 
@@ -397,6 +562,12 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       !!existingTreatment &&
       ['root_canal_done', 'extraction_done'].includes(String(status || '').toLowerCase());
 
+    // Block completion via odontogram if prepayment is required but not confirmed
+    if (isCompletionAction && existingTreatment?.requires_prepayment && !existingTreatment?.prepayment_confirmed) {
+      setSelectedTreatmentAction(existingTreatment);
+      return;
+    }
+
     const nextTreatmentPlan = category === 'procedure'
       ? mode === 'continuity' && existingTreatment
         ? (patient.treatmentPlan || []).map((item: any) =>
@@ -414,6 +585,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               procedure,
               value: values[procedure] || 0,
               status: 'PLANEJADO',
+              requires_prepayment: true,
               created_at: nowIso,
             },
           ]
@@ -434,6 +606,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             procedure,
             value: values[procedure] || 0,
             status: 'PLANEJADO',
+            requires_prepayment: true,
             created_at: nowIso,
           }
       : null;
@@ -508,7 +681,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       // Criar transação financeira automaticamente ao concluir via odontograma
       if (isCompletionAction && existingTreatment) {
         const treatmentValue = Number(existingTreatment.value) || 0;
-        if (treatmentValue > 0) {
+        const alreadyPaidViaPrePayment = existingTreatment.requires_prepayment && existingTreatment.prepayment_confirmed;
+        if (treatmentValue > 0 && !alreadyPaidViaPrePayment) {
           const procedureLabel = existingTreatment.procedure || procedure || 'Procedimento';
           apiFetch('/api/finance', {
             method: 'POST',
@@ -592,9 +766,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     try {
       await onUpdatePatient(updatedPatient);
 
-      // Criar transação financeira automaticamente
+      // Criar transação financeira automaticamente (pular se pagamento antecipado já confirmado)
       const treatmentValue = Number(treatment.value) || 0;
-      if (treatmentValue > 0) {
+      const alreadyPaidViaPrePayment = treatment.requires_prepayment && treatment.prepayment_confirmed;
+      if (treatmentValue > 0 && !alreadyPaidViaPrePayment) {
         const procedureLabel = treatment.procedure || 'Procedimento';
         const toothLabel = treatment.tooth_number ? ` — dente ${treatment.tooth_number}` : '';
         apiFetch('/api/finance', {
@@ -741,9 +916,48 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     }
   };
 
+  const handleResetTooth = async (toothNumber: number) => {
+    // Remove tooth from odontogram data
+    const currentOdontogram = { ...(patient?.odontogram || {}) };
+    delete currentOdontogram[toothNumber];
+    setOptimisticOdontogram((prev) => {
+      const next = { ...prev };
+      delete next[toothNumber];
+      return next;
+    });
+
+    // Remove active treatment plan items for this tooth
+    const nextPlan = (mergedTreatmentPlan || []).filter(
+      (item: any) => Number(item.tooth_number) !== toothNumber ||
+        String(item.status || '').toUpperCase() === 'REALIZADO'
+    );
+    setOptimisticTreatments((prev) => {
+      const nextIds = new Set(nextPlan.map((i: any) => i.id));
+      return prev.filter((i: any) => nextIds.has(i.id) || Number(i.tooth_number) !== toothNumber);
+    });
+
+    try {
+      // Update odontogram without the tooth
+      await apiFetch(`/api/patients/${patient.id}/odontogram`, {
+        method: 'POST',
+        body: JSON.stringify({ data: currentOdontogram }),
+      });
+
+      // Delete tooth history entries
+      await apiFetch(`/api/patients/${patient.id}/tooth-history/${toothNumber}`, {
+        method: 'DELETE',
+      });
+
+      // Persist updated treatment plan (removes active items for this tooth)
+      await onUpdatePatient({ ...patient, treatmentPlan: nextPlan });
+    } catch (error) {
+      console.error('Error resetting tooth:', error);
+    }
+  };
+
   const patientFiles = patient?.files || [];
-  const financialTotal = (patient?.treatmentPlan || []).reduce((acc: number, item: any) => acc + (Number(item.value) || 0), 0);
-  const completedTotal = (patient?.treatmentPlan || [])
+  const financialTotal = mergedTreatmentPlan.reduce((acc: number, item: any) => acc + (Number(item.value) || 0), 0);
+  const completedTotal = mergedTreatmentPlan
     .filter((item: any) => String(item.status || '').toUpperCase() === 'REALIZADO')
     .reduce((acc: number, item: any) => acc + (Number(item.value) || 0), 0);
 
@@ -842,6 +1056,24 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     });
   };
 
+  const saveAnamnese = async () => {
+    setIsSavingAnamnese(true);
+    try {
+      const res = await apiFetch(`/api/patients/${patient.id}/anamnesis`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(anamneseForm),
+      });
+      if (!res.ok) throw new Error('Falha ao salvar anamnese');
+      await onRefreshPatient?.();
+      setIsEditingAnamnese(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingAnamnese(false);
+    }
+  };
+
   const activeToothNumbers = useMemo(
     () =>
       treatmentInProgress
@@ -901,7 +1133,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                 <ArrowLeft size={18} />
               </button>
 
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.08em] uppercase ${clinicalBadge.className}`}>
                 {clinicalBadge.label}
               </span>
             </div>
@@ -944,7 +1176,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
               <div className="min-w-0 flex-1">
                 <h1 className="text-[27px] sm:text-[32px] leading-[1.04] tracking-[-0.03em] font-semibold text-slate-950 truncate">{patient?.name}</h1>
-                <p className="mt-1 text-sm text-slate-500">{age !== null ? `${age} anos` : 'Idade n/i'} • {clinicalBadge.label}</p>
+                <p className="mt-1 text-sm text-slate-500">{age !== null ? `${age} anos` : 'Idade n/i'}</p>
               </div>
             </div>
 
@@ -999,7 +1231,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   onClick={() => setIsAddingEvolution(true)}
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:text-slate-900"
                 >
-                  <Activity size={14} />
+                  <Plus size={14} />
                   Evolução
                 </button>
                 <button
@@ -1021,8 +1253,13 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-[24px] sm:text-[28px] font-semibold tracking-[-0.02em] text-slate-950">Odontograma</h2>
+              {activeToothNumbers.length > 0 && (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {activeToothNumbers.length} dente{activeToothNumbers.length !== 1 ? 's' : ''} em tratamento
+                </p>
+              )}
             </div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Interativo</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/70">Interativo</span>
           </div>
 
           <div className="rounded-[26px] p-1.5 sm:p-2 bg-slate-50/70 ring-1 ring-slate-100/80">
@@ -1031,6 +1268,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               history={patient?.toothHistory || []}
               onChange={handleOdontogramStatusChange}
               onAddHistory={handleAddToothHistory}
+              onResetTooth={handleResetTooth}
               onSelectProcedure={handleOdontoProcedureSelect}
               treatments={mergedTreatmentPlan}
               activeToothNumbers={activeToothNumbers}
@@ -1046,9 +1284,45 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg sm:text-xl font-semibold tracking-[-0.02em] text-slate-950">Tratamento atual</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Próximo passo clínico do paciente</p>
+                  {treatmentInProgress.length > 0 ? (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {treatmentInProgress.length} procedimento{treatmentInProgress.length !== 1 ? 's' : ''}
+                      {' · '}
+                      {treatmentInProgress.reduce((s: number, i: any) => s + (Number(i.value) || 0), 0)
+                        .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 mt-0.5">Nenhum procedimento ativo</p>
+                  )}
                 </div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-[0.12em]">Foco</span>
+                {treatmentInProgress.length > 0 && (() => {
+                  const activeUnpaid = treatmentInProgress.filter((item: any) => !item.prepayment_confirmed);
+                  const allActive = activeUnpaid.length > 0 && activeUnpaid.every((item: any) => item.requires_prepayment);
+                  const allPaid = treatmentInProgress.every((item: any) => item.requires_prepayment && item.prepayment_confirmed);
+                  return (
+                    <button
+                      type="button"
+                      onClick={togglePrepaymentAll}
+                      disabled={allPaid}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
+                        allPaid
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                          : allActive
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                            : 'bg-slate-50 text-slate-400 border border-slate-200 hover:text-slate-600 hover:border-slate-300'
+                      }`}
+                      title={allPaid ? 'Todos pagos' : allActive ? 'Cobrar antes de executar (ativo)' : 'Ativar cobrança antecipada'}
+                    >
+                      {allPaid ? (
+                        <><Check size={11} /> Todos pagos</>
+                      ) : allActive ? (
+                        <><Lock size={11} /> Cobrar antes</>
+                      ) : (
+                        <><Shield size={11} /> Cobrar antes</>
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
 
               <div className="space-y-3">
@@ -1056,42 +1330,59 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   treatmentInProgress.map((item: any, idx: number) => {
                     const isPriority = idx === 0;
                     const rawStatus = String(item.status || '').toUpperCase();
-                    const itemBadge =
-                      rawStatus === 'APROVADO'
-                        ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                        : rawStatus === 'PENDENTE'
-                          ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200';
+                    const isPrepaid = item.requires_prepayment && item.prepayment_confirmed;
+
+                    const statusConfig = rawStatus === 'APROVADO'
+                      ? { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Em andamento' }
+                      : rawStatus === 'PENDENTE'
+                        ? { cls: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Aguardando' }
+                        : { cls: 'bg-sky-50 text-sky-700 border-sky-200', label: 'Planejado' };
 
                     return (
                       <div
                         key={item.id}
-                        className={`rounded-2xl px-4 py-4 flex flex-col items-stretch gap-3 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between ${
-                          isPriority
-                            ? 'border border-slate-200 bg-slate-50/60 shadow-[0_6px_18px_rgba(15,23,42,0.04)]'
-                            : `${iosSubtleCard} hover:border-slate-300`
+                        className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between ${
+                          isPrepaid
+                            ? 'border-emerald-200 bg-emerald-50/20 shadow-[0_4px_14px_rgba(16,185,129,0.06)]'
+                            : isPriority
+                              ? 'border-slate-200 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]'
+                              : 'border-slate-100 bg-slate-50/60 hover:border-slate-200'
                         } ${
                           highlightedTreatmentId === item.id
-                            ? 'ring-2 ring-slate-300 bg-slate-50 shadow-[0_10px_24px_rgba(15,23,42,0.06)]'
+                            ? 'ring-2 ring-indigo-200 shadow-[0_6px_20px_rgba(99,102,241,0.08)]'
                             : ''
                         }`}
                       >
-                        <div className="min-w-0 w-full">
-                          {isPriority && (
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">Próximo passo</p>
-                          )}
-                          <p className="font-semibold text-slate-900 text-[15px] sm:text-base leading-6 truncate">
-                            {item.procedure} {item.tooth_number ? `dente ${item.tooth_number}` : ''}
-                          </p>
-                          <div className="flex flex-col items-stretch gap-2 mt-1.5 sm:flex-row sm:items-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${itemBadge}`}>
-                              {rawStatus === 'APROVADO' ? 'Em andamento' : rawStatus === 'PENDENTE' ? 'Pendente' : 'Planejado'}
+                        <div className="min-w-0 flex-1">
+                          {/* row 1: procedure name */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              {isPriority && (
+                                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-indigo-500 mb-1">Próximo passo</p>
+                              )}
+                              <p className={`font-bold leading-snug truncate ${isPriority ? 'text-[16px] text-slate-950' : 'text-[14px] text-slate-800'}`}>
+                                {item.procedure}
+                              </p>
+                            </div>
+                            {item.tooth_number && (
+                              <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                dente {item.tooth_number}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* row 2: status + value */}
+                          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${statusConfig.cls}`}>
+                              {statusConfig.label}
                             </span>
-                            <label className="inline-flex items-center gap-2 text-xs text-slate-500 w-full sm:w-auto">
-                              <span>R$</span>
+
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-slate-400 font-medium">R$</span>
                               <input
                                 type="text"
                                 inputMode="decimal"
+                                disabled={isPrepaid}
                                 value={editingValues[item.id] ?? formatCurrencyInputBRL(String((Number(item.value) || 0) * 100))}
                                 onChange={(event) => {
                                   const next = formatCurrencyInputBRL(event.target.value);
@@ -1108,19 +1399,34 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                                     (event.currentTarget as HTMLInputElement).blur();
                                   }
                                 }}
-                                className="w-full sm:w-24 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-base font-medium text-slate-700 outline-none focus:border-slate-400 min-h-[40px]"
+                                className={`w-24 rounded-lg border px-2.5 py-1.5 text-[13px] font-semibold outline-none ${
+                                  isPrepaid
+                                    ? 'border-emerald-200 bg-emerald-50/40 text-emerald-700 cursor-default'
+                                    : 'border-slate-200 bg-white text-slate-700 focus:border-slate-400'
+                                }`}
                                 aria-label="Valor do procedimento"
                               />
-                            </label>
+                            </div>
+
+                            {isPrepaid && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <Check size={9} /> Pago
+                              </span>
+                            )}
+                            {item.requires_prepayment && !item.prepayment_confirmed && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200">
+                                <Lock size={9} /> Aguardando
+                              </span>
+                            )}
                           </div>
                         </div>
 
                         <button
                           onClick={() => setSelectedTreatmentAction(item)}
-                          className={`w-full sm:w-auto shrink-0 px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 active:scale-[0.98] ${
+                          className={`w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 active:scale-[0.97] ${
                             isPriority
-                              ? 'bg-slate-950 text-white border border-slate-950 hover:bg-slate-900 hover:scale-[1.01]'
-                              : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-400 hover:bg-slate-50 hover:scale-[1.01]'
+                              ? 'bg-slate-950 text-white hover:bg-slate-800 hover:scale-[1.01]'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:scale-[1.01]'
                           }`}
                         >
                           Continuar
@@ -1145,169 +1451,370 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     </div>
                   </div>
                 )}
+
+                {/* Pagar orçamento completo */}
+                {(() => {
+                  const unpaid = treatmentInProgress.filter(
+                    (item: any) => !(item.requires_prepayment && item.prepayment_confirmed)
+                  );
+                  const allPaid = treatmentInProgress.length > 0 && unpaid.length === 0;
+                  const unpaidTotal = unpaid.reduce((s: number, i: any) => s + (Number(i.value) || 0), 0);
+                  if (treatmentInProgress.length < 2 && !allPaid) return null;
+                  return allPaid ? (
+                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 px-4 py-3">
+                      <Check size={14} className="text-emerald-600 shrink-0" />
+                      <p className="text-[13px] font-semibold text-emerald-700">Orçamento completo pago</p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowPaymentModal(true)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 flex items-center justify-between gap-3 transition-all duration-200 hover:border-slate-300 hover:shadow-sm active:scale-[0.99]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                          <CreditCard size={14} className="text-slate-600" />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <p className="text-[13px] font-bold text-slate-800">Pagar orçamento completo</p>
+                          <p className="text-[11px] text-slate-500">{unpaid.length} procedimento{unpaid.length !== 1 ? 's' : ''} pendente{unpaid.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <span className="text-[14px] font-bold text-slate-900 shrink-0">
+                        {unpaidTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    </button>
+                  );
+                })()}
               </div>
             </section>
 
             {!isFocusMode && (
             <section className="rounded-[24px] border border-slate-200/70 bg-white/92 p-4 sm:p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-semibold tracking-[-0.01em] text-slate-900">Evolução clínica</h3>
+              {/* ── Header ── */}
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900">Evolução clínica</h3>
+                  {timelineItems.length > 0 && (
+                    <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                      {timelineItems.length} registro{timelineItems.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={() => setIsAddingEvolution(true)}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline transition-all duration-200"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 active:scale-[0.96] transition-all duration-150"
                 >
-                  Nova evolução
+                  <Plus size={11} />
+                  Registrar
                 </button>
               </div>
 
-              <div className="space-y-3 relative">
-                {timelineItems.length > 0 && <div className="absolute left-[18px] top-1 bottom-1 w-[1px] rounded-full bg-slate-200" />}
-                {timelineItems.length > 0 ? (
-                  <>
-                    <AnimatePresence initial={false}>
-                    {(showAllEvolutions ? timelineItems : timelineItems.slice(0, 3)).map((item: any, idx: number) => {
-                    const Icon = resolveTimelineIcon(item.title);
-                    const statusPill =
-                      item.status === 'EM_ANDAMENTO'
-                        ? 'bg-slate-100 text-slate-700'
-                        : item.status === 'OBSERVACAO'
-                          ? 'bg-slate-100 text-slate-700'
-                          : 'bg-slate-100 text-slate-700';
-                    const isLatest = idx === 0;
-                    const isNewlyAdded = highlightedTimelineId === item.id;
+              {timelineItems.length > 0 ? (
+                <div className="relative">
+                  {/* vertical guide line */}
+                  <div className="absolute left-[14px] top-3 bottom-3 w-[2px] rounded-full bg-slate-100" />
 
-                      return (
-                        <motion.div
-                          key={item.id}
-                          layout
-                          initial={{ opacity: 0, y: 14 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, ease: 'easeOut' }}
-                          className={`rounded-xl p-3 ml-8 transition-all duration-300 ${
-                            isNewlyAdded
-                              ? 'bg-slate-50 border border-slate-300 ring-2 ring-slate-200 shadow-[0_12px_24px_rgba(15,23,42,0.05)]'
-                              : isLatest
-                                ? 'bg-white border border-slate-200 shadow-[0_8px_20px_rgba(15,23,42,0.04)]'
-                                : 'bg-slate-50/55 border border-slate-200/70 opacity-85 hover:opacity-100'
-                          }`}
-                        >
-                          <span className={`absolute left-[12px] mt-3 w-[13px] h-[13px] rounded-full border-2 ${isLatest ? 'bg-slate-900 border-white ring-4 ring-slate-100' : 'bg-white border-slate-300'}`} />
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex gap-3 min-w-0">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${isLatest ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-500'}`}>
-                                <Icon size={16} />
-                              </div>
-                              <div className="min-w-0">
-                                {isLatest && <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">Último evento</p>}
-                                <p className={`leading-5 truncate ${isLatest ? 'text-[15px] font-bold text-slate-950' : 'text-sm font-semibold text-slate-800'}`}>{item.title}</p>
-                                {item.notes && <p className={`text-xs leading-5 mt-0.5 line-clamp-2 ${isLatest ? 'text-slate-700' : 'text-slate-500'}`}>{item.notes}</p>}
-                                <p className={`text-[11px] mt-1 ${isLatest ? 'text-slate-600' : 'text-slate-500'}`}>{formatDate(item.date)}</p>
-                              </div>
+                  <div>
+                    {(() => {
+                      const visibleItems = showAllEvolutions ? timelineItems : timelineItems.slice(0, 5);
+                      const nodes: React.ReactNode[] = [];
+                      let lastGroup = '';
+
+                      visibleItems.forEach((item: any, idx: number) => {
+                        const group = resolveTimelineMonthGroup(item.date);
+                        if (group !== lastGroup) {
+                          lastGroup = group;
+                          nodes.push(
+                            <div key={`grp-${group}`} className="flex items-center gap-2 pl-8 pb-2 pt-3 first:pt-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">{group}</span>
+                              <div className="flex-1 h-px bg-slate-100" />
+                            </div>
+                          );
+                        }
+
+                        const cat = resolveProcedureCategory(item.title);
+                        const isNewlyAdded = highlightedTimelineId === item.id;
+                        const statusStyle = TIMELINE_STATUS_STYLES[item.status] ?? TIMELINE_STATUS_STYLES.OBSERVACAO;
+
+                        nodes.push(
+                          <motion.div
+                            key={item.id}
+                            layout
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.22, ease: 'easeOut', delay: idx * 0.025 }}
+                            className="relative flex items-start gap-3 pb-3"
+                          >
+                            {/* colored dot on vertical line */}
+                            <div className="relative z-10 flex-shrink-0 w-[30px] flex items-center justify-center mt-[15px]">
+                              <div className={`w-[11px] h-[11px] rounded-full ring-[3px] ring-white shadow-sm ${cat.dotCls}`} />
                             </div>
 
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-[0.08em] ${statusPill}`}>
-                              {item.status === 'EM_ANDAMENTO' ? 'Em andamento' : item.status === 'OBSERVACAO' ? 'Observação' : 'Concluído'}
-                            </span>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                    </AnimatePresence>
+                            {/* card */}
+                            <div className={`flex-1 min-w-0 rounded-[18px] bg-white border border-slate-200/80 border-l-[3px] ${cat.borderCls} p-3.5 shadow-[0_1px_6px_rgba(15,23,42,0.04)] transition-shadow duration-200 hover:shadow-[0_3px_12px_rgba(15,23,42,0.07)] ${isNewlyAdded ? 'ring-2 ring-blue-300/50 shadow-[0_4px_16px_rgba(99,102,241,0.1)]' : ''}`}>
+                              {/* row 1: category tag + date */}
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <span className={`inline-flex text-[10px] font-extrabold uppercase tracking-[0.07em] px-2 py-0.5 rounded-full ${cat.tagCls}`}>
+                                  {cat.label}
+                                </span>
+                                <span className="text-[11px] text-slate-400 font-medium tabular-nums shrink-0">{formatDate(item.date)}</span>
+                              </div>
 
-                    {timelineItems.length > 3 && (
-                      <div className="pt-1">
-                        <button
-                          onClick={() => setShowAllEvolutions(prev => !prev)}
-                          className="w-full py-2.5 rounded-xl bg-white text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 hover:scale-[1.01] transition-all duration-200 active:scale-[0.98]"
-                        >
-                          {showAllEvolutions ? 'Mostrar menos' : 'Ver mais'}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className={`rounded-2xl py-10 text-center ${iosSubtleCard}`}>
-                    <div className="flex flex-col items-center gap-3 px-4">
-                      <div className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500">
-                        <FileText size={18} />
-                      </div>
-                      <p className="text-slate-800 text-sm font-bold">Ainda não há evoluções registradas</p>
-                      <p className="text-slate-600 text-xs">Registre a primeira evolução para iniciar o histórico clínico.</p>
+                              {/* row 2: procedure title */}
+                              <p className="text-[14px] font-bold text-slate-900 leading-snug">{item.title}</p>
+
+                              {/* row 3: notes */}
+                              {item.notes && (
+                                <p className="text-[12px] text-slate-500 mt-1.5 leading-relaxed line-clamp-2">{item.notes}</p>
+                              )}
+
+                              {/* row 4: status */}
+                              <div className="mt-2.5 flex items-center gap-1.5">
+                                <div className={`w-[7px] h-[7px] rounded-full flex-shrink-0 ${statusStyle.dot}`} />
+                                <span className={`text-[11px] font-semibold ${statusStyle.text}`}>{statusStyle.label}</span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      });
+
+                      return nodes;
+                    })()}
+                  </div>
+
+                  {timelineItems.length > 5 && (
+                    <div className="pl-[42px] pt-1">
                       <button
-                        onClick={() => setIsAddingEvolution(true)}
-                        className="mt-1 px-3.5 py-2 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-900 hover:scale-[1.01] transition-all duration-200 active:scale-[0.98]"
+                        onClick={() => setShowAllEvolutions(prev => !prev)}
+                        className="w-full py-2.5 rounded-xl bg-slate-50 text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-white hover:shadow-sm active:scale-[0.98] transition-all duration-200"
                       >
-                        Nova evolução
+                        {showAllEvolutions
+                          ? 'Mostrar menos'
+                          : `Ver mais ${timelineItems.length - 5} registro${timelineItems.length - 5 !== 1 ? 's' : ''}`}
                       </button>
                     </div>
+                  )}
+                </div>
+              ) : (
+                <div className={`rounded-2xl py-10 text-center ${iosSubtleCard}`}>
+                  <div className="flex flex-col items-center gap-3 px-4">
+                    <div className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500">
+                      <FileText size={18} />
+                    </div>
+                    <p className="text-slate-800 text-sm font-bold">Ainda não há evoluções registradas</p>
+                    <p className="text-slate-600 text-xs">Registre a primeira evolução para iniciar o histórico clínico.</p>
+                    <button
+                      onClick={() => setIsAddingEvolution(true)}
+                      className="mt-1 px-3.5 py-2 rounded-xl bg-slate-950 text-white text-xs font-semibold hover:bg-slate-900 hover:scale-[1.01] transition-all duration-200 active:scale-[0.98]"
+                    >
+                      Nova evolução
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </section>
             )}
           </div>
 
           {!isFocusMode && (
           <aside ref={infoPanelRef} className={`${iosCard} rounded-[26px] p-4 sm:p-5 h-fit xl:sticky xl:top-[112px]`}>
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-50 rounded-2xl mb-4 border border-slate-200/70">
-              {[
-                { id: 'anamneses', label: 'Anamnese' },
-                { id: 'dados', label: 'Dados pessoais' },
-                { id: 'imagens', label: 'Imagens/RX' },
-                { id: 'financeiro', label: 'Financeiro' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setInfoTab(tab.id as InfoTab)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    infoTab === tab.id
-                      ? 'bg-white text-slate-950 shadow-[0_4px_14px_rgba(15,23,42,0.05)]'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-white/70 hover:scale-[1.01]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const hasAllergy = (() => {
+                const val = patient?.anamnesis?.allergies;
+                return val && val.trim() && val.trim().toLowerCase() !== 'não informado' && val.trim().toLowerCase() !== 'nenhuma';
+              })();
+              const pendingCount = (patientFinancial?.installments || []).filter((i: any) => i.status === 'PENDING' || i.status === 'OVERDUE').length;
+              const fileCount = patientFiles.length;
+
+              const tabs = [
+                { id: 'anamneses', label: 'Anamnese', dot: hasAllergy ? 'bg-rose-500' : null, count: null },
+                { id: 'dados', label: 'Dados', dot: null, count: null },
+                { id: 'imagens', label: 'Imagens', dot: null, count: fileCount > 0 ? fileCount : null },
+                { id: 'financeiro', label: 'Financeiro', dot: pendingCount > 0 ? 'bg-amber-500' : null, count: pendingCount > 0 ? pendingCount : null },
+              ];
+
+              return (
+                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-50 rounded-2xl mb-4 border border-slate-200/70">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setInfoTab(tab.id as InfoTab)}
+                      className={`relative px-2 py-2 rounded-xl text-[11px] font-semibold transition-all duration-200 ${
+                        infoTab === tab.id
+                          ? 'bg-white text-slate-950 shadow-[0_4px_14px_rgba(15,23,42,0.05)]'
+                          : 'text-slate-500 hover:text-slate-700 hover:bg-white/70'
+                      }`}
+                    >
+                      {tab.label}
+                      {tab.dot && infoTab !== tab.id && (
+                        <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${tab.dot} ring-2 ring-slate-50`} />
+                      )}
+                      {tab.count && tab.count > 0 && infoTab !== tab.id && (
+                        <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-slate-200 text-[9px] font-bold text-slate-600">
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {infoTab === 'anamneses' && (
               <div className="space-y-3 text-sm">
-                <div className={`p-3.5 rounded-[20px] ${iosSubtleCard}`}>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold mb-1">Histórico médico</p>
-                  <p className="text-slate-700">{patient?.anamnesis?.medical_history || 'Não informado'}</p>
+                {/* Header com botão editar/cancelar */}
+                <div className="flex items-center justify-between px-0.5">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">Anamnese clínica</p>
+                  {!isEditingAnamnese ? (
+                    <button
+                      onClick={() => {
+                        setAnamneseForm({
+                          medical_history: patient?.anamnesis?.medical_history || '',
+                          allergies: patient?.anamnesis?.allergies || '',
+                          medications: patient?.anamnesis?.medications || '',
+                        });
+                        setIsEditingAnamnese(true);
+                      }}
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100"
+                    >
+                      Editar
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsEditingAnamnese(false)}
+                      className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
-                <div className={`p-3.5 rounded-[20px] ${iosSubtleCard}`}>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold mb-1">Alergias</p>
-                  <p className="text-slate-700">{patient?.anamnesis?.allergies || 'Não informado'}</p>
-                </div>
-                <div className={`p-3.5 rounded-[20px] ${iosSubtleCard}`}>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold mb-1">Medicações</p>
-                  <p className="text-slate-700">{patient?.anamnesis?.medications || 'Não informado'}</p>
-                </div>
+
+                {isEditingAnamnese ? (
+                  <>
+                    {/* Histórico médico — editável */}
+                    <div className="p-3.5 rounded-[18px] bg-slate-50 border border-slate-200/70">
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">Histórico médico</p>
+                      <textarea
+                        value={anamneseForm.medical_history}
+                        onChange={(e) => setAnamneseForm((f) => ({ ...f, medical_history: e.target.value }))}
+                        rows={3}
+                        placeholder="Ex: Hipertensão, diabetes, cirurgias anteriores..."
+                        className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition-colors leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Alergias — editável */}
+                    <div className="p-3.5 rounded-[18px] bg-rose-50 border border-rose-200">
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-rose-600 mb-2">Alergias</p>
+                      <textarea
+                        value={anamneseForm.allergies}
+                        onChange={(e) => setAnamneseForm((f) => ({ ...f, allergies: e.target.value }))}
+                        rows={2}
+                        placeholder="Ex: Penicilina, látex, anestésico..."
+                        className="w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:outline-none transition-colors leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Medicações — editável */}
+                    <div className="p-3.5 rounded-[18px] bg-amber-50 border border-amber-200">
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-amber-600 mb-2">Medicações em uso</p>
+                      <textarea
+                        value={anamneseForm.medications}
+                        onChange={(e) => setAnamneseForm((f) => ({ ...f, medications: e.target.value }))}
+                        rows={2}
+                        placeholder="Ex: Losartana 50mg, Metformina..."
+                        className="w-full resize-none rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:outline-none transition-colors leading-relaxed"
+                      />
+                    </div>
+
+                    <button
+                      onClick={saveAnamnese}
+                      disabled={isSavingAnamnese}
+                      className="w-full py-2.5 rounded-xl bg-slate-950 text-white text-[13px] font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {isSavingAnamnese ? (
+                        <><Loader2 size={14} className="animate-spin" /> Salvando...</>
+                      ) : (
+                        <><Check size={14} /> Salvar anamnese</>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* Histórico médico — leitura */}
+                    <div className="p-3.5 rounded-[18px] bg-slate-50 border border-slate-200/70">
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-1.5">Histórico médico</p>
+                      <p className="text-slate-700 leading-relaxed">{patient?.anamnesis?.medical_history || 'Não informado'}</p>
+                    </div>
+
+                    {/* Alergias — risk highlight */}
+                    {(() => {
+                      const val = patient?.anamnesis?.allergies;
+                      const hasContent = val && val.trim() && val.trim().toLowerCase() !== 'não informado' && val.trim().toLowerCase() !== 'nenhuma';
+                      return (
+                        <div className={`p-3.5 rounded-[18px] border ${hasContent ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200/70'}`}>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            {hasContent && <div className="w-[7px] h-[7px] rounded-full bg-rose-500 shrink-0" />}
+                            <p className={`text-[10px] font-extrabold uppercase tracking-[0.1em] ${hasContent ? 'text-rose-600' : 'text-slate-400'}`}>Alergias</p>
+                          </div>
+                          <p className={`leading-relaxed ${hasContent ? 'text-rose-900 font-semibold' : 'text-slate-700'}`}>{val || 'Não informado'}</p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Medicações — amber highlight */}
+                    {(() => {
+                      const val = patient?.anamnesis?.medications;
+                      const hasContent = val && val.trim() && val.trim().toLowerCase() !== 'não informado' && val.trim().toLowerCase() !== 'nenhuma';
+                      return (
+                        <div className={`p-3.5 rounded-[18px] border ${hasContent ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200/70'}`}>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            {hasContent && <div className="w-[7px] h-[7px] rounded-full bg-amber-500 shrink-0" />}
+                            <p className={`text-[10px] font-extrabold uppercase tracking-[0.1em] ${hasContent ? 'text-amber-600' : 'text-slate-400'}`}>Medicações em uso</p>
+                          </div>
+                          <p className={`leading-relaxed ${hasContent ? 'text-amber-900 font-semibold' : 'text-slate-700'}`}>{val || 'Não informado'}</p>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
             )}
 
             {infoTab === 'dados' && (
-              <div className="space-y-3 text-sm text-slate-700">
-                <div className={`p-3.5 rounded-[20px] flex items-center gap-2 ${iosSubtleCard}`}><UserRound size={14} /> CPF: {patient?.cpf || 'Não informado'}</div>
-                <div className={`p-3.5 rounded-[20px] flex items-center gap-2 ${iosSubtleCard}`}><Phone size={14} /> {patient?.phone || 'Não informado'}</div>
-                <div className={`p-3.5 rounded-[20px] flex items-center gap-2 ${iosSubtleCard}`}><Info size={14} /> {patient?.email || 'Não informado'}</div>
-                <div className={`p-3.5 rounded-[20px] flex items-center gap-2 ${iosSubtleCard}`}><Calendar size={14} /> Nascimento: {patient?.birth_date ? formatDate(patient.birth_date) : 'Não informado'}</div>
+              <div className="space-y-2 text-sm">
+                {[
+                  { label: 'CPF', value: patient?.cpf, icon: <UserRound size={13} /> },
+                  { label: 'Telefone', value: patient?.phone, icon: <Phone size={13} /> },
+                  { label: 'E-mail', value: patient?.email, icon: <Info size={13} /> },
+                  { label: 'Data de nascimento', value: patient?.birth_date ? formatDate(patient.birth_date) : null, icon: <Calendar size={13} /> },
+                ].map(({ label, value, icon }) => (
+                  <div key={label} className="flex items-center gap-3 px-3.5 py-3 rounded-[16px] bg-slate-50 border border-slate-200/70">
+                    <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                      {icon}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.09em] text-slate-400">{label}</p>
+                      <p className="text-[13px] font-medium text-slate-800 truncate mt-0.5">{value || 'Não informado'}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
             {infoTab === 'imagens' && (
               <div className="space-y-3">
-                <div className={`p-3.5 rounded-[20px] ${iosSubtleCard}`}>
+                <div className="p-3.5 rounded-[18px] bg-slate-50 border border-slate-200/70">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-600">Anexos clínicos</p>
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Anexos clínicos</p>
                     <button
                       type="button"
                       onClick={() => clinicalImageInputRef.current?.click()}
                       disabled={isUploadingClinicalImage}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                     >
-                      <Camera size={13} />
+                      <Camera size={12} />
                       {isUploadingClinicalImage ? 'Enviando...' : 'Upload RX/Imagem'}
                     </button>
                   </div>
@@ -1327,14 +1834,21 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                       href={file.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`block p-3.5 rounded-[20px] transition-all duration-200 hover:bg-slate-100 hover:scale-[1.01] ${iosSubtleCard}`}
+                      className="flex items-center gap-3 p-3 rounded-[18px] bg-slate-50 border border-slate-200/70 transition-all duration-200 hover:bg-white hover:border-slate-300 hover:shadow-sm active:scale-[0.98]"
                     >
-                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-2"><Camera size={14} /> {file.description || 'Arquivo clínico'}</p>
-                      <p className="text-xs text-slate-500 mt-1">{file.created_at ? formatDate(file.created_at) : 'Data n/i'}</p>
+                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                        {(file.file_url || '').toLowerCase().endsWith('.pdf')
+                          ? <FileText size={16} />
+                          : <Camera size={16} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-slate-800 truncate">{file.description || 'Arquivo clínico'}</p>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">{file.created_at ? formatDate(file.created_at) : 'Data n/i'}</p>
+                      </div>
                     </a>
                   ))
                 ) : (
-                  <div className={`p-8 rounded-[20px] text-center text-sm text-slate-600 ${iosSubtleCard}`}>Nenhuma imagem/RX anexada</div>
+                  <div className="p-8 rounded-[20px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Nenhuma imagem/RX anexada</div>
                 )}
 
                 {uploadFeedback && (
@@ -1345,39 +1859,48 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
             {infoTab === 'financeiro' && (
               <div className="space-y-3">
-                {/* Resumo do plano de tratamento */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className={`p-3 rounded-[18px] ${iosSubtleCard}`}>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Orçado</p>
-                    <p className="text-[15px] font-semibold text-slate-950 mt-0.5">
-                      {financialTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-[18px] ${iosSubtleCard}`}>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Concluído</p>
-                    <p className="text-[15px] font-semibold text-slate-950 mt-0.5">
-                      {completedTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Recebido vs Orçado */}
+                {/* Resumo financeiro — 3 métricas em fluxo visual */}
                 {(() => {
                   const received = (patientFinancial?.transactions || [])
                     .filter((t: any) => t.type === 'INCOME')
                     .reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
                   const pct = financialTotal > 0 ? Math.min(100, Math.round((received / financialTotal) * 100)) : 0;
+                  const remaining = Math.max(0, financialTotal - received);
                   return (
-                    <div className={`p-3 rounded-[18px] ${iosSubtleCard}`}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Recebido</p>
-                        <span className="text-[11px] font-semibold text-slate-500">{pct}%</span>
+                    <div className="rounded-[18px] bg-slate-50 border border-slate-200/70 p-4 space-y-3">
+                      {/* Orçado → Concluído pipeline */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-1">Orçamento total</p>
+                          <p className="text-[16px] font-bold text-slate-900">
+                            {financialTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-emerald-600 mb-1">Concluído</p>
+                          <p className="text-[16px] font-bold text-emerald-700">
+                            {completedTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-[15px] font-semibold text-emerald-700">
-                        {received.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </p>
-                      <div className="mt-2 h-1.5 rounded-full bg-slate-200/80 overflow-hidden">
-                        <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+
+                      {/* Recebimento com barra de progresso */}
+                      <div className="pt-2 border-t border-slate-200/70">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Recebido</p>
+                          <span className="text-[11px] font-bold text-slate-500">{pct}%</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-[15px] font-bold text-emerald-700">
+                            {received.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          {remaining > 0 && (
+                            <p className="text-[11px] text-slate-400">falta {remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          )}
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-slate-200/80 overflow-hidden">
+                          <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
                     </div>
                   );
@@ -1389,22 +1912,22 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   if (pending.length === 0) return null;
                   return (
                     <div>
-                      <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold px-1 mb-1.5">Parcelas pendentes</p>
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 px-1 mb-1.5">Parcelas pendentes</p>
                       <div className="space-y-1.5">
                         {pending.slice(0, 5).map((inst: any) => {
                           const isOverdue = inst.status === 'OVERDUE' || new Date(inst.due_date) < new Date();
                           return (
-                            <div key={inst.id} className={`flex items-center gap-2.5 p-2.5 rounded-[16px] ${iosSubtleCard}`}>
+                            <div key={inst.id} className={`flex items-center gap-2.5 p-2.5 rounded-[14px] border ${isOverdue ? 'bg-rose-50 border-rose-200' : 'bg-amber-50/40 border-amber-200/60'}`}>
                               <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${isOverdue ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
                                 <WalletCards size={13} />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-[13px] font-medium text-slate-800 truncate">{inst.procedure || `Parcela ${inst.number}`}</p>
-                                <p className={`text-[11px] ${isOverdue ? 'text-rose-500 font-semibold' : 'text-slate-500'}`}>
-                                  {isOverdue ? 'Vencida' : 'Vence'} {formatDate(inst.due_date)}
+                                <p className="text-[13px] font-semibold text-slate-800 truncate">{inst.procedure || `Parcela ${inst.number}`}</p>
+                                <p className={`text-[11px] font-medium ${isOverdue ? 'text-rose-600' : 'text-amber-700'}`}>
+                                  {isOverdue ? 'Vencida em' : 'Vence em'} {formatDate(inst.due_date)}
                                 </p>
                               </div>
-                              <span className="text-[13px] font-semibold text-slate-800 shrink-0">
+                              <span className={`text-[13px] font-bold shrink-0 ${isOverdue ? 'text-rose-700' : 'text-slate-800'}`}>
                                 {Number(inst.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                               </span>
                             </div>
@@ -1420,23 +1943,26 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
                 {/* Movimentações do paciente */}
                 {isLoadingFinancial ? (
-                  <div className={`p-6 rounded-[18px] text-center text-sm text-slate-500 ${iosSubtleCard}`}>Carregando...</div>
+                  <div className="p-6 rounded-[18px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">
+                    <Loader2 size={18} className="animate-spin mx-auto mb-2 text-slate-400" />
+                    Carregando...
+                  </div>
                 ) : (patientFinancial?.transactions || []).length > 0 ? (
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-500 font-bold px-1 mb-1.5">Movimentações</p>
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 px-1 mb-1.5">Movimentações</p>
                     <div className="space-y-1.5">
                       {patientFinancial!.transactions.slice(0, 8).map((t: any) => {
                         const isIncome = t.type === 'INCOME';
                         return (
-                          <div key={t.id} className={`flex items-center gap-2.5 p-2.5 rounded-[16px] ${iosSubtleCard}`}>
+                          <div key={t.id} className={`flex items-center gap-2.5 p-2.5 rounded-[14px] border ${isIncome ? 'bg-emerald-50/40 border-emerald-200/50' : 'bg-slate-50 border-slate-200/70'}`}>
                             <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${isIncome ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                               {isIncome ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-[13px] font-medium text-slate-800 truncate">{t.procedure || t.description}</p>
-                              <p className="text-[11px] text-slate-500">{formatDate(t.date)}</p>
+                              <p className="text-[13px] font-semibold text-slate-800 truncate">{t.procedure || t.description}</p>
+                              <p className="text-[11px] text-slate-500 font-medium">{formatDate(t.date)}</p>
                             </div>
-                            <span className={`text-[13px] font-semibold shrink-0 ${isIncome ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            <span className={`text-[13px] font-bold shrink-0 ${isIncome ? 'text-emerald-700' : 'text-rose-600'}`}>
                               {isIncome ? '+' : '-'}{Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                           </div>
@@ -1448,7 +1974,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     </div>
                   </div>
                 ) : !isLoadingFinancial && patientFinancial ? (
-                  <div className={`p-6 rounded-[18px] text-center text-sm text-slate-500 ${iosSubtleCard}`}>Nenhuma movimentação registrada</div>
+                  <div className="p-6 rounded-[18px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Nenhuma movimentação registrada</div>
                 ) : null}
 
                 <button
@@ -1487,34 +2013,82 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       )}
 
       {selectedTreatmentAction && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/30 p-4">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_28px_70px_rgba(15,23,42,0.20)]">
-            <div className="mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Continuar tratamento</h3>
-              <p className="text-sm text-slate-600">
-                {selectedTreatmentAction.procedure} {selectedTreatmentAction.tooth_number ? `- dente ${selectedTreatmentAction.tooth_number}` : ''}
-              </p>
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="w-full max-w-lg rounded-[28px] border border-slate-200/70 bg-white p-5 sm:p-6 shadow-[0_28px_70px_rgba(15,23,42,0.18)]"
+          >
+            <div className="mb-5">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">Continuar tratamento</p>
+              <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">{selectedTreatmentAction.procedure}</h3>
+              {selectedTreatmentAction.tooth_number && (
+                <span className="mt-2 inline-flex text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  dente {selectedTreatmentAction.tooth_number}
+                </span>
+              )}
             </div>
 
-            <div className="space-y-3">
-              <button
-                onClick={() => handleCompleteTreatment(selectedTreatmentAction)}
-                className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition-colors hover:bg-emerald-100"
-              >
-                <p className="text-sm font-bold text-emerald-900">Concluir procedimento atual</p>
-                <p className="text-xs text-emerald-700">Move para execução concluída e registra na evolução clínica.</p>
-              </button>
+            <div className="space-y-2.5">
+              {selectedTreatmentAction.requires_prepayment && !selectedTreatmentAction.prepayment_confirmed ? (
+                <>
+                  <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                        <Lock size={13} className="text-amber-600" />
+                      </div>
+                      <p className="text-sm font-bold text-amber-900">Pagamento antecipado exigido</p>
+                    </div>
+                    <p className="text-xs text-amber-700 leading-relaxed pl-9">
+                      Este procedimento exige pagamento antes da execução.
+                      {Number(selectedTreatmentAction.value) > 0 && (
+                        <> Valor: <strong>R$ {Number(selectedTreatmentAction.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => confirmPrepayment(selectedTreatmentAction)}
+                    className="w-full rounded-[18px] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all duration-200 hover:bg-emerald-100 hover:shadow-sm active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                        <Check size={13} className="text-emerald-700" />
+                      </div>
+                      <p className="text-sm font-bold text-emerald-900">Confirmar pagamento recebido</p>
+                    </div>
+                    <p className="text-xs text-emerald-700 mt-1 pl-9 leading-relaxed">Registra o recebimento e libera o procedimento para conclusão.</p>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => handleCompleteTreatment(selectedTreatmentAction)}
+                  className="w-full rounded-[18px] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all duration-200 hover:bg-emerald-100 hover:shadow-sm active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                      <CheckCircle2 size={14} className="text-emerald-700" />
+                    </div>
+                    <p className="text-sm font-bold text-emerald-900">Concluir procedimento atual</p>
+                  </div>
+                  <p className="text-xs text-emerald-700 mt-1 pl-9 leading-relaxed">Move para execução concluída e registra na evolução clínica.</p>
+                  {selectedTreatmentAction.requires_prepayment && selectedTreatmentAction.prepayment_confirmed && (
+                    <p className="text-[10px] text-emerald-600 mt-1.5 pl-9 flex items-center gap-1"><Check size={10} /> Pagamento já confirmado</p>
+                  )}
+                </button>
+              )}
 
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Converter para outro procedimento</p>
+              <div className="rounded-[18px] border border-slate-200/70 bg-slate-50 p-4">
+                <p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Converter para outro procedimento</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Restauracao', 'Canal', 'Extracao', 'Coroa']
+                  {['Restauracao', 'Canal', 'Extracao', 'Coroa', 'Implante']
                     .filter((proc) => proc !== selectedTreatmentAction.procedure)
                     .map((proc) => (
                       <button
                         key={proc}
                         onClick={() => handleConvertTreatment(selectedTreatmentAction, proc)}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-white"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-semibold text-slate-800 transition-all duration-200 hover:bg-white hover:shadow-sm hover:border-slate-300 active:scale-[0.98]"
                       >
                         {proc}
                       </button>
@@ -1526,14 +2100,85 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setSelectedTreatmentAction(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]"
               >
                 Fechar
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
+
+      {showPaymentModal && (() => {
+        const unpaid = treatmentInProgress.filter(
+          (item: any) => !(item.requires_prepayment && item.prepayment_confirmed)
+        );
+        const unpaidTotal = unpaid.reduce((s: number, i: any) => s + (Number(i.value) || 0), 0);
+        const methods = [
+          { key: 'Dinheiro', label: 'Dinheiro', icon: <WalletCards size={16} />, desc: 'Espécie' },
+          { key: 'Pix', label: 'Pix', icon: <Zap size={16} />, desc: 'Transferência instantânea' },
+          { key: 'Cartão Crédito', label: 'Cartão Crédito', icon: <CreditCard size={16} />, desc: 'Crédito' },
+          { key: 'Cartão Débito', label: 'Cartão Débito', icon: <CreditCard size={16} />, desc: 'Débito' },
+          { key: 'Transferência', label: 'Transferência', icon: <ArrowUpRight size={16} />, desc: 'TED/DOC' },
+        ];
+        return (
+          <div className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md rounded-[28px] border border-slate-200/70 bg-white p-5 sm:p-6 shadow-[0_28px_70px_rgba(15,23,42,0.18)]"
+            >
+              <div className="mb-5">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">Pagamento</p>
+                <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">Pagar orçamento completo</h3>
+                <div className="mt-3 flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-slate-50 border border-slate-200/70">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] text-slate-500 font-medium">{unpaid.length} procedimento{unpaid.length !== 1 ? 's' : ''} pendente{unpaid.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <span className="text-[16px] font-bold text-slate-950 shrink-0">
+                    {unpaidTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2.5">Forma de pagamento</p>
+              <div className="space-y-1.5">
+                {methods.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={async () => {
+                      setShowPaymentModal(false);
+                      await confirmPrepaymentAll(m.key);
+                    }}
+                    className="w-full rounded-[16px] border border-slate-200/70 bg-white px-4 py-3.5 flex items-center gap-3 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm active:scale-[0.98]"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                      {m.icon}
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-800">{m.label}</p>
+                      <p className="text-[11px] text-slate-400">{m.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
 
     </div>
   );

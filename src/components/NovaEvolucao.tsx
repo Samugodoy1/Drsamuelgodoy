@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Check, Sparkles, Activity, MapPin, Zap, Info, Palette, FlaskConical, Lock } from 'lucide-react';
+import { ChevronLeft, Check, Sparkles, Activity, MapPin, Zap, Info, Palette, FlaskConical, Lock } from '../icons';
 import { useNavigate } from 'react-router-dom';
 
 interface Block {

@@ -187,6 +187,24 @@ export const addToothHistory = async (req: Request, res: Response) => {
   }
 };
 
+export const deleteToothHistory = async (req: Request, res: Response) => {
+  const user = req.user!;
+  const { id, toothNumber } = req.params;
+  try {
+    const checkOwnership = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [id, user.id]);
+    if (checkOwnership.rows.length === 0) return res.status(403).json({ error: 'Acesso negado' });
+
+    await query(
+      'DELETE FROM tooth_history WHERE patient_id = $1 AND tooth_number = $2',
+      [id, toothNumber]
+    );
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('deleteToothHistory error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 export const addPatientFile = async (req: Request, res: Response) => {
   const user = req.user!;
   const { id } = req.params;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '../icons';
 import { Link } from 'react-router-dom';
 
 export const TermsPage = () => {

@@ -21,7 +21,7 @@ import {
   AlertTriangle,
   LogOut,
   Settings,
-  Image as ImageIcon,
+  ImageIcon,
   Bell,
   Lock,
   Trash2,
@@ -44,7 +44,7 @@ import {
   Pencil,
   Mail,
   Download
-} from 'lucide-react';
+} from './icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
@@ -478,7 +478,7 @@ export default function App() {
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ id: number; name: string; role: string; onboarding_done?: boolean; welcome_seen?: boolean } | null>(null);
   const [loginData, setLoginData] = useState({ email: '', password: '', rememberMe: false });
   const [registerData, setRegisterData] = useState({ 
     name: '', 
@@ -1079,6 +1079,24 @@ export default function App() {
     localStorage.removeItem('user');
     setActiveTab('dashboard');
     setLoading(true);
+  };
+
+  const updateUserOnboarding = async (field: 'onboarding_done' | 'welcome_seen') => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch('/api/profile/onboarding', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ [field]: true })
+      });
+    } catch (e) {
+      console.error('Failed to update onboarding state', e);
+    }
+    if (user) {
+      const updated = { ...user, [field]: true };
+      setUser(updated);
+      localStorage.setItem('user', JSON.stringify(updated));
+    }
   };
 
   // Dashboard Stats Calculations
@@ -2133,7 +2151,7 @@ export default function App() {
                 <SidebarItem id="configuracoes" icon={Settings} label="Configurações" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
               </nav>
             </aside>
-            <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+            <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col pt-4 md:pt-6 lg:pt-8">
               <ClinicalPageRoute 
                 transactions={transactions}
                 appointments={appointments}
@@ -2562,6 +2580,8 @@ export default function App() {
                 sendReminder={sendReminder}
                 onReschedule={openRescheduleAppointment}
                 onSchedulePatient={openScheduleSuggestion}
+                onDismissOnboarding={() => updateUserOnboarding('onboarding_done')}
+                onDismissWelcome={() => updateUserOnboarding('welcome_seen')}
               />
             )}
 
@@ -2713,7 +2733,7 @@ export default function App() {
                             </div>
                             <div className="space-y-2">
                               <p className="text-lg font-bold text-slate-800">Nenhum agendamento neste dia</p>
-                              <p className="text-sm text-slate-500">Clique no bot\u00e3o abaixo para agendar uma consulta r\u00e1pida. Voc\u00ea escolhe o paciente, data e hor\u00e1rio.</p>
+                              <p className="text-sm text-slate-500">Sua agenda está livre. Que tal encaixar um paciente?</p>
                             </div>
                             <button 
                               onClick={openAppointmentModal}
@@ -3015,7 +3035,7 @@ export default function App() {
                                       <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
                                         <CalendarDays size={24} className="text-slate-300" />
                                       </div>
-                                      <p className="text-sm text-slate-400 font-medium">Nenhum agendamento neste dia</p>
+                                      <p className="text-sm text-slate-400 font-medium">Agenda livre neste dia</p>
                                       {bestSlot && (
                                         <button
                                           type="button"
@@ -3908,6 +3928,9 @@ export default function App() {
                                       <button
                                         onClick={() => {
                                           const slots = findAvailableSlots(monthSheetSelectedDay!);
+                                          const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
+                                          setAppointmentModalMode('schedule');
+                                          setEditingAppointmentId(null);
                                           if (slots.length > 0) {
                                             const bestSlot = slots[0]; // Biggest slot
                                             setSuggestedSlot({
@@ -3917,16 +3940,19 @@ export default function App() {
                                             });
                                             setNewAppointment({
                                               patient_id: '',
-                                              dentist_id: user?.id ? user.id.toString() : '',
+                                              patient_name: '',
+                                              dentist_id: dentist_id || '',
                                               date: bestSlot.startTime.toISOString().split('T')[0],
                                               time: bestSlot.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }).replace(':', ''),
                                               duration: Math.floor(bestSlot.duration).toString(),
                                               notes: bestSlot.procedure
                                             });
                                           } else {
+                                            setSuggestedSlot(null);
                                             setNewAppointment({
                                               patient_id: '',
-                                              dentist_id: user?.id ? user.id.toString() : '',
+                                              patient_name: '',
+                                              dentist_id: dentist_id || '',
                                               date: monthSheetSelectedDay!.toISOString().split('T')[0],
                                               time: '',
                                               duration: '30',
@@ -4173,21 +4199,30 @@ export default function App() {
                   const totalAtRisk = patientIntelligence.filter((pi: any) => pi.status === 'ABANDONO' || pi.status === 'ATENCAO').length;
                   const totalNoAppointment = patientIntelligence.filter((pi: any) => !pi.has_future_appointment && pi.status !== 'FINALIZADO').length;
                   const totalLeads = allMetas.filter(x => x.meta.isLead).length;
+                  const totalInTreatment = allMetas.filter(x => {
+                    const intel = intelMap.get(x.patient.id);
+                    return intel?.status === 'EM_TRATAMENTO' || x.meta.clinicalStatus === 'Em tratamento';
+                  }).length;
 
                   const filterChips = [
-                    { key: 'all', label: 'Todos', count: 0 },
-                    { key: 'leads', label: 'Leads', count: totalLeads },
-                    { key: 'action-needed', label: 'Preciso agir', count: totalActionNeeded },
-                    { key: 'at-risk', label: 'Em risco', count: totalAtRisk },
-                    { key: 'no-appointment', label: 'Sem agendamento', count: totalNoAppointment },
-                    { key: 'in-treatment', label: 'Em tratamento', count: 0 },
-                    { key: 'overdue', label: 'Atrasados', count: totalOverdue }
-                  ] as const;
+                    { key: 'all',            label: 'Todos',             count: null },
+                    { key: 'leads',          label: 'Leads',             count: totalLeads },
+                    { key: 'action-needed',  label: 'Preciso agir',      count: totalActionNeeded },
+                    { key: 'at-risk',        label: 'Em risco',          count: totalAtRisk },
+                    { key: 'no-appointment', label: 'Sem agendamento',   count: totalNoAppointment },
+                    { key: 'in-treatment',   label: 'Em tratamento',     count: totalInTreatment },
+                    { key: 'overdue',        label: 'Atrasados',         count: totalOverdue },
+                  ].filter(chip => chip.count === null || chip.count > 0) as { key: string; label: string; count: number | null }[];
 
                   const handleScheduleFromCard = (patient: Patient) => {
                     setPatientActionsToday(prev => new Set([...prev, patient.id]));
                     openPatientAppointmentModal(patient);
                   };
+
+                  // Reset active filter if its chip was hidden (count dropped to 0)
+                  if (patientListFilter !== 'all' && !filterChips.some(c => c.key === patientListFilter)) {
+                    setPatientListFilter('all');
+                  }
 
                   const handleSummaryOverdueClick = () => {
                     setPatientListFilter('overdue');
@@ -4319,7 +4354,7 @@ export default function App() {
                             }`}
                           >
                             {chip.label}
-                            {chip.count > 0 && (
+                            {chip.count !== null && chip.count > 0 && (
                               <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
                                 chip.key === 'action-needed' || chip.key === 'overdue'
                                   ? 'bg-rose-100 text-rose-600'
@@ -5275,7 +5310,7 @@ export default function App() {
               {suggestedSlot && (
                 <div className="mx-4 mt-3 p-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px]">
                   <p className="text-xs text-slate-600 font-medium">
-                    <strong>{suggestedSlot.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong> • <strong>{Math.floor(suggestedSlot.duration)}min</strong> • {suggestedSlot.procedure}
+                    <strong>{suggestedSlot.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong> • <strong>{Math.floor(suggestedSlot.duration)}min</strong> • {suggestedSlot.procedure}
                   </p>
                 </div>
               )}

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  FileText, 
-  User, 
-  Calendar as CalendarIcon, 
-  Printer, 
-  Download, 
+import {
+  FileText,
+  User,
+  CalendarIcon,
+  Printer,
+  Download,
   ChevronLeft,
   Plus,
   Trash2,
@@ -13,8 +13,8 @@ import {
   ClipboardList,
   Send,
   Calculator,
-  Info
-} from 'lucide-react';
+  Info,
+} from '../icons';
 
 import { Odontogram } from './Odontogram';
 

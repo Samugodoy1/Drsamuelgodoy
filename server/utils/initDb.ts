@@ -22,6 +22,8 @@ export async function initDb() {
         accepted_terms BOOLEAN DEFAULT FALSE,
         accepted_terms_at TIMESTAMP WITH TIME ZONE,
         accepted_privacy_policy BOOLEAN DEFAULT FALSE,
+        onboarding_done BOOLEAN DEFAULT FALSE,
+        welcome_seen BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -39,6 +41,12 @@ export async function initDb() {
         END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='photo_public_id') THEN
           ALTER TABLE users ADD COLUMN photo_public_id TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='onboarding_done') THEN
+          ALTER TABLE users ADD COLUMN onboarding_done BOOLEAN DEFAULT FALSE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='welcome_seen') THEN
+          ALTER TABLE users ADD COLUMN welcome_seen BOOLEAN DEFAULT FALSE;
         END IF;
       END $$;
 

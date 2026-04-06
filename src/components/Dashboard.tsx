@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from 'lucide-react';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -80,6 +80,8 @@ interface DashboardProps {
   sendReminder: (appointment: any) => void;
   onReschedule?: (appointment: any) => void;
   onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => void;
+  onDismissOnboarding: () => void;
+  onDismissWelcome: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -134,7 +136,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setActiveTab,
   sendReminder,
   onReschedule,
-  onSchedulePatient
+  onSchedulePatient,
+  onDismissOnboarding,
+  onDismissWelcome
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
@@ -449,10 +453,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // ─── Onboarding: welcome + guided setup ──────────────────────────────
   const hasPatients = patients.length > 0;
   const hasAppointments = totalAppointmentsCount > 0;
-  const onboardingKey = `odontohub_onboarding_done_${user?.id ?? 'unknown'}`;
-  const welcomeKey = `odontohub_welcome_seen_${user?.id ?? 'unknown'}`;
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem(onboardingKey) === '1');
-  const [welcomeSeen, setWelcomeSeen] = useState(() => localStorage.getItem(welcomeKey) === '1');
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => user?.onboarding_done ?? false);
+  const [welcomeSeen, setWelcomeSeen] = useState(() => user?.welcome_seen ?? false);
   const wasInOnboarding = useRef(!hasPatients || !hasAppointments);
   const showOnboarding = !onboardingDismissed && (
     !hasPatients || !hasAppointments || wasInOnboarding.current
@@ -581,8 +583,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              localStorage.setItem(welcomeKey, '1');
               setWelcomeSeen(true);
+              onDismissWelcome();
             }}
             className="w-full flex items-center justify-center gap-3 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all"
           >
@@ -885,8 +887,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   transition={{ delay: 0.2, duration: 0.3 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
-                    localStorage.setItem(onboardingKey, '1');
                     setOnboardingDismissed(true);
+                    onDismissOnboarding();
                   }}
                   className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
                 >
