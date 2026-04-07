@@ -37,19 +37,23 @@ import {
   FileText       as PhFileText,
   Flask          as PhFlask,
   GearSix        as PhGearSix,
+  Heart          as PhHeart,
   Heartbeat      as PhHeartbeat,
   House          as PhHouse,
   Image          as PhImage,
   Info           as PhInfo,
   Lightning      as PhLightning,
+  Link           as PhLink,
   List           as PhList,
   Lock           as PhLock,
   MagnifyingGlass as PhMagnifyingGlass,
   MapPin         as PhMapPin,
   Palette        as PhPalette,
   PaperPlaneTilt as PhPaperPlaneTilt,
+  Pen            as PhPen,
   PencilSimple   as PhPencilSimple,
   Phone          as PhPhone,
+  Pill           as PhPill,
   Plus           as PhPlus,
   Printer        as PhPrinter,
   Rocket         as PhRocket,
@@ -173,6 +177,10 @@ export const Rocket        = fill(PhRocket);
 export const MoreHorizontal = fill(PhDotsThree);
 export const Send          = fill(PhPaperPlaneTilt);
 export const Calculator    = fill(PhCalculator);
+export const Heart         = fill(PhHeart);
+export const Pill          = fill(PhPill);
+export const Pen           = fill(PhPen);
+export const LinkIcon      = fill(PhLink);
 export const Palette       = fill(PhPalette);
 export const FlaskConical  = fill(PhFlask);
 export const Zap           = fill(PhLightning);

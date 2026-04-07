@@ -58,6 +58,18 @@ import {
   getDashboardData,
   getSchedulingSuggestionsEndpoint
 } from '../server/controllers/intelligenceController.js';
+import {
+  generatePortalLink,
+  authenticatePortalToken,
+  verifyPortalAuth,
+  submitIntakeForm,
+  signConsent,
+  getPortalData,
+  requestAppointment,
+  getAppointmentRequests,
+  updateAppointmentRequest,
+  uploadPortalDocument
+} from '../server/controllers/portalController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
 
@@ -97,6 +109,14 @@ app.post(['/auth/login', '/api/auth/login'], login);
 app.post(['/auth/register', '/api/auth/register'], register);
 app.post(['/auth/request-password-reset', '/api/auth/request-password-reset'], requestPasswordReset);
 app.post(['/auth/reset-password', '/api/auth/reset-password'], resetPassword);
+
+// Portal do Paciente (public routes — no dentist auth needed)
+app.get(['/portal/auth/:token', '/api/portal/auth/:token'], authenticatePortalToken);
+app.get(['/portal/data', '/api/portal/data'], verifyPortalAuth, getPortalData);
+app.post(['/portal/intake', '/api/portal/intake'], verifyPortalAuth, submitIntakeForm);
+app.post(['/portal/consent', '/api/portal/consent'], verifyPortalAuth, signConsent);
+app.post(['/portal/request-appointment', '/api/portal/request-appointment'], verifyPortalAuth, requestAppointment);
+app.post(['/portal/upload', '/api/portal/upload'], verifyPortalAuth, upload.single('file'), uploadPortalDocument);
 
 // Protected routes
 app.use(authenticate);
@@ -156,5 +176,10 @@ app.get(['/intelligence/scheduling', '/api/intelligence/scheduling'], getSchedul
 app.get(['/admin/users', '/api/admin/users'], requireAdmin, getUsers);
 app.patch(['/admin/users/:id', '/api/admin/users/:id'], requireAdmin, updateUser);
 app.all(['/admin/update-schema', '/api/admin/update-schema'], updateSchema);
+
+// Portal management (dentist side)
+app.post(['/portal/generate-link', '/api/portal/generate-link'], generatePortalLink);
+app.get(['/portal/appointment-requests', '/api/portal/appointment-requests'], getAppointmentRequests);
+app.patch(['/portal/appointment-requests/:id', '/api/portal/appointment-requests/:id'], updateAppointmentRequest);
 
 export default app;

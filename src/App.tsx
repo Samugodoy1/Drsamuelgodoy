@@ -43,7 +43,8 @@ import {
   Camera,
   Pencil,
   Mail,
-  Download
+  Download,
+  LinkIcon
 } from './icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -53,6 +54,8 @@ import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
 import { Dashboard } from './components/Dashboard';
 import { Finance } from './components/Finance';
+import { PreAtendimento } from './components/PreAtendimento';
+import { PatientPortal } from './components/PatientPortal';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
 // Types
@@ -1319,6 +1322,30 @@ export default function App() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const [portalLinkData, setPortalLinkData] = useState<{ url: string; preUrl: string; patientName: string } | null>(null);
+
+  const generatePatientPortalLink = async (patient: Patient) => {
+    try {
+      const res = await apiFetch('/api/portal/generate-link', {
+        method: 'POST',
+        body: JSON.stringify({ patient_id: patient.id })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Erro ao gerar link');
+        return;
+      }
+      const data = await res.json();
+      setPortalLinkData({
+        url: data.portal_url,
+        preUrl: data.pre_atendimento_url,
+        patientName: patient.name
+      });
+    } catch {
+      alert('Erro de conexão ao gerar link do portal');
+    }
+  };
+
   const getPatientLastVisitDate = (patient: Patient) => {
     const finishedAppointments = appointments
       .filter(app => app.patient_id === patient.id && app.status === 'FINISHED')
@@ -2115,6 +2142,8 @@ export default function App() {
     <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/portal/:token" element={<PatientPortal />} />
+      <Route path="/pre-atendimento/:token" element={<PreAtendimento />} />
       <Route path="/prontuario/:id" element={
         user ? (
           <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
@@ -4514,6 +4543,14 @@ export default function App() {
                                     >
                                       <MessageCircle size={16} />
                                     </button>
+                                    <button
+                                      type="button"
+                                      title="Link Portal do Paciente"
+                                      onClick={() => generatePatientPortalLink(patient)}
+                                      className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    >
+                                      <LinkIcon size={16} />
+                                    </button>
                                   </>
                                 )}
                               </div>
@@ -6453,6 +6490,84 @@ export default function App() {
                 >
                   Confirmar
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Portal Link Modal */}
+      <AnimatePresence>
+        {portalLinkData && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300] flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-slate-800">Portal do Paciente</h3>
+                  <button onClick={() => setPortalLinkData(null)} className="text-slate-400 hover:text-slate-600">
+                    <X size={20} />
+                  </button>
+                </div>
+                <p className="text-sm text-slate-500 mb-5">
+                  Links gerados para <span className="font-semibold text-slate-700">{portalLinkData.patientName}</span>. Válidos por 7 dias.
+                </p>
+
+                <div className="space-y-3">
+                  {/* Pre-atendimento link */}
+                  <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ClipboardList size={16} className="text-emerald-600" />
+                      <span className="text-sm font-bold text-emerald-800">Pré-Atendimento</span>
+                    </div>
+                    <p className="text-xs text-emerald-600 mb-3">Ficha online, termos e envio de documentos</p>
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        value={portalLinkData.preUrl}
+                        className="flex-1 text-xs bg-white border border-emerald-200 rounded-lg px-3 py-2 text-slate-600 truncate"
+                      />
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(portalLinkData.preUrl); }}
+                        className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Portal link */}
+                  <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Home size={16} className="text-blue-600" />
+                      <span className="text-sm font-bold text-blue-800">Portal Completo</span>
+                    </div>
+                    <p className="text-xs text-blue-600 mb-3">Histórico, exames, orçamentos, agendamento</p>
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        value={portalLinkData.url}
+                        className="flex-1 text-xs bg-white border border-blue-200 rounded-lg px-3 py-2 text-slate-600 truncate"
+                      />
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(portalLinkData.url); }}
+                        className="px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-slate-50 rounded-xl">
+                  <p className="text-xs text-slate-500 text-center">
+                    💡 Envie o link de pré-atendimento <strong>antes</strong> da consulta para zero papel e atendimento mais rápido!
+                  </p>
+                </div>
               </div>
             </motion.div>
           </div>

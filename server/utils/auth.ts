@@ -63,12 +63,30 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     path.includes('/auth/login') || 
     path.includes('/auth/register') || 
     path.includes('/health') ||
+    path.includes('/portal/auth/') ||
+    path.includes('/portal/data') ||
+    path.includes('/portal/intake') ||
+    path.includes('/portal/consent') ||
+    path.includes('/portal/request-appointment') ||
+    path.includes('/portal/upload') ||
     url.includes('/auth/login') || 
     url.includes('/auth/register') || 
     url.includes('/health') ||
+    url.includes('/portal/auth/') ||
+    url.includes('/portal/data') ||
+    url.includes('/portal/intake') ||
+    url.includes('/portal/consent') ||
+    url.includes('/portal/request-appointment') ||
+    url.includes('/portal/upload') ||
     originalUrl.includes('/auth/login') || 
     originalUrl.includes('/auth/register') || 
-    originalUrl.includes('/health');
+    originalUrl.includes('/health') ||
+    originalUrl.includes('/portal/auth/') ||
+    originalUrl.includes('/portal/data') ||
+    originalUrl.includes('/portal/intake') ||
+    originalUrl.includes('/portal/consent') ||
+    originalUrl.includes('/portal/request-appointment') ||
+    originalUrl.includes('/portal/upload');
 
   if (isPublic) {
     return next();
