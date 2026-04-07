@@ -68,7 +68,9 @@ import {
   requestAppointment,
   getAppointmentRequests,
   updateAppointmentRequest,
-  uploadPortalDocument
+  uploadPortalDocument,
+  getIntakeForms,
+  reviewIntakeForm
 } from '../server/controllers/portalController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
@@ -181,5 +183,7 @@ app.all(['/admin/update-schema', '/api/admin/update-schema'], updateSchema);
 app.post(['/portal/generate-link', '/api/portal/generate-link'], generatePortalLink);
 app.get(['/portal/appointment-requests', '/api/portal/appointment-requests'], getAppointmentRequests);
 app.patch(['/portal/appointment-requests/:id', '/api/portal/appointment-requests/:id'], updateAppointmentRequest);
+app.get(['/portal/intake-forms', '/api/portal/intake-forms'], getIntakeForms);
+app.patch(['/portal/intake-forms/:id/review', '/api/portal/intake-forms/:id/review'], reviewIntakeForm);
 
 export default app;

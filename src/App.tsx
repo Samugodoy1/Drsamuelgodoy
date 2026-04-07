@@ -56,6 +56,7 @@ import { Dashboard } from './components/Dashboard';
 import { Finance } from './components/Finance';
 import { PreAtendimento } from './components/PreAtendimento';
 import { PatientPortal } from './components/PatientPortal';
+import { PortalInbox } from './components/PortalInbox';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
 // Types
@@ -72,6 +73,10 @@ interface Patient {
     medical_history: string;
     allergies: string;
     medications: string;
+    chief_complaint?: string;
+    habits?: string;
+    family_history?: string;
+    vital_signs?: string;
   };
   evolution?: Array<{
     id: number;
@@ -362,7 +367,7 @@ const LegacyClinicalRedirect = () => {
 
 export default function App() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -514,6 +519,8 @@ export default function App() {
   const [patientListFilter, setPatientListFilter] = useState<'all' | 'action-needed' | 'at-risk' | 'no-appointment' | 'in-treatment' | 'overdue' | 'leads'>('all');
   const [patientActionsToday, setPatientActionsToday] = useState<Set<number>>(new Set());
   const [patientsInlineFeedback, setPatientsInlineFeedback] = useState('');
+  const [patientsSubView, setPatientsSubView] = useState<'list' | 'portal'>('list');
+  const [portalPendingCount, setPortalPendingCount] = useState(0);
   const [patientIntelligence, setPatientIntelligence] = useState<any[]>([]);
   const [patientIntelLoaded, setPatientIntelLoaded] = useState(false);
   const [dentistSearchTerm, setDentistSearchTerm] = useState('');
@@ -808,6 +815,16 @@ export default function App() {
       apiFetch('/api/intelligence/patients', { explicitToken })
         .then(r => r.json())
         .then(data => { if (Array.isArray(data)) { setPatientIntelligence(data); setPatientIntelLoaded(true); } })
+        .catch(() => {});
+
+      // Fetch portal pending counts (non-blocking)
+      apiFetch('/api/portal/appointment-requests', { explicitToken })
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setPortalPendingCount(data.filter((r: any) => r.status === 'PENDING').length);
+          }
+        })
         .catch(() => {});
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -2615,6 +2632,8 @@ export default function App() {
                 onSchedulePatient={openScheduleSuggestion}
                 onDismissOnboarding={() => updateUserOnboarding('onboarding_done')}
                 onDismissWelcome={() => updateUserOnboarding('welcome_seen')}
+                portalPendingCount={portalPendingCount}
+                onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
               />
             )}
 
@@ -4283,12 +4302,36 @@ export default function App() {
                     <>
                       {/* ── Header ── */}
                       <div className="flex flex-col gap-4 mb-2">
-                        <div className="flex flex-col gap-0.5">
-                          <h3 className="text-2xl font-bold tracking-tight text-slate-900">Pacientes</h3>
-                          {patients.length <= 3 && (
-                            <p className="text-[13px] text-slate-400">Cadastro, prontuário e acompanhamento dos seus pacientes</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-0.5">
+                            <h3 className="text-2xl font-bold tracking-tight text-slate-900">Pacientes</h3>
+                            {patients.length <= 3 && patientsSubView === 'list' && (
+                              <p className="text-[13px] text-slate-400">Cadastro, prontuário e acompanhamento dos seus pacientes</p>
+                            )}
+                          </div>
+                          {/* Botão Solicitações — só aparece quando há pendências */}
+                          {portalPendingCount > 0 && patientsSubView === 'list' && (
+                            <button
+                              type="button"
+                              onClick={() => setPatientsSubView('portal')}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-[12px] font-semibold shrink-0"
+                            >
+                              <ClipboardList size={13} />
+                              {portalPendingCount} {portalPendingCount === 1 ? 'solicitação' : 'solicitações'}
+                            </button>
+                          )}
+                          {patientsSubView === 'portal' && (
+                            <button
+                              type="button"
+                              onClick={() => setPatientsSubView('list')}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors text-[12px] font-semibold shrink-0"
+                            >
+                              ← Lista
+                            </button>
                           )}
                         </div>
+
+                        {patientsSubView === 'list' && (
                         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-full">
                           <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -4309,8 +4352,23 @@ export default function App() {
                             <Plus size={18} strokeWidth={2.5} />
                           </button>
                         </div>
+                        )}
                       </div>
 
+                      {patientsSubView === 'portal' ? (
+                        <PortalInbox
+                          apiFetch={apiFetch}
+                          onSchedulePatient={(patientId, _patientName, preferredDate) => {
+                            const p = patients.find(pt => pt.id === patientId);
+                            if (p) openPatientAppointmentModal(p);
+                          }}
+                          onOpenPatient={(id) => {
+                            openPatientRecord(id);
+                            setActiveTab('prontuario');
+                          }}
+                        />
+                      ) : (
+                      <>
                       {/* ── Action-driven status bar ── */}
                       {(() => {
                         const items: React.ReactNode[] = [];
@@ -4602,6 +4660,8 @@ export default function App() {
                           </div>
                         )}
                       </div>
+                      </>
+                    )}
                     </>
                   );
                 })()}
@@ -6414,9 +6474,6 @@ export default function App() {
           <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="pacientes" label="Pacientes" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="financeiro" label="Financeiro" icon={DollarSign} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-          {user?.role?.toUpperCase() === 'ADMIN' && (
-            <BottomNavItem id="admin" label="Dentistas" icon={UserCog} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-          )}
           <BottomNavItem id="configuracoes" label="Mais" icon={Settings} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
         </nav>
       </div>

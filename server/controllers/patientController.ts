@@ -22,7 +22,7 @@ export const getPatientById = async (req: Request, res: Response) => {
     
     const patient = patientResult.rows[0];
     
-    const [anamnesis, evolution, files, odontogram, toothHistory] = await Promise.all([
+    const [anamnesis, evolution, files, odontogram, toothHistory, consents] = await Promise.all([
       query('SELECT * FROM anamnesis WHERE patient_id = $1', [id]),
       query('SELECT * FROM clinical_evolution WHERE patient_id = $1 ORDER BY date DESC', [id]),
       query('SELECT * FROM patient_files WHERE patient_id = $1 ORDER BY created_at DESC', [id]),
@@ -33,7 +33,8 @@ export const getPatientById = async (req: Request, res: Response) => {
         JOIN users u ON th.dentist_id = u.id
         WHERE th.patient_id = $1 
         ORDER BY th.date DESC, th.created_at DESC
-      `, [id])
+      `, [id]),
+      query('SELECT id, consent_type, signature_data, signed_at FROM patient_consent_signatures WHERE patient_id = $1 ORDER BY signed_at DESC', [id])
     ]);
 
     return res.status(200).json({
@@ -52,7 +53,8 @@ export const getPatientById = async (req: Request, res: Response) => {
       odontogram: odontogram.rows[0] ? JSON.parse(odontogram.rows[0].data) : {},
       toothHistory: toothHistory.rows,
       treatmentPlan: patient.treatment_plan || [],
-      procedures: patient.procedures || []
+      procedures: patient.procedures || [],
+      consents: consents.rows
     });
   } catch (error: any) {
     console.error('getPatientById error:', error);

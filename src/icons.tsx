@@ -20,6 +20,7 @@ import {
   CalendarPlus   as PhCalendarPlus,
   Camera         as PhCamera,
   CaretLeft      as PhCaretLeft,
+  CaretDown      as PhCaretDown,
   CaretRight     as PhCaretRight,
   ChatCircle     as PhChatCircle,
   Check          as PhCheck,
@@ -108,6 +109,7 @@ function bold(Ph: React.ElementType) {
 // ─── Bold (directional / stroke) ─────────────────────────────────────────────
 
 export const ChevronRight   = bold(PhCaretRight);
+export const ChevronDown    = bold(PhCaretDown);
 export const ChevronLeft    = bold(PhCaretLeft);
 export const ArrowRight     = bold(PhArrowRight);
 export const ArrowLeft      = bold(PhArrowLeft);

@@ -8,6 +8,7 @@ import {
   Camera,
   Check,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock3,
   CreditCard,
@@ -243,6 +244,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isEditingAnamnese, setIsEditingAnamnese] = useState(false);
   const [anamneseForm, setAnamneseForm] = useState({ medical_history: '', allergies: '', medications: '' });
   const [isSavingAnamnese, setIsSavingAnamnese] = useState(false);
+  const [showAnamneseExtra, setShowAnamneseExtra] = useState(false);
+  const [showDadosExtra, setShowDadosExtra] = useState(false);
   const [patientFinancial, setPatientFinancial] = useState<{ transactions: any[]; paymentPlans: any[]; installments: any[] } | null>(null);
   const [isLoadingFinancial, setIsLoadingFinancial] = useState(false);
   const infoPanelRef = useRef<HTMLElement | null>(null);
@@ -1820,6 +1823,45 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                         </div>
                       );
                     })()}
+
+                    {/* Ver mais — campos do pré-atendimento */}
+                    {(() => {
+                      const extra = patient?.anamnesis;
+                      const hasExtra = extra && (extra.chief_complaint || extra.habits || extra.family_history);
+                      if (!hasExtra) return null;
+
+                      const extraFields = [
+                        { label: 'Queixa principal', value: extra.chief_complaint, color: 'bg-blue-50 border-blue-200/70', labelColor: 'text-blue-600' },
+                        { label: 'Hábitos', value: extra.habits, color: 'bg-violet-50 border-violet-200/70', labelColor: 'text-violet-600' },
+                        { label: 'Histórico familiar', value: extra.family_history, color: 'bg-teal-50 border-teal-200/70', labelColor: 'text-teal-600' },
+                      ].filter(f => f.value && f.value.trim());
+
+                      if (extraFields.length === 0) return null;
+
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowAnamneseExtra(v => !v)}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            {showAnamneseExtra ? 'Ver menos' : `Ver mais (${extraFields.length})`}
+                            <ChevronDown size={13} className={`transition-transform ${showAnamneseExtra ? 'rotate-180' : ''}`} />
+                          </button>
+                          {showAnamneseExtra && (
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                              {extraFields.map(f => (
+                                <div key={f.label} className={`p-3.5 rounded-[18px] border ${f.color}`}>
+                                  <p className={`text-[10px] font-extrabold uppercase tracking-[0.1em] ${f.labelColor} mb-1.5`}>{f.label}</p>
+                                  <p className="text-slate-700 leading-relaxed">{f.value}</p>
+                                </div>
+                              ))}
+                              <p className="text-[10px] text-slate-300 text-center">Informações enviadas pelo paciente via pré-atendimento</p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>
@@ -1843,6 +1885,95 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     </div>
                   </div>
                 ))}
+
+                {/* Ver mais — dados do pré-atendimento */}
+                {(() => {
+                  const hasEmergency = patient?.emergency_contact_name || patient?.emergency_contact_phone;
+                  const hasInsurance = patient?.health_insurance;
+                  const consents: any[] = patient?.consents || [];
+                  const hasConsents = consents.length > 0;
+                  const hasExtra = hasEmergency || hasInsurance || hasConsents;
+                  if (!hasExtra) return null;
+
+                  const consentLabels: Record<string, string> = {
+                    TREATMENT_CONSENT: 'Consentimento de Tratamento',
+                    DATA_PRIVACY: 'Privacidade de Dados (LGPD)',
+                    GENERAL_TERMS: 'Termos Gerais de Uso',
+                  };
+
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowDadosExtra(v => !v)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {showDadosExtra ? 'Ver menos' : 'Ver mais — Pré-atendimento'}
+                        <ChevronDown size={13} className={`transition-transform ${showDadosExtra ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showDadosExtra && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {/* Contato de emergência */}
+                          {hasEmergency && (
+                            <div className="p-3.5 rounded-[18px] bg-orange-50 border border-orange-200/70">
+                              <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-orange-600 mb-2">Contato de emergência</p>
+                              {patient.emergency_contact_name && (
+                                <p className="text-[13px] font-medium text-slate-800">{patient.emergency_contact_name}</p>
+                              )}
+                              {patient.emergency_contact_phone && (
+                                <p className="text-[12px] text-slate-500 mt-0.5">{patient.emergency_contact_phone}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Convênio */}
+                          {hasInsurance && (
+                            <div className="p-3.5 rounded-[18px] bg-blue-50 border border-blue-200/70">
+                              <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-600 mb-2">Convênio / Plano de saúde</p>
+                              <p className="text-[13px] font-medium text-slate-800">{patient.health_insurance}</p>
+                              {patient.health_insurance_number && (
+                                <p className="text-[12px] text-slate-500 mt-0.5">Carteirinha: {patient.health_insurance_number}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Termos aceitos e assinatura */}
+                          {hasConsents && (
+                            <div className="p-3.5 rounded-[18px] bg-emerald-50 border border-emerald-200/70">
+                              <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-emerald-600 mb-2">Termos aceitos digitalmente</p>
+                              <div className="space-y-2">
+                                {consents.map((c: any) => (
+                                  <div key={c.id} className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                                      <Check size={11} className="text-white" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-[12px] font-semibold text-slate-700">{consentLabels[c.consent_type] || c.consent_type}</p>
+                                      <p className="text-[10px] text-slate-400">
+                                        Assinado em {new Date(c.signed_at).toLocaleDateString('pt-BR')} às {new Date(c.signed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Assinatura digital */}
+                              {consents[0]?.signature_data && consents[0].signature_data.startsWith('data:image') && (
+                                <div className="mt-3 pt-3 border-t border-emerald-200/50">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-emerald-600 mb-2">Assinatura digital</p>
+                                  <div className="bg-white rounded-xl border border-emerald-200/50 p-2">
+                                    <img src={consents[0].signature_data} alt="Assinatura digital" className="max-h-20 mx-auto" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <p className="text-[10px] text-slate-300 text-center">Informações enviadas pelo paciente via pré-atendimento</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 

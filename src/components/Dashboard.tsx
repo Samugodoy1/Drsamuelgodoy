@@ -82,6 +82,8 @@ interface DashboardProps {
   onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => void;
   onDismissOnboarding: () => void;
   onDismissWelcome: () => void;
+  portalPendingCount?: number;
+  onOpenPortalInbox?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -138,7 +140,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onReschedule,
   onSchedulePatient,
   onDismissOnboarding,
-  onDismissWelcome
+  onDismissWelcome,
+  portalPendingCount = 0,
+  onOpenPortalInbox
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
@@ -944,6 +948,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* 1.8 QUICK ACTIONS — always-visible primary actions */}
       <section className="px-1 -mt-4">
+        {/* Portal notification banner — iOS style */}
+        {portalPendingCount > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            onClick={() => onOpenPortalInbox?.()}
+            className="w-full mb-3 flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-4 py-3.5 text-left hover:shadow-md transition-all active:scale-[0.98]"
+          >
+            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
+              <Calendar size={18} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-bold text-slate-800">
+                {portalPendingCount === 1
+                  ? 'Você tem 1 solicitação de consulta'
+                  : `Você tem ${portalPendingCount} solicitações de consulta`}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Toque para revisar</p>
+            </div>
+            <ChevronRight size={16} className="text-slate-300 shrink-0" />
+          </motion.button>
+        )}
         <div className="flex gap-3">
           <motion.button
             whileTap={{ scale: 0.97 }}
