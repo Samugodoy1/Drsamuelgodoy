@@ -49,6 +49,21 @@ export const createAppointment = async (req: Request, res: Response) => {
     const patientCheck = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [patient_id, user.id]);
     if (patientCheck.rows.length === 0) return res.status(403).json({ error: 'Paciente não encontrado ou acesso negado' });
 
+    // Apple-style: Check for conflicting appointments (overlap)
+    const conflictCheck = await query(
+      `SELECT id FROM appointments
+        WHERE dentist_id = $1
+          AND status NOT IN ('CANCELLED')
+          AND (
+            (start_time < $4 AND end_time > $3)
+          )
+      `,
+      [user.id, patient_id, start_time, end_time]
+    );
+    if (conflictCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'Já existe um agendamento conflitante neste horário.' });
+    }
+
     const result = await query(
       'INSERT INTO appointments (patient_id, dentist_id, start_time, end_time, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
       [patient_id, user.id, start_time, end_time, notes]

@@ -48,6 +48,15 @@ export async function initDb() {
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='welcome_seen') THEN
           ALTER TABLE users ADD COLUMN welcome_seen BOOLEAN DEFAULT FALSE;
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='pix_key') THEN
+          ALTER TABLE users ADD COLUMN pix_key TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='pix_key_type') THEN
+          ALTER TABLE users ADD COLUMN pix_key_type TEXT DEFAULT 'CPF';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='pix_beneficiary_name') THEN
+          ALTER TABLE users ADD COLUMN pix_beneficiary_name TEXT;
+        END IF;
       END $$;
 
       CREATE TABLE IF NOT EXISTS patients (
@@ -330,6 +339,262 @@ export async function initDb() {
         END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='health_insurance_number') THEN
           ALTER TABLE patients ADD COLUMN health_insurance_number TEXT;
+        END IF;
+      END $$;
+
+      -- ===================== FINANCEIRO AVANÇADO =====================
+
+      -- Convênios / Planos de saúde (ANS)
+      CREATE TABLE IF NOT EXISTS insurance_plans (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        name TEXT NOT NULL,
+        ans_code TEXT,
+        operator_name TEXT,
+        contact_phone TEXT,
+        contact_email TEXT,
+        notes TEXT,
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Vínculo paciente <-> convênio
+      CREATE TABLE IF NOT EXISTS patient_insurance (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        insurance_plan_id INTEGER NOT NULL REFERENCES insurance_plans(id) ON DELETE CASCADE,
+        card_number TEXT,
+        valid_until DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(patient_id, insurance_plan_id)
+      );
+
+      -- Notas Fiscais (NFS-e)
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+        transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+        invoice_number TEXT,
+        description TEXT NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PROCESSING','AUTHORIZED','REJECTED','ERROR','CANCEL_PROCESSING','CANCELLED','INTERNAL')),
+        issued_at TIMESTAMP WITH TIME ZONE,
+        patient_name TEXT,
+        patient_cpf TEXT,
+        service_code TEXT DEFAULT '8630-5/04',
+        cnae TEXT DEFAULT '8630504',
+        municipality_code TEXT,
+        error_message TEXT,
+        pdf_url TEXT,
+        retry_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Registros de inadimplência
+      CREATE TABLE IF NOT EXISTS delinquency_records (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        installment_id INTEGER REFERENCES installments(id) ON DELETE SET NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        due_date DATE NOT NULL,
+        days_overdue INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','CONTACTED','NEGOTIATED','PAID','WRITTEN_OFF')),
+        contact_attempts INTEGER DEFAULT 0,
+        last_contact_date DATE,
+        last_contact_method TEXT,
+        notes TEXT,
+        resolved_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Pagamentos Pix
+      CREATE TABLE IF NOT EXISTS pix_payments (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+        transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+        installment_id INTEGER REFERENCES installments(id) ON DELETE SET NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        pix_key TEXT NOT NULL,
+        pix_key_type TEXT NOT NULL DEFAULT 'CPF' CHECK (pix_key_type IN ('CPF','CNPJ','EMAIL','PHONE','RANDOM')),
+        description TEXT,
+        txid TEXT,
+        qr_code_payload TEXT,
+        status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','PAID','EXPIRED','CANCELLED')),
+        expires_at TIMESTAMP WITH TIME ZONE,
+        paid_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Adicionar campos de parcelamento avançado em payment_plans
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_plans' AND column_name='entry_amount') THEN
+          ALTER TABLE payment_plans ADD COLUMN entry_amount DECIMAL(12,2) DEFAULT 0;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_plans' AND column_name='interest_rate') THEN
+          ALTER TABLE payment_plans ADD COLUMN interest_rate DECIMAL(5,2) DEFAULT 0;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_plans' AND column_name='interest_type') THEN
+          ALTER TABLE payment_plans ADD COLUMN interest_type TEXT DEFAULT 'NONE';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_plans' AND column_name='payment_method') THEN
+          ALTER TABLE payment_plans ADD COLUMN payment_method TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_plans' AND column_name='insurance_plan_id') THEN
+          ALTER TABLE payment_plans ADD COLUMN insurance_plan_id INTEGER REFERENCES insurance_plans(id);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_plans' AND column_name='notes') THEN
+          ALTER TABLE payment_plans ADD COLUMN notes TEXT;
+        END IF;
+      END $$;
+
+      -- Adicionar campos extras em transactions para NF e Pix
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='transactions' AND column_name='invoice_id') THEN
+          ALTER TABLE transactions ADD COLUMN invoice_id INTEGER REFERENCES invoices(id);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='transactions' AND column_name='pix_payment_id') THEN
+          ALTER TABLE transactions ADD COLUMN pix_payment_id INTEGER REFERENCES pix_payments(id);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='transactions' AND column_name='insurance_plan_id') THEN
+          ALTER TABLE transactions ADD COLUMN insurance_plan_id INTEGER REFERENCES insurance_plans(id);
+        END IF;
+      END $$;
+
+      -- ===================== CONFIGURAÇÃO FISCAL (NFS-e) =====================
+      -- Dados fiscais do prestador para emissão de NFS-e real
+      CREATE TABLE IF NOT EXISTS fiscal_config (
+        id SERIAL PRIMARY KEY,
+        dentist_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
+        cnpj TEXT,
+        inscricao_municipal TEXT,
+        razao_social TEXT,
+        nome_fantasia TEXT,
+        regime_tributario TEXT DEFAULT 'SIMPLES_NACIONAL',
+        endereco_logradouro TEXT,
+        endereco_numero TEXT,
+        endereco_complemento TEXT,
+        endereco_bairro TEXT,
+        endereco_cidade TEXT,
+        endereco_uf TEXT DEFAULT 'SP',
+        endereco_cep TEXT,
+        codigo_municipio_ibge TEXT,
+        telefone TEXT,
+        email TEXT,
+        -- Certificado digital ICP-Brasil (A1)
+        certificado_base64 TEXT,
+        certificado_senha TEXT,
+        certificado_validade TIMESTAMP WITH TIME ZONE,
+        -- Configuração do provedor NFS-e
+        nfse_provider TEXT DEFAULT 'NENHUM',
+        nfse_ambiente TEXT DEFAULT 'HOMOLOGACAO',
+        nfse_url_homologacao TEXT,
+        nfse_url_producao TEXT,
+        nfse_usuario TEXT,
+        nfse_senha TEXT,
+        -- Código de serviço padrão
+        codigo_servico TEXT DEFAULT '8630-5/04',
+        codigo_cnae TEXT DEFAULT '8630504',
+        aliquota_iss DECIMAL(5,2) DEFAULT 5.00,
+        iss_retido BOOLEAN DEFAULT FALSE,
+        -- Numeração
+        ultimo_rps INTEGER DEFAULT 0,
+        serie_rps TEXT DEFAULT 'OHB',
+        auto_emit_on_payment BOOLEAN DEFAULT FALSE,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Adicionar campos de NFS-e real na tabela invoices
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='nfse_numero') THEN
+          ALTER TABLE invoices ADD COLUMN nfse_numero TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='nfse_codigo_verificacao') THEN
+          ALTER TABLE invoices ADD COLUMN nfse_codigo_verificacao TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='nfse_xml_envio') THEN
+          ALTER TABLE invoices ADD COLUMN nfse_xml_envio TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='nfse_xml_retorno') THEN
+          ALTER TABLE invoices ADD COLUMN nfse_xml_retorno TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='nfse_protocolo') THEN
+          ALTER TABLE invoices ADD COLUMN nfse_protocolo TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='nfse_link_visualizacao') THEN
+          ALTER TABLE invoices ADD COLUMN nfse_link_visualizacao TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='rps_numero') THEN
+          ALTER TABLE invoices ADD COLUMN rps_numero INTEGER;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='rps_serie') THEN
+          ALTER TABLE invoices ADD COLUMN rps_serie TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='prestador_cnpj') THEN
+          ALTER TABLE invoices ADD COLUMN prestador_cnpj TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='tomador_cpf_cnpj') THEN
+          ALTER TABLE invoices ADD COLUMN tomador_cpf_cnpj TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='aliquota_iss') THEN
+          ALTER TABLE invoices ADD COLUMN aliquota_iss DECIMAL(5,2);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='valor_iss') THEN
+          ALTER TABLE invoices ADD COLUMN valor_iss DECIMAL(12,2);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='valor_liquido') THEN
+          ALTER TABLE invoices ADD COLUMN valor_liquido DECIMAL(12,2);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='retry_count') THEN
+          ALTER TABLE invoices ADD COLUMN retry_count INTEGER DEFAULT 0;
+        END IF;
+      END $$;
+
+      -- Migrate legacy statuses to new lifecycle
+      UPDATE invoices SET status='AUTHORIZED' WHERE status='ISSUED';
+      UPDATE invoices SET status='DRAFT' WHERE status='PENDING';
+
+      -- Add auto_emit_on_payment to fiscal_config
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fiscal_config' AND column_name='auto_emit_on_payment') THEN
+          ALTER TABLE fiscal_config ADD COLUMN auto_emit_on_payment BOOLEAN DEFAULT FALSE;
+        END IF;
+      END $$;
+
+      -- Relax status constraint on invoices to accept new statuses
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.constraint_column_usage WHERE table_name='invoices' AND column_name='status') THEN
+          ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
+          ALTER TABLE invoices ADD CONSTRAINT invoices_status_check CHECK (status IN ('DRAFT','PROCESSING','AUTHORIZED','REJECTED','ERROR','CANCEL_PROCESSING','CANCELLED','INTERNAL','PENDING','ISSUED'));
+        END IF;
+      END $$;
+
+      -- Portal Messages (chat paciente <-> dentista)
+      CREATE TABLE IF NOT EXISTS portal_messages (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        sender TEXT NOT NULL CHECK (sender IN ('patient', 'dentist')),
+        message TEXT NOT NULL,
+        read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Add request_type to appointment_requests if not exists
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appointment_requests' AND column_name='request_type') THEN
+          ALTER TABLE appointment_requests ADD COLUMN request_type TEXT DEFAULT 'NEW';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appointment_requests' AND column_name='appointment_id') THEN
+          ALTER TABLE appointment_requests ADD COLUMN appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL;
         END IF;
       END $$;
 

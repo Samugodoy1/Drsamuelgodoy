@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, AlertTriangle, UserX, TrendingUp, Clock, Sparkles, ThumbsUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -66,14 +66,11 @@ interface DashboardProps {
   patients: any[];
   appointments: any[];
   nextAppointments: any[];
-  todayAppointmentsTotalCount: number;
   todayAppointmentsRemainingCount: number;
   totalAppointmentsCount: number;
   tomorrowUnconfirmedCount: number;
   tomorrowUnconfirmedAppointments: ReminderAppointment[];
   todayRevenue: number;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
   openPatientRecord: (id: number) => void;
   setIsModalOpen: (open: boolean) => void;
   setActiveTab: (tab: any) => void;
@@ -107,8 +104,10 @@ function formatDaysAgo(days: number | null): string {
   if (days === 1) return 'Ontem';
   if (days < 7) return `${days} dias atrás`;
   if (days < 30) return `${Math.floor(days / 7)} sem. atrás`;
-  if (days < 365) return `${Math.floor(days / 30)} meses atrás`;
-  return `${Math.floor(days / 365)} anos atrás`;
+  const months = Math.floor(days / 30);
+  if (days < 365) return `${months} ${months === 1 ? 'mês' : 'meses'} atrás`;
+  const years = Math.floor(days / 365);
+  return `${years} ${years === 1 ? 'ano' : 'anos'} atrás`;
 }
 
 function openWhatsApp(phone: string, name: string) {
@@ -148,6 +147,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,7 +212,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const abandonCount = intelligence?.abandonmentRisk?.length || 0;
     const remaining = todayAppointmentsRemainingCount;
     const suggestionsCount = schedulingSuggestions.length;
-    const totalPatients = intelligence?.stats?.totalPatients || 0;
 
     // Use a daily seed so the variant stays consistent throughout the day
     const daySeed = new Date().toISOString().slice(0, 10);
@@ -217,91 +221,77 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     // Priority 1 — urgent patients
     if (urgentCount > 0) {
-      const msgs = urgentCount === 1
+      return pick(urgentCount === 1
         ? [
-            '1 paciente precisa da sua atenção agora',
-            'Tem um paciente aguardando seu cuidado',
-            'Atenção: 1 paciente precisa de você hoje',
+            'Tem um paciente que precisa de você agora.',
+            'Um paciente está esperando — vamos cuidar dele?',
           ]
         : [
-            `${urgentCount} pacientes precisam da sua atenção`,
-            `Você tem ${urgentCount} oportunidades de cuidado hoje`,
-            `${urgentCount} pacientes contam com você hoje`,
-          ];
-      return pick(msgs);
+            `${urgentCount} pacientes contando com você hoje.`,
+            `Separei ${urgentCount} casos que pedem sua atenção.`,
+          ]);
     }
 
     // Priority 2 — abandonment risk
     if (abandonCount > 0) {
-      const msgs = abandonCount === 1
+      return pick(abandonCount === 1
         ? [
-            '1 paciente pode estar se afastando — que tal um contato?',
-            'Um paciente está sumido. Um "oi" pode fazer a diferença',
+            'Um paciente sumiu do radar. Uma mensagem resolve.',
+            'Tem alguém que não volta faz tempo — lembrar dele?',
           ]
         : [
-            `${abandonCount} pacientes prontos para reagendamento`,
-            `${abandonCount} pacientes estão sentindo falta de você`,
-          ];
-      return pick(msgs);
+            `${abandonCount} pacientes sentem sua falta.`,
+            `Olha, ${abandonCount} pacientes pararam de vir — dá pra recuperar.`,
+          ]);
     }
 
     // Priority 3 — empty agenda with suggestions
     if (remaining === 0 && suggestionsCount > 0) {
       return pick([
-        `Agenda livre — ${suggestionsCount} sugestão${suggestionsCount > 1 ? 'ões' : ''} esperando por você`,
-        'Sua agenda está vazia — vamos preencher?',
-        `${suggestionsCount} oportunidade${suggestionsCount > 1 ? 's' : ''} para encaixar hoje`,
+        'Agenda vazia, mas achei encaixes perfeitos pra você.',
+        `Sem consultas agora — mas tenho ${suggestionsCount} ideia${suggestionsCount > 1 ? 's' : ''}.`,
       ]);
     }
 
-    // Priority 4 — empty agenda, nothing to suggest
+    // Priority 4 — empty agenda
     if (remaining === 0) {
-      if (hour < 12) {
-        return pick([
-          'Manhã tranquila. Bom momento para organizar a semana',
-          'Sem consultas por enquanto — aproveite para respirar',
-        ]);
-      }
-      if (hour < 18) {
-        return pick([
-          'Tarde livre! Que tal revisar prontuários pendentes?',
-          'Agenda leve hoje — é raro, aproveite',
-        ]);
-      }
+      if (hour < 12) return pick([
+        'Manhã livre. Que tal organizar a semana?',
+        'Sem pressa hoje — aproveita pra respirar.',
+      ]);
+      if (hour < 18) return pick([
+        'Tarde tranquila. Bom momento pra revisar prontuários.',
+        'Nada na agenda — raro, né? Aproveita.',
+      ]);
       return pick([
-        'Dia encerrado. Descanse, você mereceu',
-        'Tudo feito por hoje — até amanhã!',
+        'Dia encerrado. Você mandou bem, descansa.',
+        'Tudo feito. Até amanhã!',
       ]);
     }
 
     // Priority 5 — last patient
     if (remaining === 1) {
       return pick([
-        'Falta só 1 — reta final do dia!',
-        'Último atendimento do dia, vamos lá!',
-        'Quase lá — 1 paciente e o dia é seu',
+        'Último paciente. A reta final é sua.',
+        'Falta só 1 — depois disso, o dia é todo seu.',
       ]);
     }
 
-    // Priority 6 — few patients remaining
+    // Priority 6 — few patients
     if (remaining <= 3) {
       return pick([
-        `Mais ${remaining} e o dia está feito`,
-        `Faltam ${remaining} atendimentos — você está voando`,
-        `Só ${remaining} pela frente, quase lá!`,
+        `Só mais ${remaining}. Você está voando hoje.`,
+        `${remaining} atendimentos e acabou — quase lá.`,
+        `Mais ${remaining} e o dia está feito. Tá indo bem.`,
       ]);
     }
 
     // Priority 7 — busy day
-    if (remaining > 3) {
-      return pick([
-        `Dia cheio: ${remaining} atendimentos pela frente`,
-        `${remaining} pacientes contam com você hoje — bora!`,
-        `Agenda forte hoje com ${remaining} consultas`,
-      ]);
-    }
-
-    return 'Vamos fazer um ótimo dia!';
+    return pick([
+      `${remaining} pacientes pela frente. Dia cheio, bora!`,
+      `Agenda forte: ${remaining} consultas. Você dá conta.`,
+      `${remaining} atendimentos hoje. Foco e café.`,
+    ]);
   };
 
   const getInsightCard = (): { text: string; icon: React.ReactNode; accent: string } | null => {
@@ -311,79 +301,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const unconfirmed = tomorrowUnconfirmedCount;
     const revenue = todayRevenue || 0;
 
-    const daySeed = new Date().toISOString().slice(0, 10);
-    const variant = Math.abs([...daySeed].reduce((a, c) => a + c.charCodeAt(0), 0)) % 3;
-
-    // Show only one insight — pick the most relevant
+    // 1 — Encaixes inteligentes disponíveis
     if (remaining === 0 && suggestionsCount > 0) {
       return {
         text: suggestionsCount === 1
-          ? 'Encontrei 1 horário ideal para um paciente que precisa voltar'
-          : `Encontrei ${suggestionsCount} encaixes inteligentes para sua agenda`,
+          ? 'Achei um horário perfeito pra encaixar um paciente que precisa voltar.'
+          : `Encontrei ${suggestionsCount} encaixes inteligentes. Quer que eu mostre?`,
         icon: <Sparkles size={16} />,
         accent: 'violet',
       };
     }
 
+    // 2 — Risco de abandono
     if (abandonCount >= 2) {
       return {
-        text: variant % 2 === 0
-          ? `${abandonCount} pacientes não voltam há semanas — uma mensagem rápida pode trazê-los de volta`
-          : `${abandonCount} pacientes sumiram. Um lembrete carinhoso resolve`,
+        text: `${abandonCount} pacientes sumiram — uma mensagem rápida pode mudar isso.`,
+        icon: <UserX size={16} />,
+        accent: 'rose',
+      };
+    }
+    if (abandonCount === 1) {
+      return {
+        text: 'Um paciente parou de vir. Um "oi" resolve mais do que parece.',
         icon: <UserX size={16} />,
         accent: 'rose',
       };
     }
 
+    // 3 — Confirmações pendentes
     if (unconfirmed >= 2) {
       return {
-        text: `${unconfirmed} consultas de amanhã sem confirmação — um lembrete agora evita faltas`,
+        text: `${unconfirmed} pacientes de amanhã ainda não confirmaram. Manda lembrete agora?`,
+        icon: <MessageCircle size={16} />,
+        accent: 'amber',
+      };
+    }
+    if (unconfirmed === 1) {
+      return {
+        text: '1 consulta de amanhã sem confirmação. Vale mandar um lembrete.',
         icon: <MessageCircle size={16} />,
         accent: 'amber',
       };
     }
 
+    // 4 — Dia encerrado com receita
     if (revenue > 0 && remaining === 0) {
       return {
-        text: `Dia encerrado com ${revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} — bom trabalho!`,
+        text: `Dia fechado com ${revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Bom trabalho.`,
         icon: <TrendingUp size={16} />,
         accent: 'emerald',
       };
     }
 
+    // 5 — Nenhum insight relevante
     return null;
   };
 
   const insightCard = !loading ? getInsightCard() : null;
-
-  const statChips = intelligence
-    ? [
-        {
-          key: 'in-treatment',
-          value: intelligence.stats.inTreatment,
-          text: `${intelligence.stats.inTreatment} em tratamento`,
-          className: 'text-sky-600',
-        },
-        {
-          key: 'attention',
-          value: intelligence.stats.attention,
-          text: `${intelligence.stats.attention} ${intelligence.stats.attention === 1 ? 'atenção' : 'atenções'}`,
-          className: 'text-amber-600',
-        },
-        {
-          key: 'abandonment',
-          value: intelligence.stats.abandonment,
-          text: `${intelligence.stats.abandonment} risco${intelligence.stats.abandonment === 1 ? '' : 's'} de abandono`,
-          className: 'text-rose-600',
-        },
-        {
-          key: 'completed',
-          value: intelligence.stats.completed,
-          text: `${intelligence.stats.completed} finalizado${intelligence.stats.completed === 1 ? '' : 's'}`,
-          className: 'text-emerald-600',
-        },
-      ].filter((item) => item.value > 0)
-    : [];
 
   const getEffectiveStatus = (appointment: any): string => {
     const now = new Date();
@@ -405,24 +379,41 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const getCountdown = (appointment: any): string => {
+    const start = new Date(appointment.start_time);
+    const diffMs = start.getTime() - now.getTime();
+    const diffMin = Math.round(diffMs / 60_000);
+    if (diffMin <= 0) return 'Em andamento';
+    if (diffMin < 60) return `em ${diffMin} min`;
+    const h = Math.floor(diffMin / 60);
+    const m = diffMin % 60;
+    return m > 0 ? `em ${h}h ${m}min` : `em ${h}h`;
+  };
+
   // ─── Intelligence patient row ───────────────────────────────────────────
 
   const renderIntelligencePatient = (p: PatientIntelligence, showPriority = true) => {
     const cfg = priorityConfig[p.priority];
+    const dotColor = showPriority
+      ? 'bg-rose-400'
+      : 'bg-amber-400';
     return (
       <motion.div
         key={p.patient_id}
-        whileTap={{ backgroundColor: '#F2F2F7', scale: 0.995 }}
+        whileTap={{ backgroundColor: '#F2F2F7' }}
         transition={{ duration: 0.2 }}
-        className="flex items-center gap-4 p-5 cursor-pointer transition-colors border-b border-[#C6C6C8]/5 last:border-b-0"
+        className="flex items-center gap-4 p-5 cursor-pointer border-b border-[#C6C6C8]/5 last:border-b-0"
         onClick={() => openPatientRecord(p.patient_id)}
       >
-        <div className="w-11 h-11 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm overflow-hidden border border-primary/20 shrink-0">
-          {p.photo_url ? (
-            <img src={p.photo_url} alt={p.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          ) : (
-            (p.patient_name || '?').charAt(0).toUpperCase()
-          )}
+        <div className="relative">
+          <div className="w-11 h-11 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm overflow-hidden border border-primary/20 shrink-0">
+            {p.photo_url ? (
+              <img src={p.photo_url} alt={p.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              (p.patient_name || '?').charAt(0).toUpperCase()
+            )}
+          </div>
+          <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full ${dotColor} border-2 border-white`} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{p.patient_name}</p>
@@ -440,7 +431,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); openWhatsApp(p.phone, p.patient_name); }}
-              className="w-8 h-8 flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+              className="w-[44px] h-[44px] flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
               title="WhatsApp"
             >
               <MessageCircle size={15} />
@@ -908,57 +899,58 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-14 pb-32 pt-10 px-2 max-w-2xl mx-auto">
-      {/* 1. HEADER */}
-      <header className="space-y-1.5 px-2">
-        <h1 className="text-[28px] font-bold tracking-tight text-[#1C1C1E]">
-          {timeGreeting.text}, {getGreetingName()} <span className="text-[14px] align-middle">{timeGreeting.emoji}</span>
-        </h1>
-        <p className="text-[17px] font-medium text-[#8E8E93]">
-          {getSmartMessage()}
+    <div className="flex flex-col gap-10 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-10 px-5 max-w-2xl mx-auto">
+      {/* 1. HEADER + CONTEXTO PRÉ-HERO */}
+      <div className="space-y-5">
+        {/* Saudação — caption level */}
+        <p className="text-[13px] font-medium text-[#8E8E93] px-1 tracking-wide">
+          {timeGreeting.text}, {getGreetingName()} {timeGreeting.emoji}
         </p>
-      </header>
 
-      {/* 1.5 INSIGHT CARD */}
-      {insightCard && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className={`mx-1 -mt-6 flex items-start gap-3.5 rounded-2xl px-5 py-4 border ${
-            insightCard.accent === 'violet' ? 'bg-violet-50/60 border-violet-100' :
-            insightCard.accent === 'rose' ? 'bg-rose-50/60 border-rose-100' :
-            insightCard.accent === 'amber' ? 'bg-amber-50/60 border-amber-100' :
-            'bg-emerald-50/60 border-emerald-100'
-          }`}
-        >
-          <span className={`mt-0.5 shrink-0 ${
-            insightCard.accent === 'violet' ? 'text-violet-500' :
-            insightCard.accent === 'rose' ? 'text-rose-500' :
-            insightCard.accent === 'amber' ? 'text-amber-500' :
-            'text-emerald-500'
-          }`}>
-            {insightCard.icon}
-          </span>
-          <p className="text-[14px] font-medium text-[#3A3A3C] leading-snug">
-            {insightCard.text}
-          </p>
-        </motion.div>
-      )}
+        {/* Mensagem principal — headline dominante */}
+        <h1 className="text-[28px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2] px-1">
+          {getSmartMessage()}
+        </h1>
 
-      {/* 1.8 QUICK ACTIONS — always-visible primary actions */}
-      <section className="px-1 -mt-4">
-        {/* Portal notification banner — iOS style */}
+        {/* Insight inteligente — fala humana do sistema */}
+        {insightCard && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            className={`flex items-start gap-3 rounded-2xl px-4 py-3.5 ${
+              insightCard.accent === 'violet' ? 'bg-violet-50/70' :
+              insightCard.accent === 'rose' ? 'bg-rose-50/70' :
+              insightCard.accent === 'amber' ? 'bg-amber-50/70' :
+              'bg-emerald-50/70'
+            }`}
+          >
+            <span className={`mt-0.5 shrink-0 ${
+              insightCard.accent === 'violet' ? 'text-violet-500' :
+              insightCard.accent === 'rose' ? 'text-rose-500' :
+              insightCard.accent === 'amber' ? 'text-amber-500' :
+              'text-emerald-500'
+            }`}>
+              {insightCard.icon}
+            </span>
+            <p className="text-[14px] font-medium text-[#3A3A3C] leading-snug">
+              {insightCard.text}
+            </p>
+          </motion.div>
+        )}
+
+        {/* Portal banner */}
         {portalPendingCount > 0 && (
           <motion.button
-            initial={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
+            transition={{ duration: 0.3 }}
             onClick={() => onOpenPortalInbox?.()}
-            className="w-full mb-3 flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-4 py-3.5 text-left hover:shadow-md transition-all active:scale-[0.98]"
+            whileTap={{ scale: 0.98 }}
+            className="w-full flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-4 py-3.5 text-left transition-all"
           >
             <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
-              <Calendar size={18} className="text-white" />
+              <Calendar size={17} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-bold text-slate-800">
@@ -971,389 +963,242 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <ChevronRight size={16} className="text-slate-300 shrink-0" />
           </motion.button>
         )}
-        <div className="flex gap-3">
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setActiveTab('pacientes')}
-            className="flex-1 flex items-center justify-center gap-2.5 bg-white border border-slate-100 rounded-[18px] py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-primary/20 transition-all"
+      </div>
+
+      {/* 2. HERO — PRÓXIMO ATENDIMENTO (protagonista absoluto) */}
+      {nextPatient ? (() => {
+        const effectiveStatus = getEffectiveStatus(nextPatient);
+        const isInProgress = effectiveStatus === 'IN_PROGRESS';
+        const isFinished = effectiveStatus === 'FINISHED';
+        const badge = getStatusBadge(nextPatient);
+        const countdown = getCountdown(nextPatient);
+        const gradientClass = isInProgress
+          ? 'from-blue-600 via-blue-500 to-blue-400'
+          : isFinished
+          ? 'from-slate-500 via-slate-400 to-slate-400'
+          : 'from-[#1E4430] via-[#264E36] to-[#3A6B4E]';
+        const startFormatted = new Date(nextPatient.start_time)
+          .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        return (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            <Plus size={16} className="text-primary" />
-            <span className="text-[13px] font-bold text-[#1C1C1E]">Novo Paciente</span>
-          </motion.button>
+            <div className={`overflow-hidden rounded-[32px] shadow-[0_24px_80px_rgba(0,0,0,0.10)] flex flex-col bg-gradient-to-br ${gradientClass}`}
+              style={{ minHeight: 'min(60svh, 520px)' }}>
+
+              {/* ── TOPO: identidade do paciente ── */}
+              <div className="flex-1 px-7 pt-9 pb-6 flex flex-col gap-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
+                      Próximo atendimento
+                    </span>
+                    <h2 className="text-[36px] sm:text-[40px] font-bold text-white leading-[1.1] tracking-[-0.025em] mt-1.5 break-words">
+                      {nextPatient.patient_name}
+                    </h2>
+                  </div>
+                  {/* avatar */}
+                  {nextPatient.photo_url ? (
+                    <img
+                      src={nextPatient.photo_url}
+                      alt={nextPatient.patient_name}
+                      referrerPolicy="no-referrer"
+                      className="w-16 h-16 rounded-[22px] object-cover border-2 border-white/20 shrink-0 mt-1 shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-[22px] bg-white/15 border border-white/20 flex items-center justify-center shrink-0 mt-1 font-bold text-[26px] text-white shadow-inner">
+                      {(nextPatient.patient_name || '?').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+
+                {/* status + countdown */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${badge.className}`}>
+                    {badge.label}
+                  </span>
+                  {!isFinished && (
+                    <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/15 text-white">
+                      {countdown}
+                    </span>
+                  )}
+                </div>
+
+                {/* horário + procedimento */}
+                <div className="flex items-end justify-between gap-4 mt-auto pt-4">
+                  <div>
+                    <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.12em]">Procedimento</span>
+                    <p className="text-[18px] font-semibold text-white mt-0.5 leading-snug line-clamp-2">
+                      {nextPatient.notes || 'Avaliação Geral'}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.12em]">Horário</span>
+                    <p className="text-[32px] font-bold text-white leading-none mt-0.5">
+                      {startFormatted}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── BASE: CTAs ── */}
+              <div className="px-7 pb-8 pt-5 space-y-3">
+                <motion.button
+                  whileTap={{ scale: 0.98, opacity: 0.92 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  onClick={() => openPatientRecord(nextPatient.patient_id)}
+                  className="w-full py-[20px] rounded-[26px] text-[18px] font-bold bg-white shadow-[0_8px_32px_rgba(0,0,0,0.18)] transition-all"
+                  style={{ color: isInProgress ? '#1E6ED6' : isFinished ? '#374151' : '#1E4430' }}
+                >
+                  {isFinished ? 'Ver prontuário' : isInProgress ? 'Atender agora' : 'Atender'}
+                </motion.button>
+                <div className="grid grid-cols-2 gap-3">
+                  <motion.button
+                    whileTap={{ scale: 0.98, opacity: 0.9 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    onClick={() => sendReminder(nextPatient)}
+                    className="flex items-center justify-center gap-2 px-5 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
+                  >
+                    <MessageCircle size={16} />
+                    WhatsApp
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.98, opacity: 0.9 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    onClick={() => onReschedule?.(nextPatient)}
+                    className="flex items-center justify-center gap-2 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
+                  >
+                    Reagendar
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        );
+      })() : (
+        <section className="space-y-5">
+          <div className="w-16 h-16 bg-[#F2F2F7] rounded-full flex items-center justify-center text-[#8E8E93] mx-auto">
+            <Calendar size={32} />
+          </div>
+          <div className="space-y-1.5 text-center">
+            <p className="text-[19px] font-bold text-[#1C1C1E]">Agenda livre</p>
+            <p className="text-[14px] text-[#8E8E93]">
+              {schedulingSuggestions.length > 0
+                ? `${schedulingSuggestions.length} paciente${schedulingSuggestions.length === 1 ? '' : 's'} aguardando encaixe`
+                : 'Nenhuma consulta por agora'}
+            </p>
+          </div>
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 flex items-center justify-center gap-2.5 bg-white border border-slate-100 rounded-[18px] py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-violet-200 transition-all"
+            className="flex items-center justify-center gap-2.5 bg-primary text-white w-full py-[18px] rounded-[22px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] mx-auto max-w-xs"
           >
-            <CalendarPlus size={16} className="text-violet-600" />
-            <span className="text-[13px] font-bold text-[#1C1C1E]">Nova Consulta</span>
+            <CalendarPlus size={18} />
+            Agendar consulta
           </motion.button>
-        </div>
-      </section>
-
-      {/* 2. INTELLIGENCE STATS — Compact summary */}
-      {intelligence && !loading && statChips.length > 0 && (
-        <section className="px-2">
-          <div className="flex flex-wrap items-center gap-2 text-[15px] font-medium">
-            {statChips.map((item, index) => (
-              <React.Fragment key={item.key}>
-                {index > 0 && <span className="text-[#C7C7CC]">•</span>}
-                <span className={item.className}>{item.text}</span>
-              </React.Fragment>
-            ))}
-          </div>
+          <button
+            onClick={() => setActiveTab('agenda')}
+            className="block text-[13px] font-semibold text-primary text-center mx-auto mt-1"
+          >
+            Ver agenda completa
+          </button>
         </section>
       )}
 
-      {/* Leads panel removed — using patient list for lead management */}
+      {/* 2b. QUICK ACTIONS — anchored to hero (only when hero is visible) */}
+      {nextPatient && <div className="-mt-4 flex items-center justify-end gap-2 px-0.5">
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setActiveTab('pacientes')}
+            className="flex items-center gap-1.5 px-3.5 py-[11px] rounded-[12px] bg-primary/10 text-primary text-[12px] font-bold transition-all"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+            Paciente
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-[11px] rounded-[12px] bg-violet-100 text-violet-700 text-[12px] font-bold transition-all"
+          >
+            <CalendarPlus size={13} strokeWidth={2.5} />
+            Consulta
+          </motion.button>
+      </div>}
 
-      {/* 3. NEEDS ACTION TODAY — "What should I do now?" */}
+      {/* 3. PRECISAM DA SUA AÇÃO — adaptive: inline for 1, atmosphere for 2+ */}
       {intelligence && intelligence.needsActionToday.length > 0 && (
-        <section className="space-y-5">
-          <div className="flex items-center justify-between px-2">
+        intelligence.needsActionToday.length === 1 ? (
+          <section className="px-0">
+            <motion.div
+              whileTap={{ scale: 0.98, opacity: 0.9 }}
+              onClick={() => openPatientRecord(intelligence.needsActionToday[0].patient_id)}
+              className="w-full flex items-center gap-4 bg-rose-50/60 rounded-[20px] px-5 py-4 cursor-pointer transition-all"
+            >
+              <div className="relative">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[13px] overflow-hidden border border-primary/20 shrink-0">
+                  {intelligence.needsActionToday[0].photo_url ? (
+                    <img src={intelligence.needsActionToday[0].photo_url} alt={intelligence.needsActionToday[0].patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    (intelligence.needsActionToday[0].patient_name || '?').charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-400 border-2 border-white" />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{intelligence.needsActionToday[0].patient_name}</p>
+                <p className="text-[12px] text-[#8E8E93]">
+                  {formatDaysAgo(intelligence.needsActionToday[0].days_since_last_visit)} · {statusLabels[intelligence.needsActionToday[0].status] || intelligence.needsActionToday[0].status}
+                </p>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${priorityConfig[intelligence.needsActionToday[0].priority].bg} ${priorityConfig[intelligence.needsActionToday[0].priority].text} shrink-0`}>
+                {priorityConfig[intelligence.needsActionToday[0].priority].label}
+              </span>
+              <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
+            </motion.div>
+          </section>
+        ) : (
+        <section className="-mx-5 px-5 py-6 bg-gradient-to-b from-rose-50/80 to-rose-50/20 rounded-[20px] space-y-4">
+          <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
-              <h3 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Precisam da sua ação</h3>
+              <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Precisam da sua ação</h3>
             </div>
-            <span className="text-[13px] font-bold text-rose-500">{intelligence.needsActionToday.length}</span>
+            <span className="text-[12px] font-bold text-rose-400">{intelligence.needsActionToday.length}</span>
           </div>
-          <div className="ios-card !p-0 overflow-hidden border border-rose-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+          <div className="rounded-[20px] overflow-hidden bg-white/80 backdrop-blur-sm border border-rose-100/40 shadow-[0_2px_12px_rgba(244,63,94,0.06)]">
             {intelligence.needsActionToday.slice(0, 5).map(p => renderIntelligencePatient(p))}
           </div>
           {intelligence.needsActionToday.length > 5 && (
-            <button type="button" onClick={() => setActiveTab('pacientes')} className="text-[14px] font-bold text-primary px-2">
+            <button type="button" onClick={() => setActiveTab('pacientes')} className="text-[13px] font-semibold text-rose-600 px-1">
               Ver todos os {intelligence.needsActionToday.length} pacientes →
             </button>
           )}
         </section>
+        )
       )}
 
-      {/* 4. PRIMARY CARD — NEXT APPOINTMENT */}
-      {nextPatient ? (
-        <section className="space-y-5">
-          <div className="px-2">
-            <h3 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Próximo atendimento</h3>
-          </div>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="ios-card !p-12 space-y-12 shadow-[0_8px_40px_rgba(0,0,0,0.02)] border border-[#C6C6C8]/5 rounded-[32px]"
-          >
-            <div className="flex justify-between items-start gap-8">
-              <div className="space-y-4">
-                <h2 className="text-[34px] font-bold text-[#1C1C1E] leading-[1.15] tracking-[-0.02em]">
-                  {nextPatient.patient_name}
-                </h2>
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const badge = getStatusBadge(nextPatient);
-                    return (
-                      <span className={`px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${badge.className}`}>
-                        {badge.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-              </div>
-              <div className="text-right shrink-0 pt-2">
-                <span className="text-[21px] font-bold text-[#1C1C1E] block leading-none">
-                  {new Date(nextPatient.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-[22px] bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E]">
-                  <ClipboardList size={22} />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-widest">Procedimento</span>
-                  <span className="text-[17px] font-semibold text-[#1C1C1E]">{nextPatient.notes || 'Avaliação Geral'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-5 pt-2">
-              <motion.button
-                whileTap={{ scale: 0.98, opacity: 0.9 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                onClick={() => openPatientRecord(nextPatient.patient_id)}
-                className="bg-primary text-white w-full py-[22px] rounded-[30px] text-[17px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] transition-all"
-              >
-                Atender
-              </motion.button>
-              <div className="grid grid-cols-2 gap-5">
-                <motion.button
-                  whileTap={{ scale: 0.98, opacity: 0.9 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  onClick={() => sendReminder(nextPatient)}
-                  className="flex items-center justify-center gap-2.5 px-6 py-[18px] rounded-[26px] border border-[#C6C6C8]/50 text-[15px] font-bold text-[#1C1C1E] bg-[#F9F9FB] transition-all"
-                >
-                  <MessageCircle size={18} className="text-primary" />
-                  WhatsApp
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.98, opacity: 0.9 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  onClick={() => onReschedule?.(nextPatient)}
-                  className="flex items-center justify-center gap-2.5 py-[18px] rounded-[26px] text-[15px] font-bold text-[#8E8E93] hover:text-[#1C1C1E] transition-all"
-                >
-                  Reagendar
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        </section>
-      ) : (
-        <section className="ios-card flex flex-col items-center justify-center py-16 text-center rounded-[32px] space-y-6">
-          <div className="w-20 h-20 bg-[#F2F2F7] rounded-full flex items-center justify-center text-[#8E8E93]">
-            <Calendar size={36} />
-          </div>
-          <div className="space-y-2">
-            <p className="text-[19px] font-semibold text-[#1C1C1E]">Nenhuma consulta para agora</p>
-            <p className="text-[15px] text-[#8E8E93]">Sua agenda está livre no momento</p>
-          </div>
-          <div className="flex gap-3">
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-[16px] text-[13px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.1)]"
-            >
-              <CalendarPlus size={15} />
-              Agendar consulta
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setActiveTab('agenda')}
-              className="flex items-center gap-2 bg-[#F2F2F7] text-[#1C1C1E] px-5 py-3 rounded-[16px] text-[13px] font-bold"
-            >
-              Ver agenda completa
-            </motion.button>
-          </div>
-        </section>
-      )}
-
-      {/* 5. TODAY'S SCHEDULE */}
-      {otherAppointments.length > 0 && (
-        <section className="space-y-7">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Próximos da agenda</h3>
-            <button onClick={() => setActiveTab('agenda')} className="text-[15px] font-bold text-primary">
-              Ver tudo
-            </button>
-          </div>
-          <div className="ios-card !p-0 overflow-hidden border border-[#C6C6C8]/5 rounded-[32px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-            {otherAppointments.map((app, index) => (
-              <motion.div
-                key={app.id}
-                whileTap={{ backgroundColor: '#F2F2F7', scale: 0.995 }}
-                transition={{ duration: 0.2 }}
-                onClick={() => openPatientRecord(app.patient_id)}
-                className={`flex items-center justify-between p-8 transition-colors cursor-pointer ${index !== otherAppointments.length - 1 ? 'border-b border-[#C6C6C8]/5' : ''}`}
-              >
-                <div className="flex items-center gap-7">
-                  <span className="text-[15px] font-bold text-[#1C1C1E] w-12">
-                    {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[17px] font-semibold text-[#1C1C1E]">{app.patient_name}</span>
-                    <span className="text-[13px] text-[#8E8E93] font-medium">{app.notes || 'Consulta'}</span>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="text-[#C6C6C8]" />
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 6. ABANDONMENT RISK */}
-      {intelligence && intelligence.abandonmentRisk.length > 0 && (
-        <section className="space-y-5">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2.5">
-              <UserX size={18} className="text-rose-500" />
-              <h3 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Risco de abandono</h3>
-            </div>
-            <span className="text-[13px] font-bold text-[#8E8E93]">{intelligence.abandonmentRisk.length}</span>
-          </div>
-          <div className="ios-card !p-0 overflow-hidden border border-[#C6C6C8]/5 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-            {intelligence.abandonmentRisk.slice(0, 4).map(p => renderIntelligencePatient(p, false))}
-          </div>
-          {intelligence.abandonmentRisk.length > 4 && (
-            <button type="button" onClick={() => setActiveTab('pacientes')} className="text-[14px] font-bold text-primary px-2">
-              Ver todos →
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* 7. ATTENTION NEEDED */}
-      {intelligence && intelligence.attentionNeeded.length > 0 && (
-        <section className="space-y-5">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle size={18} className="text-amber-500" />
-              <h3 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Precisam de atenção</h3>
-            </div>
-            <span className="text-[13px] font-bold text-[#8E8E93]">{intelligence.attentionNeeded.length}</span>
-          </div>
-          <div className="ios-card !p-0 overflow-hidden border border-[#C6C6C8]/5 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-            {intelligence.attentionNeeded.slice(0, 3).map(p => renderIntelligencePatient(p, false))}
-          </div>
-        </section>
-      )}
-
-      {/* 8. SMART SCHEDULING SUGGESTIONS */}
-      {schedulingSuggestions.length > 0 && (
-        <section className="space-y-5">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2.5">
-              <Calendar size={18} className="text-violet-500" />
-              <h3 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Sugestões para hoje</h3>
-            </div>
-            <span className="text-[13px] font-bold text-violet-500">{schedulingSuggestions.length} horários</span>
-          </div>
-          <p className="text-[13px] text-[#8E8E93] px-2 -mt-2">
-            Melhores encaixes para hoje
-          </p>
-          <div className="space-y-3">
-            {schedulingSuggestions.slice(0, 4).map((sug, i) => {
-              const dayLabel = (() => {
-                const d = new Date(sug.suggested_slot.date + 'T12:00:00');
-                const today = new Date(); today.setHours(0,0,0,0);
-                const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-                if (d.toDateString() === today.toDateString()) return 'Hoje';
-                if (d.toDateString() === tomorrow.toDateString()) return 'Amanhã';
-                return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
-              })();
-              const beh = sug.behavior;
-              const hasInsight = beh && (beh.confidence_label || beh.insight);
-              const suggestionLabel = beh && (beh.attendance_rate !== null && beh.attendance_rate >= 0.75 || beh.confidence_label === 'Melhor horário' || beh.confidence_label === 'Alta chance de presença')
-                ? 'Maior chance de comparecimento'
-                : 'Baseado no histórico';
-
-              const confidenceBadge = {
-                bg: suggestionLabel === 'Maior chance de comparecimento' ? 'bg-emerald-50' : 'bg-violet-50',
-                text: suggestionLabel === 'Maior chance de comparecimento' ? 'text-emerald-700' : 'text-violet-700',
-                border: suggestionLabel === 'Maior chance de comparecimento' ? 'border-emerald-100' : 'border-violet-100',
-              };
-
-              const procedureLabel = sug.procedure || 'Consulta';
-              const durationLabel = sug.duration_minutes ? `${sug.duration_minutes} min` : '30 min';
-
-              return (
-                <motion.div
-                  key={`sug-${i}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-white rounded-[20px] border border-violet-100 p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-11 h-11 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-sm overflow-hidden border border-violet-100 shrink-0">
-                      {sug.patient.photo_url ? (
-                        <img src={sug.patient.photo_url} alt={sug.patient.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        (sug.patient.patient_name || '?').charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{sug.patient.patient_name}</p>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-sky-50 text-sky-700 shrink-0">
-                          {procedureLabel}
-                        </span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${confidenceBadge.bg} ${confidenceBadge.text} border ${confidenceBadge.border} shrink-0`}>
-                          {suggestionLabel}
-                        </span>
-                      </div>
-                      <p className="text-[12px] text-[#8E8E93] mb-2">{sug.reason}</p>
-
-                      {/* Behavioral insight */}
-                      {hasInsight && beh!.insight && (
-                        <div className="flex items-start gap-1.5 mb-3 bg-[#F9F9FB] rounded-xl px-3 py-2">
-                          <Sparkles size={11} className="text-violet-400 mt-0.5 shrink-0" />
-                          <p className="text-[11px] text-[#636366] leading-snug font-medium">
-                            {beh!.insight}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 bg-violet-50 px-3 py-1.5 rounded-full">
-                          <Calendar size={12} className="text-violet-600" />
-                          <span className="text-[12px] font-bold text-violet-700">{dayLabel}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-violet-50 px-3 py-1.5 rounded-full">
-                          <Clock size={12} className="text-violet-600" />
-                          <span className="text-[12px] font-bold text-violet-700">{sug.suggested_slot.start} – {sug.suggested_slot.end}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-[#F2F2F7] px-3 py-1.5 rounded-full">
-                          <span className="text-[12px] font-bold text-[#636366]">{durationLabel}</span>
-                        </div>
-                        {beh?.attendance_rate !== null && beh?.attendance_rate !== undefined && beh.attendance_rate >= 0.5 && (
-                          <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-full">
-                            <ThumbsUp size={11} className="text-emerald-600" />
-                            <span className="text-[11px] font-bold text-emerald-700">{Math.round(beh.attendance_rate * 100)}% presença</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <motion.button
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => onSchedulePatient?.(sug.patient.patient_id, sug.suggested_slot.date, sug.suggested_slot.start, sug.suggested_slot.end, sug.procedure)}
-                      className="flex-1 flex items-center justify-center gap-2 bg-violet-600 text-white py-3 rounded-2xl text-[13px] font-bold shadow-[0_4px_16px_rgba(109,40,217,0.15)] hover:bg-violet-700 transition-colors"
-                    >
-                      <CalendarPlus size={14} />
-                      Agendar
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => openPatientRecord(sug.patient.patient_id)}
-                      className="px-5 py-3 rounded-2xl text-[13px] font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 transition-colors"
-                    >
-                      Ver prontuário
-                    </motion.button>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-          {schedulingSuggestions.length > 4 && (
-            <button type="button" onClick={() => setActiveTab('agenda')} className="text-[14px] font-bold text-violet-600 px-2">
-              Ver todas as {schedulingSuggestions.length} sugestões →
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* 9. WHATSAPP REMINDERS */}
+      {/* 4. WHATSAPP REMINDERS — time-sensitive, promoted */}
       {tomorrowUnconfirmedCount > 0 && (
-        <section className="px-1">
-          <div className="ios-card !bg-[#F2F2F7] !p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border-none rounded-[32px]">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-white rounded-[22px] flex items-center justify-center text-primary shadow-[0_4px_12px_rgba(0,0,0,0.03)] shrink-0">
-                <MessageCircle size={28} />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <h4 className="text-[17px] font-bold text-[#1C1C1E]">Lembretes de amanhã</h4>
-                <p className="text-[14px] text-[#8E8E93] font-medium">{tomorrowUnconfirmedCount} paciente{tomorrowUnconfirmedCount === 1 ? '' : 's'} para confirmar</p>
-              </div>
+        <section className="px-0">
+          <motion.button
+            whileTap={{ scale: 0.98, opacity: 0.9 }}
+            onClick={openReminderModal}
+            className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all"
+          >
+            <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-primary shadow-sm shrink-0">
+              <MessageCircle size={20} />
             </div>
-            <motion.button
-              whileTap={{ scale: 0.97, opacity: 0.9 }}
-              transition={{ duration: 0.2 }}
-              onClick={openReminderModal}
-              className="bg-primary text-white px-8 py-4 rounded-[999px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.1)] w-full sm:w-auto"
-            >
-              Enviar lembretes
-            </motion.button>
-          </div>
-
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                {tomorrowUnconfirmedCount} lembrete{tomorrowUnconfirmedCount === 1 ? '' : 's'} para enviar
+              </p>
+              <p className="text-[12px] text-[#8E8E93]">Consultas de amanhã sem confirmação</p>
+            </div>
+            <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
+          </motion.button>
           <AnimatePresence>
             {isReminderModalOpen && (
               <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -1435,12 +1280,153 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
-      {/* 10. FINANCIAL SUMMARY */}
-      <section className="flex justify-center pt-10 pb-20">
-        <p className="text-[15px] font-medium text-[#8E8E93]">
-          Faturamento hoje: <span className="text-[#1C1C1E] font-bold">{(todayRevenue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-        </p>
-      </section>
+      {/* 5. TODAY'S SCHEDULE — clean with green time accent */}
+      {otherAppointments.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Próximos da agenda</h3>
+            <button onClick={() => setActiveTab('agenda')} className="text-[13px] font-semibold text-primary">
+              Ver tudo
+            </button>
+          </div>
+          <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+            {otherAppointments.map((app, index) => (
+              <motion.div
+                key={app.id}
+                whileTap={{ backgroundColor: '#F2F2F7' }}
+                transition={{ duration: 0.15 }}
+                onClick={() => openPatientRecord(app.patient_id)}
+                className={`flex items-center justify-between px-5 py-[16px] transition-colors cursor-pointer ${index !== otherAppointments.length - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-center shrink-0 w-11">
+                    <span className="text-[15px] font-bold text-primary leading-none">
+                      {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="w-px h-8 bg-primary/15 shrink-0" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[15px] font-semibold text-[#1C1C1E]">{app.patient_name}</span>
+                    <span className="text-[12px] text-[#8E8E93]">{app.notes || 'Consulta'}</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-[#C6C6C8]" />
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 6+7. PACIENTES QUE PRECISAM DE VOCÊ — neutral with amber accent */}
+      {intelligence && (intelligence.abandonmentRisk.length > 0 || intelligence.attentionNeeded.length > 0) && (() => {
+        const combined = [
+          ...intelligence.abandonmentRisk.map(p => ({ ...p, _reason: 'abandono' as const })),
+          ...intelligence.attentionNeeded.filter(p => !intelligence.abandonmentRisk.some(a => a.patient_id === p.patient_id)).map(p => ({ ...p, _reason: 'atencao' as const })),
+        ];
+        return (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="w-1 h-5 rounded-full bg-amber-400" />
+                <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Precisam de atenção</h3>
+              </div>
+              <span className="text-[12px] font-bold text-[#8E8E93]">{combined.length}</span>
+            </div>
+            <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+              {combined.slice(0, 5).map(p => renderIntelligencePatient(p, false))}
+            </div>
+            {combined.length > 5 && (
+              <button type="button" onClick={() => setActiveTab('pacientes')} className="text-[13px] font-semibold text-primary px-1">
+                Ver todos os {combined.length} pacientes →
+              </button>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* 8. SMART SCHEDULING SUGGESTIONS — neutral with violet accent */}
+      {schedulingSuggestions.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-1 h-5 rounded-full bg-violet-400" />
+              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Sugestões de encaixe</h3>
+            </div>
+            <span className="text-[12px] font-bold text-[#8E8E93]">{schedulingSuggestions.length}</span>
+          </div>
+          <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+            {schedulingSuggestions.slice(0, 4).map((sug, i) => {
+              const dayLabel = (() => {
+                const d = new Date(sug.suggested_slot.date + 'T12:00:00');
+                const today = new Date(); today.setHours(0,0,0,0);
+                const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+                if (d.toDateString() === today.toDateString()) return 'Hoje';
+                if (d.toDateString() === tomorrow.toDateString()) return 'Amanhã';
+                return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+              })();
+              return (
+                <motion.div
+                  key={`sug-${i}`}
+                  whileTap={{ backgroundColor: '#F2F2F7' }}
+                  transition={{ duration: 0.15 }}
+                  className={`flex items-center gap-4 px-5 py-[14px] cursor-pointer ${i !== Math.min(schedulingSuggestions.length, 4) - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+                  onClick={() => openPatientRecord(sug.patient.patient_id)}
+                >
+                  <div className="w-10 h-10 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-[13px] overflow-hidden border border-violet-100 shrink-0">
+                    {sug.patient.photo_url ? (
+                      <img src={sug.patient.photo_url} alt={sug.patient.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      (sug.patient.patient_name || '?').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{sug.patient.patient_name}</p>
+                    <p className="text-[12px] text-[#8E8E93] truncate">
+                      {dayLabel} · {sug.suggested_slot.start} · {sug.procedure || 'Consulta'}
+                    </p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => { e.stopPropagation(); onSchedulePatient?.(sug.patient.patient_id, sug.suggested_slot.date, sug.suggested_slot.start, sug.suggested_slot.end, sug.procedure); }}
+                    className="shrink-0 px-4 py-[10px] rounded-full bg-violet-600 text-white text-[12px] font-bold"
+                  >
+                    Agendar
+                  </motion.button>
+                </motion.div>
+              );
+            })}
+          </div>
+          {schedulingSuggestions.length > 4 && (
+            <button type="button" onClick={() => setActiveTab('agenda')} className="text-[13px] font-semibold text-violet-600 px-1">
+              Ver todas as {schedulingSuggestions.length} sugestões →
+            </button>
+          )}
+        </section>
+      )}
+
+      {/* 9. FINANCIAL SUMMARY — emerald accent, tappable */}
+      {(todayRevenue || 0) > 0 && (
+        <section className="px-0">
+          <motion.button
+            whileTap={{ scale: 0.98, opacity: 0.9 }}
+            onClick={() => setActiveTab('financeiro')}
+            className="w-full flex items-center justify-between bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 rounded-[20px] px-5 py-5 border border-emerald-100/40 text-left transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 bg-emerald-500 rounded-[14px] flex items-center justify-center shadow-sm shrink-0">
+                <DollarSign size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Faturamento hoje</p>
+                <p className="text-[22px] font-bold text-emerald-900 leading-tight">
+                  {(todayRevenue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-emerald-300 shrink-0" />
+          </motion.button>
+        </section>
+      )}
     </div>
   );
 };

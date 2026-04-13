@@ -24,6 +24,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
+    "fast-xml-parser": "^5.5.11",
     "framer-motion": "^12.35.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
@@ -38,7 +39,8 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.13.1",
     "vite": "^6.2.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -49,6 +51,7 @@
     "@types/node": "^22.14.0",
     "@types/nodemailer": "^7.0.11",
     "@types/pg": "^8.18.0",
+    "@types/xml2js": "^0.4.14",
     "@vercel/node": "^3.2.29",
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",

@@ -551,8 +551,15 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
   const behaviors = await getPatientBehaviors(dentistId, candidateIds);
 
   // 3. Get today's and next 5 business days appointments to find free slots
+  // Use TO_CHAR to extract date and time as plain strings, avoiding timezone
+  // conversion issues between PostgreSQL TIMESTAMP and JS Date objects.
+  // The frontend stores appointments in the user's local time as ISO strings,
+  // so we must compare using the raw stored values, not JS Date re-interpretation.
   const slotsResult = await query(`
-    SELECT start_time, end_time
+    SELECT
+      TO_CHAR(start_time, 'YYYY-MM-DD') as slot_date,
+      TO_CHAR(start_time, 'HH24:MI') as slot_start,
+      TO_CHAR(end_time, 'HH24:MI') as slot_end
     FROM appointments
     WHERE dentist_id = $1
       AND start_time >= CURRENT_DATE
@@ -561,57 +568,63 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
     ORDER BY start_time ASC
   `, [dentistId]);
 
+  function slotTimeToMinutes(t: string): number {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+
   const bookedSlots = slotsResult.rows.map((r: any) => ({
-    start: new Date(r.start_time),
-    end: new Date(r.end_time),
+    date: r.slot_date as string,
+    startMin: slotTimeToMinutes(r.slot_start),
+    endMin: slotTimeToMinutes(r.slot_end),
   }));
 
   // 4. Build all possible (candidate, slot) pairs and score them
   type ScoredPair = { candidate: PatientIntelligence; slot: { date: string; start: string; end: string }; score: number; slotHour: number; durationMinutes: number };
   const scoredPairs: ScoredPair[] = [];
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Build list of next 6 calendar days (as YYYY-MM-DD strings) using the DB server's date
+  const todayResult = await query(`SELECT TO_CHAR(CURRENT_DATE + i, 'YYYY-MM-DD') as d, EXTRACT(DOW FROM CURRENT_DATE + i)::int as dow FROM generate_series(0, 5) i`);
+  const nowResult = await query(`SELECT EXTRACT(HOUR FROM NOW())::int as h, EXTRACT(MINUTE FROM NOW())::int as m`);
+  const nowHour = nowResult.rows[0].h;
+  const nowMinute = nowResult.rows[0].m;
+  const todayStr = todayResult.rows[0].d;
 
-  for (let dayOffset = 0; dayOffset < 6; dayOffset++) {
-    const day = new Date(today);
-    day.setDate(day.getDate() + dayOffset);
-    if (day.getDay() === 0) continue; // skip Sunday
+  for (const dayRow of todayResult.rows) {
+    const dayStr = dayRow.d as string;
+    const dow = dayRow.dow as number;
+    if (dow === 0) continue; // skip Sunday
 
-    const dayStr = day.toISOString().split('T')[0];
-    const dayBooked = bookedSlots.filter(s =>
-      s.start.toISOString().split('T')[0] === dayStr
-    );
+    const dayBooked = bookedSlots.filter(s => s.date === dayStr);
 
     for (let hour = 8; hour < 18; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        const slotStart = new Date(day);
-        slotStart.setHours(hour, minute, 0, 0);
+        // Skip past slots for today
+        if (dayStr === todayStr && (hour < nowHour || (hour === nowHour && minute <= nowMinute))) continue;
 
-        if (slotStart <= new Date()) continue;
+        const slotStartMin = hour * 60 + minute;
 
         for (const candidate of candidates) {
           const durationMinutes = getProcedureDuration(candidate.pending_procedure);
-          const slotEnd = new Date(slotStart);
-          slotEnd.setMinutes(slotEnd.getMinutes() + durationMinutes);
+          const slotEndMin = slotStartMin + durationMinutes;
 
-          // Don't exceed business hours (18:00)
-          const endLimit = new Date(day);
-          endLimit.setHours(18, 0, 0, 0);
-          if (slotEnd > endLimit) continue;
+          // Don't exceed business hours (18:00 = 1080 minutes)
+          if (slotEndMin > 18 * 60) continue;
 
-          // Check if slot is free for the entire duration
+          // Check if slot overlaps any booked appointment (all in minutes, same date)
           const isOccupied = dayBooked.some(b =>
-            (slotStart >= b.start && slotStart < b.end) ||
-            (slotEnd > b.start && slotEnd <= b.end) ||
-            (slotStart <= b.start && slotEnd >= b.end)
+            (slotStartMin >= b.startMin && slotStartMin < b.endMin) ||
+            (slotEndMin > b.startMin && slotEndMin <= b.endMin) ||
+            (slotStartMin <= b.startMin && slotEndMin >= b.endMin)
           );
           if (isOccupied) continue;
 
+          const endHour = Math.floor(slotEndMin / 60);
+          const endMinute = slotEndMin % 60;
           const slot = {
             date: dayStr,
             start: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-            end: `${String(slotEnd.getHours()).padStart(2, '0')}:${String(slotEnd.getMinutes()).padStart(2, '0')}`,
+            end: `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`,
           };
 
           const behavior = behaviors.get(candidate.patient_id);

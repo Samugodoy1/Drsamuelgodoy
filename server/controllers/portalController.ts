@@ -24,7 +24,7 @@ export const generatePortalLink = async (req: Request, res: Response) => {
     }
 
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000); // No practical expiration
 
     // Invalidate previous tokens for this patient
     await query(
@@ -38,13 +38,21 @@ export const generatePortalLink = async (req: Request, res: Response) => {
       [patient_id, dentistId, token, expiresAt]
     );
 
+    // Check if patient has any finished appointments (first visit = no finished appointments)
+    const finishedCheck = await query(
+      `SELECT 1 FROM appointments WHERE patient_id = $1 AND dentist_id = $2 AND status = 'FINISHED' LIMIT 1`,
+      [patient_id, dentistId]
+    );
+    const isFirstVisit = finishedCheck.rows.length === 0;
+
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const portalUrl = `${baseUrl}/portal/${token}`;
     const preAtendimentoUrl = `${baseUrl}/pre-atendimento/${token}`;
 
     res.json({
       portal_url: portalUrl,
-      pre_atendimento_url: preAtendimentoUrl,
+      pre_atendimento_url: isFirstVisit ? preAtendimentoUrl : null,
+      is_first_visit: isFirstVisit,
       token,
       expires_at: expiresAt,
       patient: patientCheck.rows[0]
@@ -453,6 +461,312 @@ export const reviewIntakeForm = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error reviewing intake form:', error);
     res.status(500).json({ error: 'Erro ao revisar ficha' });
+  }
+};
+
+// ─── Cancel appointment request (patient side) ───
+export const cancelAppointment = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+    const { appointment_id, reason } = req.body;
+
+    if (!appointment_id) {
+      return res.status(400).json({ error: 'ID da consulta é obrigatório' });
+    }
+
+    // Verify appointment belongs to this patient
+    const appt = await query(
+      `SELECT id, status FROM appointments WHERE id = $1 AND patient_id = $2 AND status IN ('SCHEDULED', 'CONFIRMED')`,
+      [appointment_id, portal.patient_id]
+    );
+    if (appt.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada ou não pode ser cancelada' });
+    }
+
+    // Create cancellation request
+    await query(
+      `INSERT INTO appointment_requests (patient_id, dentist_id, preferred_date, notes, status, request_type, appointment_id)
+       VALUES ($1, $2, CURRENT_DATE, $3, 'PENDING', 'CANCEL', $4)`,
+      [portal.patient_id, portal.dentist_id, reason || 'Paciente solicitou cancelamento', appointment_id]
+    );
+
+    res.json({ message: 'Solicitação de cancelamento enviada. A clínica confirmará em breve.' });
+  } catch (error: any) {
+    console.error('Error cancelling appointment:', error);
+    res.status(500).json({ error: 'Erro ao solicitar cancelamento' });
+  }
+};
+
+// ─── Reschedule appointment request (patient side) ───
+export const rescheduleAppointment = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+    const { appointment_id, preferred_date, preferred_time, reason } = req.body;
+
+    if (!appointment_id || !preferred_date) {
+      return res.status(400).json({ error: 'ID da consulta e nova data são obrigatórios' });
+    }
+
+    // Verify appointment belongs to this patient
+    const appt = await query(
+      `SELECT id, status FROM appointments WHERE id = $1 AND patient_id = $2 AND status IN ('SCHEDULED', 'CONFIRMED')`,
+      [appointment_id, portal.patient_id]
+    );
+    if (appt.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada ou não pode ser reagendada' });
+    }
+
+    await query(
+      `INSERT INTO appointment_requests (patient_id, dentist_id, preferred_date, preferred_time, notes, status, request_type, appointment_id)
+       VALUES ($1, $2, $3, $4, $5, 'PENDING', 'RESCHEDULE', $6)`,
+      [portal.patient_id, portal.dentist_id, preferred_date, preferred_time || null, reason || 'Paciente solicitou reagendamento', appointment_id]
+    );
+
+    res.json({ message: 'Solicitação de reagendamento enviada. A clínica confirmará em breve.' });
+  } catch (error: any) {
+    console.error('Error rescheduling appointment:', error);
+    res.status(500).json({ error: 'Erro ao solicitar reagendamento' });
+  }
+};
+
+// ─── Confirm appointment (patient side) ───
+export const confirmAppointment = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+    const { appointment_id } = req.body;
+
+    if (!appointment_id) {
+      return res.status(400).json({ error: 'ID da consulta é obrigatório' });
+    }
+
+    // patient_id é suficiente — getPortalData lista consultas de todos os dentistas
+    const appt = await query(
+      `SELECT id, status, start_time, dentist_id
+       FROM appointments
+       WHERE id = $1
+         AND patient_id = $2
+         AND status IN ('SCHEDULED', 'CONFIRMED')`,
+      [appointment_id, portal.patient_id]
+    );
+
+    if (appt.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada ou não pode ser confirmada' });
+    }
+
+    const row = appt.rows[0];
+
+    if (row.status !== 'CONFIRMED') {
+      await query(
+        `UPDATE appointments SET status = 'CONFIRMED' WHERE id = $1 AND patient_id = $2`,
+        [appointment_id, portal.patient_id]
+      );
+
+      const scheduledAt = new Date(row.start_time).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      await query(
+        `INSERT INTO portal_messages (patient_id, dentist_id, sender, message)
+         VALUES ($1, $2, 'patient', $3)`,
+        [portal.patient_id, row.dentist_id, `Confirmei minha presença para a consulta de ${scheduledAt}.`]
+      );
+    }
+
+    res.json({ message: 'Consulta confirmada com sucesso!' });
+  } catch (error: any) {
+    console.error('Error confirming appointment:', error);
+    res.status(500).json({ error: 'Erro ao confirmar consulta' });
+  }
+};
+
+// ─── Send message (patient side) ───
+export const sendPortalMessage = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Mensagem não pode ser vazia' });
+    }
+
+    if (message.length > 2000) {
+      return res.status(400).json({ error: 'Mensagem muito longa (máx. 2000 caracteres)' });
+    }
+
+    await query(
+      `INSERT INTO portal_messages (patient_id, dentist_id, sender, message) VALUES ($1, $2, 'patient', $3)`,
+      [portal.patient_id, portal.dentist_id, message.trim()]
+    );
+
+    res.json({ message: 'Mensagem enviada!' });
+  } catch (error: any) {
+    console.error('Error sending portal message:', error);
+    res.status(500).json({ error: 'Erro ao enviar mensagem' });
+  }
+};
+
+// ─── Get messages (patient side) ───
+export const getPortalMessages = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+
+    const result = await query(
+      `SELECT id, sender, message, read, created_at FROM portal_messages
+       WHERE patient_id = $1 AND dentist_id = $2
+       ORDER BY created_at ASC
+       LIMIT 100`,
+      [portal.patient_id, portal.dentist_id]
+    );
+
+    // Mark dentist messages as read
+    await query(
+      `UPDATE portal_messages SET read = TRUE WHERE patient_id = $1 AND dentist_id = $2 AND sender = 'dentist' AND read = FALSE`,
+      [portal.patient_id, portal.dentist_id]
+    );
+
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching portal messages:', error);
+    res.status(500).json({ error: 'Erro ao carregar mensagens' });
+  }
+};
+
+// ─── Get messages (dentist side) ───
+export const getDentistMessages = async (req: Request, res: Response) => {
+  try {
+    const dentistId = req.user?.id;
+    const { patient_id } = req.params;
+
+    const result = await query(
+      `SELECT id, sender, message, read, created_at FROM portal_messages
+       WHERE patient_id = $1 AND dentist_id = $2
+       ORDER BY created_at ASC
+       LIMIT 100`,
+      [patient_id, dentistId]
+    );
+
+    // Mark patient messages as read
+    await query(
+      `UPDATE portal_messages SET read = TRUE WHERE patient_id = $1 AND dentist_id = $2 AND sender = 'patient' AND read = FALSE`,
+      [patient_id, dentistId]
+    );
+
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching dentist messages:', error);
+    res.status(500).json({ error: 'Erro ao carregar mensagens' });
+  }
+};
+
+// ─── Send message (dentist side) ───
+export const sendDentistMessage = async (req: Request, res: Response) => {
+  try {
+    const dentistId = req.user?.id;
+    const { patient_id } = req.params;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Mensagem não pode ser vazia' });
+    }
+
+    if (message.length > 2000) {
+      return res.status(400).json({ error: 'Mensagem muito longa (máx. 2000 caracteres)' });
+    }
+
+    // Verify patient belongs to dentist
+    const check = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [patient_id, dentistId]);
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    await query(
+      `INSERT INTO portal_messages (patient_id, dentist_id, sender, message) VALUES ($1, $2, 'dentist', $3)`,
+      [patient_id, dentistId, message.trim()]
+    );
+
+    res.json({ message: 'Mensagem enviada!' });
+  } catch (error: any) {
+    console.error('Error sending dentist message:', error);
+    res.status(500).json({ error: 'Erro ao enviar mensagem' });
+  }
+};
+
+// ─── Get unread message counts (dentist side) ───
+export const getUnreadMessageCounts = async (req: Request, res: Response) => {
+  try {
+    const dentistId = req.user?.id;
+
+    const result = await query(
+      `SELECT pm.patient_id, p.name as patient_name, COUNT(*) as unread_count, MAX(pm.created_at) as last_message_at
+       FROM portal_messages pm
+       JOIN patients p ON p.id = pm.patient_id
+       WHERE pm.dentist_id = $1 AND pm.sender = 'patient' AND pm.read = FALSE
+       GROUP BY pm.patient_id, p.name
+       ORDER BY last_message_at DESC`,
+      [dentistId]
+    );
+
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching unread counts:', error);
+    res.status(500).json({ error: 'Erro ao buscar mensagens não lidas' });
+  }
+};
+
+// ─── Inform payment (patient side) ───
+export const informPayment = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+    const { installment_id, amount, notes } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'Valor é obrigatório' });
+    }
+
+    // Create a message to the dentist informing payment
+    const msg = installment_id
+      ? `💰 Informo que realizei o pagamento da parcela #${installment_id} no valor de R$ ${Number(amount).toFixed(2)}. ${notes || ''}`
+      : `💰 Informo que realizei um pagamento no valor de R$ ${Number(amount).toFixed(2)}. ${notes || ''}`;
+
+    await query(
+      `INSERT INTO portal_messages (patient_id, dentist_id, sender, message) VALUES ($1, $2, 'patient', $3)`,
+      [portal.patient_id, portal.dentist_id, msg.trim()]
+    );
+
+    res.json({ message: 'Pagamento informado! A clínica confirmará o recebimento.' });
+  } catch (error: any) {
+    console.error('Error informing payment:', error);
+    res.status(500).json({ error: 'Erro ao informar pagamento' });
+  }
+};
+
+// ─── Get clinic PIX info (patient side) ───
+export const getClinicPixInfo = async (req: Request, res: Response) => {
+  try {
+    const portal = (req as any).portal;
+
+    const result = await query(
+      `SELECT pix_key, pix_key_type, pix_beneficiary_name, name, clinic_name FROM users WHERE id = $1`,
+      [portal.dentist_id]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].pix_key) {
+      return res.json({ has_pix: false });
+    }
+
+    const row = result.rows[0];
+    res.json({
+      has_pix: true,
+      pix_key: row.pix_key,
+      pix_key_type: row.pix_key_type,
+      beneficiary_name: row.pix_beneficiary_name || row.clinic_name || row.name
+    });
+  } catch (error: any) {
+    console.error('Error fetching PIX info:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados PIX' });
   }
 };
 

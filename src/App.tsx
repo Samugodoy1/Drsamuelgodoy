@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Routes, Route, useParams, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
@@ -57,6 +57,7 @@ import { Finance } from './components/Finance';
 import { PreAtendimento } from './components/PreAtendimento';
 import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
+import { MLInsights } from './components/MLInsights';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
 // Types
@@ -367,7 +368,7 @@ const LegacyClinicalRedirect = () => {
 
 export default function App() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -455,7 +456,7 @@ export default function App() {
       return true;
     }).map(inst => {
       const plan = paymentPlans.find(p => p.id === inst.payment_plan_id);
-      const patient = patients.find(p => p.id === inst.patient_id);
+      const patient = patientMap.get(inst.patient_id);
       return {
         'Data': formatDate(inst.due_date),
         'Paciente': patient?.name || 'N/A',
@@ -534,13 +535,86 @@ export default function App() {
   const [weekSuggestionSheet, setWeekSuggestionSheet] = useState<{ date: Date; start: string; end: string; duration: number; procedure: string } | null>(null);
 
   useEffect(() => {
+    if (activeTab !== 'dashboard' && activeTab !== 'agenda') return;
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTab]);
 
   const [statusFilter, setStatusFilter] = useState<string[]>(['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']);
   const [agendaSearchTerm, setAgendaSearchTerm] = useState('');
+
+  // ─── O(1) patient lookup map ─────────────────────────────────────────
+  const patientMap = useMemo(() => {
+    const map = new Map<number, typeof patients[0]>();
+    for (const p of patients) map.set(p.id, p);
+    return map;
+  }, [patients]);
+
+  // ─── Memoized filtered appointments ──────────────────────────────────
+  const filteredAppointments = useMemo(() => {
+    const effectiveStatusFilter = [...statusFilter, 'FINISHED', 'NO_SHOW'].filter((v, i, a) => a.indexOf(v) === i);
+    let filtered = appointments
+      .filter(a => effectiveStatusFilter.length === 0 || effectiveStatusFilter.includes(a.status))
+      .filter(a => agendaSearchTerm === '' || (a.patient_name || '').toLowerCase().includes((agendaSearchTerm || '').toLowerCase()));
+
+    if (agendaViewMode === 'day') {
+      filtered = filtered.filter(a => {
+        const appDate = new Date(a.start_time);
+        return appDate.toDateString() === selectedDate.toDateString();
+      });
+    } else if (agendaViewMode === 'week') {
+      const startOfWeek = new Date(selectedDate);
+      startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      filtered = filtered.filter(a => {
+        const appDate = new Date(a.start_time);
+        return appDate >= startOfWeek && appDate <= endOfWeek;
+      });
+    } else if (agendaViewMode === 'month') {
+      filtered = filtered.filter(a => {
+        const appDate = new Date(a.start_time);
+        return appDate.getMonth() === selectedDate.getMonth() && appDate.getFullYear() === selectedDate.getFullYear();
+      });
+    }
+
+    return filtered.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [appointments, statusFilter, agendaSearchTerm, agendaViewMode, selectedDate]);
   const [agendaFocusMode, setAgendaFocusMode] = useState(true);
+
+  // ─── Agenda date navigation helper ───────────────────────────────────
+  const navigateDate = useCallback((direction: 'prev' | 'next' | 'today') => {
+    if (direction === 'today') { setSelectedDate(new Date()); return; }
+    setSelectedDate(prev => {
+      const d = new Date(prev);
+      const delta = direction === 'next' ? 1 : -1;
+      if (agendaViewMode === 'day' || agendaFocusMode) d.setDate(d.getDate() + delta);
+      else if (agendaViewMode === 'week') d.setDate(d.getDate() + 7 * delta);
+      else d.setMonth(d.getMonth() + delta);
+      return d;
+    });
+  }, [agendaViewMode, agendaFocusMode]);
+
+  // ─── Keyboard shortcuts (agenda) ─────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'agenda') return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case 'ArrowLeft':  e.preventDefault(); navigateDate('prev'); break;
+        case 'ArrowRight': e.preventDefault(); navigateDate('next'); break;
+        case 't': case 'T': e.preventDefault(); navigateDate('today'); break;
+        case '1': e.preventDefault(); setAgendaFocusMode(false); setAgendaViewMode('day'); break;
+        case '2': e.preventDefault(); setAgendaFocusMode(false); setAgendaViewMode('week'); break;
+        case '3': e.preventDefault(); setAgendaFocusMode(false); setAgendaViewMode('month'); break;
+        case 'n': case 'N': e.preventDefault(); openAppointmentModal(); break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTab, navigateDate]);
   const [isEvolutionFormOpen, setIsEvolutionFormOpen] = useState(false);
   const [newEvolution, setNewEvolution] = useState({ notes: '', procedure: '' });
   const [newDentist, setNewDentist] = useState({ name: '', email: '', password: '' });
@@ -557,6 +631,8 @@ export default function App() {
   const [appointmentModalMode, setAppointmentModalMode] = useState<'schedule' | 'reschedule'>('schedule');
   const [editingAppointmentId, setEditingAppointmentId] = useState<number | null>(null);
   const [suggestedSlot, setSuggestedSlot] = useState<{ date: Date; duration: number; procedure: string } | null>(null);
+  const [appointmentFormError, setAppointmentFormError] = useState<string | null>(null);
+  const [appointmentConflict, setAppointmentConflict] = useState<Appointment | null>(null);
 
   const [newPaymentPlan, setNewPaymentPlan] = useState({
     patient_id: '',
@@ -602,13 +678,15 @@ export default function App() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
-  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error', celebration?: boolean } | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error', celebration?: boolean, onUndo?: () => void } | null>(null);
   const [confirmation, setConfirmation] = useState<{ message: string, onConfirm: () => void } | null>(null);
   const [guideDismissedUntil, setGuideDismissedUntil] = useState<string | null>(null);
+  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false) => {
-    setNotification({ message, type, celebration });
-    setTimeout(() => setNotification(null), celebration ? 4500 : 3000);
+  const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false, onUndo?: () => void) => {
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+    setNotification({ message, type, celebration, onUndo });
+    notificationTimerRef.current = setTimeout(() => setNotification(null), onUndo ? 5000 : celebration ? 4500 : 3000);
   };
 
   // ─── Implicit Onboarding: milestone tracking ─────────────────────────
@@ -838,7 +916,7 @@ export default function App() {
     try {
       const patientId = selectedPatient ? selectedPatient.id : newPaymentPlan.patient_id;
       if (!patientId) {
-        alert('Selecione um paciente');
+        showNotification('Selecione um paciente', 'error');
         return;
       }
 
@@ -866,10 +944,11 @@ export default function App() {
         }
       } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao criar plano de pagamento');
+        showNotification(data.error || 'Erro ao criar plano de pagamento', 'error');
       }
     } catch (error) {
       console.error('Error creating payment plan:', error);
+      showNotification('Erro de conexão ao criar plano', 'error');
     }
   };
 
@@ -906,10 +985,11 @@ export default function App() {
         }
       } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao registrar pagamento');
+        showNotification(data.error || 'Erro ao registrar pagamento', 'error');
       }
     } catch (error) {
       console.error('Error paying installment:', error);
+      showNotification('Erro de conexão ao registrar pagamento', 'error');
     }
   };
 
@@ -986,11 +1066,11 @@ export default function App() {
         fetchData();
       } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao salvar transação');
+        showNotification(data.error || 'Erro ao salvar transação', 'error');
       }
     } catch (error) {
       console.error('Error saving transaction:', error);
-      alert('Erro de conexão ao salvar transação');
+      showNotification('Erro de conexão ao salvar transação', 'error');
     }
   };
 
@@ -1276,7 +1356,7 @@ export default function App() {
   };
 
   const openScheduleSuggestion = (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => {
-    const patient = patients.find(p => p.id === patientId);
+    const patient = patientMap.get(patientId);
     if (!patient) return;
     const dentistId = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
     // Calculate duration from start/end times
@@ -1323,7 +1403,7 @@ export default function App() {
 
   const contactPatientOnWhatsApp = (patient: Patient) => {
     if (!patient.phone) {
-      alert('Este paciente não possui telefone cadastrado.');
+      showNotification('Este paciente não possui telefone cadastrado.', 'error');
       return;
     }
 
@@ -1339,7 +1419,7 @@ export default function App() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  const [portalLinkData, setPortalLinkData] = useState<{ url: string; preUrl: string; patientName: string } | null>(null);
+  const [portalLinkData, setPortalLinkData] = useState<{ url: string; preUrl: string | null; patientName: string } | null>(null);
 
   const generatePatientPortalLink = async (patient: Patient) => {
     try {
@@ -1349,17 +1429,20 @@ export default function App() {
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Erro ao gerar link');
+        showNotification(data.error || 'Erro ao gerar link', 'error');
         return;
       }
       const data = await res.json();
+
+      // Only show pre-atendimento link for first visit (no finished appointments)
+      const hasFinished = appointments.some(a => a.patient_id === patient.id && a.status === 'FINISHED');
       setPortalLinkData({
         url: data.portal_url,
-        preUrl: data.pre_atendimento_url,
+        preUrl: hasFinished ? null : data.pre_atendimento_url,
         patientName: patient.name
       });
     } catch {
-      alert('Erro de conexão ao gerar link do portal');
+      showNotification('Erro de conexão ao gerar link do portal', 'error');
     }
   };
 
@@ -1698,47 +1781,61 @@ export default function App() {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAppointmentFormError(null);
+    setAppointmentConflict(null);
 
     // Ensure dentist_id is set - fallback to user if not already set
     const dentist_id = newAppointment.dentist_id || (user?.id ? user.id.toString() : null);
     const savedUser = localStorage.getItem('user');
     const fallbackDentistId = dentist_id || (savedUser ? JSON.parse(savedUser)?.id?.toString() : null);
 
-    // Debug logs
-    console.log('New appointment data:', newAppointment);
-    console.log('User:', user);
-    console.log('Dentist ID:', fallbackDentistId);
-
-    // Improved validation with better error messages
+    // Inline validation — no alert()
     if (!newAppointment.patient_id || newAppointment.patient_id === '') {
-      alert('Por favor, selecione um paciente.');
+      setAppointmentFormError('Selecione um paciente da lista.');
       return;
     }
     if (!fallbackDentistId) {
-      alert('Erro: Dentista não identificado. Tente recarregar a página.');
+      setAppointmentFormError('Dentista não identificado. Recarregue a página.');
       return;
     }
     if (!newAppointment.date || newAppointment.date === '') {
-      alert('Por favor, selecione a data da consulta.');
+      setAppointmentFormError('Selecione a data da consulta.');
       return;
     }
     if (!newAppointment.time || newAppointment.time === '') {
-      alert('Por favor, selecione o horário da consulta.');
+      setAppointmentFormError('Selecione o horário.');
       return;
     }
     if (!newAppointment.duration || newAppointment.duration === '') {
-      alert('Por favor, informe a duração da consulta em minutos.');
+      setAppointmentFormError('Informe a duração em minutos.');
       return;
     }
     const durationMinutes = parseInt(newAppointment.duration, 10);
     if (isNaN(durationMinutes) || durationMinutes <= 0) {
-      alert('A duração da consulta deve ser um número maior que 0.');
+      setAppointmentFormError('A duração deve ser maior que 0.');
       return;
     }
 
     // Calculate start and end times
     const startTime = new Date(`${newAppointment.date}T${newAppointment.time}`);
     const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
+
+    // Conflict detection — check for overlapping appointments
+    const conflicting = appointments.find(a => {
+      if (a.status === 'CANCELLED' || a.status === 'NO_SHOW') return false;
+      if (appointmentModalMode === 'reschedule' && a.id === editingAppointmentId) return false;
+      const aStart = new Date(a.start_time).getTime();
+      const aEnd = new Date(a.end_time).getTime();
+      return startTime.getTime() < aEnd && endTime.getTime() > aStart;
+    });
+
+    if (conflicting) {
+      setAppointmentConflict(conflicting);
+      setAppointmentFormError(
+        `Conflito: ${conflicting.patient_name} às ${new Date(conflicting.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–${new Date(conflicting.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+      );
+      return;
+    }
 
     try {
       const formattedProcedure = formatProcedure(newAppointment.notes || '');
@@ -1761,6 +1858,8 @@ export default function App() {
         setSuggestedSlot(null);
         setAppointmentModalMode('schedule');
         setEditingAppointmentId(null);
+        setAppointmentFormError(null);
+        setAppointmentConflict(null);
         fetchData();
 
         setNewAppointment({ patient_id: '', patient_name: '', dentist_id: '', date: '', time: '', duration: '', notes: '' });
@@ -1771,11 +1870,11 @@ export default function App() {
           isFirstAppointment
         );
       } else {
-        showNotification(data.error || 'Erro ao realizar agendamento', 'error');
+        setAppointmentFormError(data.error || 'Erro ao realizar agendamento.');
       }
     } catch (error) {
       console.error('Error creating appointment:', error);
-      showNotification('Erro de conexão ao realizar agendamento', 'error');
+      setAppointmentFormError('Erro de conexão. Tente novamente.');
     }
   };
 
@@ -1820,14 +1919,14 @@ export default function App() {
         setIsDentistModalOpen(false);
         fetchAdminUsers();
         setNewDentist({ name: '', email: '', password: '' });
-        alert('Dentista cadastrado com sucesso!');
+        showNotification('Dentista cadastrado com sucesso!');
       } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao cadastrar dentista');
+        showNotification(data.error || 'Erro ao cadastrar dentista', 'error');
       }
     } catch (error) {
       console.error('Error creating dentist:', error);
-      alert('Erro de conexão ao cadastrar dentista');
+      showNotification('Erro de conexão ao cadastrar dentista', 'error');
     }
   };
 
@@ -1842,14 +1941,14 @@ export default function App() {
       if (res.ok) {
         setIsEditDentistModalOpen(false);
         fetchAdminUsers();
-        alert('Dentista atualizado com sucesso!');
+        showNotification('Dentista atualizado com sucesso!');
       } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao atualizar dentista');
+        showNotification(data.error || 'Erro ao atualizar dentista', 'error');
       }
     } catch (error) {
       console.error('Error updating dentist:', error);
-      alert('Erro de conexão ao atualizar dentista');
+      showNotification('Erro de conexão ao atualizar dentista', 'error');
     }
   };
 
@@ -1884,6 +1983,8 @@ export default function App() {
   };
 
   const updateStatus = async (id: number, status: Appointment['status']) => {
+    const previousApp = appointments.find(a => a.id === id);
+    const previousStatus = previousApp?.status;
     try {
       const res = await apiFetch(`/api/appointments/${id}/status`, {
         method: 'PATCH',
@@ -1891,7 +1992,7 @@ export default function App() {
       });
       if (res.ok) {
         if (status === 'FINISHED') {
-          const app = appointments.find(a => a.id === id);
+          const app = previousApp;
           if (app) {
             setTransactionType('INCOME');
             setNewTransaction({
@@ -1906,8 +2007,17 @@ export default function App() {
               notes: `Referente ao agendamento #${app.id}`
             });
             setIsTransactionModalOpen(true);
-            setActiveTab('financeiro');
+            showNotification('Consulta finalizada — registre o pagamento quando quiser.', 'success');
           }
+        } else {
+          const statusLabels: Record<string, string> = {
+            SCHEDULED: 'Agendado', CONFIRMED: 'Confirmado', IN_PROGRESS: 'Atendendo',
+            FINISHED: 'Finalizado', CANCELLED: 'Cancelado', NO_SHOW: 'Faltou'
+          };
+          const undoFn = previousStatus ? () => {
+            updateStatus(id, previousStatus);
+          } : undefined;
+          showNotification(`Status alterado para ${statusLabels[status] || status}`, 'success', false, undoFn);
         }
         fetchData();
       }
@@ -2023,7 +2133,7 @@ export default function App() {
 
   const sendReminder = async (app: Appointment) => {
     if (!app.patient_phone) {
-      alert('Este paciente não possui telefone cadastrado.');
+      showNotification('Este paciente não possui telefone cadastrado.', 'error');
       return;
     }
 
@@ -2198,6 +2308,7 @@ export default function App() {
                 <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
+                <SidebarItem id="inteligencia" icon={Sparkles} label="Inteligência ML" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="configuracoes" icon={Settings} label="Configurações" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
               </nav>
             </aside>
@@ -2453,6 +2564,7 @@ export default function App() {
           <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
+          <SidebarItem id="inteligencia" icon={Sparkles} label="Inteligência ML" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           {user?.role?.toUpperCase() === 'ADMIN' && (
             <SidebarItem id="admin" icon={UserCog} label="Gestão de Dentistas" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           )}
@@ -2616,14 +2728,11 @@ export default function App() {
                 patients={patients}
                 appointments={appointments}
                 nextAppointments={nextAppointments}
-                todayAppointmentsTotalCount={todayAppointmentsTotalCount}
                 todayAppointmentsRemainingCount={todayAppointmentsRemainingCount}
                 totalAppointmentsCount={appointments.length}
                 todayRevenue={dailyRevenue}
                 tomorrowUnconfirmedCount={tomorrowUnconfirmedCount}
                 tomorrowUnconfirmedAppointments={tomorrowUnconfirmedAppointments}
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
                 openPatientRecord={openPatientRecord}
                 setIsModalOpen={setIsModalOpen}
                 setActiveTab={setActiveTab}
@@ -2645,105 +2754,134 @@ export default function App() {
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Agenda</h2>
-                        <span className="text-sm font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                          {selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                        </span>
                       </div>
                       {appointments.length <= 3 && (
-                        <p className="text-[13px] text-slate-400">Organize seus horários e envie lembretes automáticos</p>
+                        <p className="text-[13px] text-slate-500">Organize seus horários e envie lembretes automáticos</p>
                       )}
                     </div>
                     <button 
                       onClick={openAppointmentModal}
-                      className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100"
+                      className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors rounded-full hover:bg-slate-100"
                       title="Nova consulta"
+                      aria-label="Novo agendamento"
                     >
-                      <Plus size={18} strokeWidth={2.5} />
+                      <Plus size={20} strokeWidth={2.5} />
                     </button>
                   </div>
 
-                  {/* Focus Mode Toggle and View Controls */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  {/* Date Navigation — Apple Calendar style */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigateDate('prev')}
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors text-slate-500"
+                        aria-label="Anterior"
+                      >
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button
+                        onClick={() => navigateDate('today')}
+                        className={`px-3 py-1.5 text-[13px] font-bold rounded-full transition-all min-h-[36px] ${
+                          selectedDate.toDateString() === new Date().toDateString()
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                        aria-label="Ir para hoje (T)"
+                      >
+                        Hoje
+                      </button>
+                      <button
+                        onClick={() => navigateDate('next')}
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors text-slate-500"
+                        aria-label="Próximo"
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-600">
+                      {agendaViewMode === 'week' && !agendaFocusMode
+                        ? (() => {
+                            const start = new Date(selectedDate);
+                            start.setDate(start.getDate() - start.getDay());
+                            const end = new Date(start);
+                            end.setDate(start.getDate() + 6);
+                            return `${start.getDate()} ${start.toLocaleDateString('pt-BR', { month: 'short' })} – ${end.getDate()} ${end.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`;
+                          })()
+                        : agendaViewMode === 'month' && !agendaFocusMode
+                          ? selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+                          : selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+                      }
+                    </span>
+                  </div>
+
+                  {/* View Mode Controls */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="flex bg-slate-100 p-1 rounded-full">
                       <button 
                         onClick={() => { setAgendaFocusMode(true); setAgendaViewMode('day'); }}
-                        className={`px-6 py-2 text-[13px] font-bold rounded-full transition-all flex items-center gap-2 ${agendaFocusMode ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-5 py-2 text-[13px] font-bold rounded-full transition-all flex items-center gap-2 min-h-[40px] ${agendaFocusMode ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        aria-label="Modo foco"
                       >
                         <Activity size={16} />
-                        Modo Foco
+                        Próximos
                       </button>
                       <button 
-                        onClick={() => setAgendaFocusMode(false)}
-                        className={`px-6 py-2 text-[13px] font-bold rounded-full transition-all flex items-center gap-2 ${!agendaFocusMode ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => { setAgendaFocusMode(false); setAgendaViewMode('day'); }}
+                        className={`px-5 py-2 text-[13px] font-bold rounded-full transition-all min-h-[40px] ${!agendaFocusMode && agendaViewMode === 'day' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        aria-label="Visão diária"
                       >
-                        <List size={16} />
-                        Agenda Completa
+                        Dia
+                      </button>
+                      <button 
+                        onClick={() => { setAgendaFocusMode(false); setAgendaViewMode('week'); }}
+                        className={`px-5 py-2 text-[13px] font-bold rounded-full transition-all min-h-[40px] ${!agendaFocusMode && agendaViewMode === 'week' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        aria-label="Visão semanal"
+                      >
+                        Semana
+                      </button>
+                      <button 
+                        onClick={() => { setAgendaFocusMode(false); setAgendaViewMode('month'); }}
+                        className={`px-5 py-2 text-[13px] font-bold rounded-full transition-all min-h-[40px] ${!agendaFocusMode && agendaViewMode === 'month' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        aria-label="Visão mensal"
+                      >
+                        Mês
                       </button>
                     </div>
-
-                    {!agendaFocusMode && (
-                      <div className="flex bg-slate-100 p-1 rounded-full">
-                        <button 
-                          onClick={() => setAgendaViewMode('day')}
-                          className={`px-4 py-2 text-[12px] font-bold rounded-full transition-all ${agendaViewMode === 'day' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          Dia
-                        </button>
-                        <button 
-                          onClick={() => setAgendaViewMode('week')}
-                          className={`px-4 py-2 text-[12px] font-bold rounded-full transition-all ${agendaViewMode === 'week' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          Semana
-                        </button>
-                        <button 
-                          onClick={() => setAgendaViewMode('month')}
-                          className={`px-4 py-2 text-[12px] font-bold rounded-full transition-all ${agendaViewMode === 'month' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          Mês
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 {/* Timeline */}
+                {loading ? (
+                  <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_8px_40px_rgba(0,0,0,0.02)] overflow-hidden">
+                    <div className="divide-y divide-slate-100">
+                      {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex items-start gap-4 p-5 animate-pulse">
+                          <div className="flex flex-col items-center gap-1 pt-1">
+                            <div className="w-12 h-4 bg-slate-100 rounded-md" />
+                            <div className="w-8 h-3 bg-slate-50 rounded-md" />
+                          </div>
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-slate-100 rounded-full shrink-0" />
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 bg-slate-100 rounded-lg w-2/3" />
+                                <div className="h-3 bg-slate-50 rounded-lg w-1/3" />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <div className="h-8 bg-slate-50 rounded-full w-24" />
+                              <div className="h-8 bg-slate-50 rounded-full w-16" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
                 <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_8px_40px_rgba(0,0,0,0.02)] overflow-hidden no-print">
                   <div className="divide-y divide-slate-100">
                     {(() => {
-                      const getFilteredAppointments = () => {
-                        // Always include FINISHED, NO_SHOW and CANCELLED so status changes remain visible across all views.
-                        const effectiveStatusFilter = [...statusFilter, 'FINISHED', 'NO_SHOW', 'CANCELLED'].filter((v, i, a) => a.indexOf(v) === i);
-                        
-                        let filtered = appointments.filter(a => effectiveStatusFilter.length === 0 || effectiveStatusFilter.includes(a.status))
-                          .filter(a => agendaSearchTerm === '' || (a.patient_name || '').toLowerCase().includes((agendaSearchTerm || '').toLowerCase()));
-
-                        if (agendaViewMode === 'day') {
-                          filtered = filtered.filter(a => {
-                            const appDate = new Date(a.start_time);
-                            // Only include appointments from the selected date
-                            return appDate.toDateString() === selectedDate.toDateString();
-                          });
-                        } else if (agendaViewMode === 'week') {
-                          const startOfWeek = new Date(selectedDate);
-                          startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
-                          const endOfWeek = new Date(startOfWeek);
-                          endOfWeek.setDate(startOfWeek.getDate() + 6);
-
-                          filtered = filtered.filter(a => {
-                            const appDate = new Date(a.start_time);
-                            return appDate >= startOfWeek && appDate <= endOfWeek;
-                          });
-                        } else if (agendaViewMode === 'month') {
-                          filtered = filtered.filter(a => {
-                            const appDate = new Date(a.start_time);
-                            return appDate.getMonth() === selectedDate.getMonth() && appDate.getFullYear() === selectedDate.getFullYear();
-                          });
-                        }
-
-                        return filtered.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-                      };
-
-                      const filtered = getFilteredAppointments();
+                      const filtered = filteredAppointments;
 
                       if (filtered.length === 0 && agendaViewMode === 'day') {
                         return patients.length === 0 ? (
@@ -2817,7 +2955,7 @@ export default function App() {
                                 <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => openPatientRecord(app.patient_id)}>
                                   <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0 overflow-hidden border border-slate-200">
                                     {(() => {
-                                      const patient = patients.find(p => p.id === app.patient_id);
+                                      const patient = patientMap.get(app.patient_id);
                                       return patient?.photo_url ? (
                                         <img src={patient.photo_url} alt={app.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                       ) : (
@@ -2834,14 +2972,22 @@ export default function App() {
                                 <select
                                     value={app.status}
                                     onChange={(e) => updateStatus(app.id, e.target.value as Appointment['status'])}
-                                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-slate-200 rounded text-base sm:text-base font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0"
+                                    aria-label={`Status de ${app.patient_name}`}
+                                    className={`px-3 py-2 border rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0 appearance-none cursor-pointer transition-colors ${
+                                      app.status === 'CONFIRMED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                      app.status === 'IN_PROGRESS' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                      app.status === 'FINISHED' ? 'bg-slate-100 border-slate-200 text-slate-500' :
+                                      app.status === 'CANCELLED' ? 'bg-rose-50 border-rose-200 text-rose-600' :
+                                      app.status === 'NO_SHOW' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                      'bg-white border-slate-200 text-slate-700'
+                                    }`}
                                   >
-                                    <option value="SCHEDULED">Agendado</option>
-                                    <option value="CONFIRMED">Confirmado</option>
-                                    <option value="IN_PROGRESS">Atendendo</option>
-                                    <option value="FINISHED">Finalizado</option>
-                                    <option value="CANCELLED">Cancelado</option>
-                                    <option value="NO_SHOW">Faltou</option>
+                                    <option value="SCHEDULED">⏳ Agendado</option>
+                                    <option value="CONFIRMED">✓ Confirmado</option>
+                                    <option value="IN_PROGRESS">● Atendendo</option>
+                                    <option value="FINISHED">✓ Finalizado</option>
+                                    <option value="CANCELLED">✕ Cancelado</option>
+                                    <option value="NO_SHOW">⊘ Faltou</option>
                                   </select>
                               </div>
 
@@ -2849,7 +2995,7 @@ export default function App() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <button 
                                   onClick={() => {
-                                    const patient = patients.find(p => p.id === app.patient_id);
+                                    const patient = patientMap.get(app.patient_id);
                                     if (patient) openPatientRecord(patient.id);
                                     navigate(`/prontuario/${app.patient_id}`);
                                   }}
@@ -2885,15 +3031,16 @@ export default function App() {
                                 patient_id: '',
                                 dentist_id: user?.id ? user.id.toString() : '',
                                 date: selectedDate.toISOString().split('T')[0],
-                                time: slot.start.replace(':', ''),
+                                time: slot.start,
                                 duration: slot.duration.toString(),
                                 notes: suggestion
                               });
                               setIsModalOpen(true);
                             }}
                           >
-                            <span className="text-xs text-gray-500">
-                              💡 {slot.start} – {slot.end}   {suggestion}
+                            <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                              <Sparkles size={12} className="text-amber-500" />
+                              {slot.start} – {slot.end} • {suggestion}
                             </span>
                           </div>
                         );
@@ -2935,10 +3082,9 @@ export default function App() {
 
                       // Full Agenda Mode - Different views based on agendaViewMode
                       if (agendaViewMode === 'week') {
-                        // Week grid view (always show current week)
-                        const current = new Date();
-                        const startOfWeek = new Date(current);
-                        startOfWeek.setDate(current.getDate() - current.getDay());
+                        // Week grid view — navigable via selectedDate
+                        const startOfWeek = new Date(selectedDate);
+                        startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
                         
                         const weekDays = [];
                         for (let i = 0; i < 7; i++) {
@@ -3098,7 +3244,7 @@ export default function App() {
                                           })}
                                           className="text-xs font-bold text-primary flex items-center gap-1 mx-auto hover:underline"
                                         >
-                                          💡 Ver horário disponível ({bestSlot.start}–{bestSlot.end})
+                                          <Sparkles size={12} className="inline text-amber-500 mr-1" />Ver horário disponível ({bestSlot.start}–{bestSlot.end})
                                         </button>
                                       )}
                                     </div>
@@ -3109,7 +3255,7 @@ export default function App() {
                                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                                     {bestSlot && (
                                       <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
-                                        <span className="text-xs text-amber-700">💡 Horário livre: {bestSlot.start}–{bestSlot.end}</span>
+                                        <span className="text-xs text-amber-700 flex items-center gap-1"><Sparkles size={12} /> Horário livre: {bestSlot.start}–{bestSlot.end}</span>
                                         <button
                                           type="button"
                                           onClick={() => setWeekSuggestionSheet({
@@ -3203,10 +3349,11 @@ export default function App() {
                                                   procedure: getSuggestion(bestSlotSuggestion.duration)
                                                 });
                                               }}
-                                              className="absolute top-1 right-1 z-10 text-[10px] leading-none text-slate-500 bg-white/80 rounded px-0.5 hover:text-slate-600 transition-colors"
-                                              title="Ver sugestao"
+                                              className="absolute top-1 right-1 z-10 text-slate-400 bg-white/80 rounded-full p-0.5 hover:text-amber-500 transition-colors"
+                                              title="Ver sugestão de encaixe"
+                                              aria-label="Ver sugestão de encaixe"
                                             >
-                                              💡
+                                              <Sparkles size={12} />
                                             </button>
                                           )}
                                         </div>
@@ -3258,19 +3405,19 @@ export default function App() {
                                                     }}
                                                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.hover}
                                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = colors.bg}
-                                                    className={`${textColor} rounded text-[8px] px-1 py-0.5 font-medium cursor-pointer transition-colors min-h-6 flex flex-col justify-center overflow-hidden`}
+                                                    className={`${textColor} rounded-lg text-[11px] px-1.5 py-1 font-semibold cursor-pointer transition-colors min-h-7 flex flex-col justify-center overflow-hidden`}
                                                     title={`${app.patient_name} - ${new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
                                                     onClick={() => setWeekSheetSelectedAppointment(app)}
                                                   >
                                                     <div className="truncate leading-tight">{firstName}</div>
-                                                    <div className="text-[7px] opacity-90 leading-tight">
+                                                    <div className="text-[10px] opacity-80 leading-tight">
                                                       {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                   </div>
                                                 );
                                               })}
                                               {dayAppointments.length > 3 && (
-                                                <div className="text-[7px] text-primary font-bold px-1 py-0.5">
+                                                <div className="text-[10px] text-primary font-bold px-1 py-0.5">
                                                   +{dayAppointments.length - 3}
                                                 </div>
                                               )}
@@ -3354,7 +3501,7 @@ export default function App() {
                                       <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 overflow-hidden border border-slate-200 shrink-0">
                                           {(() => {
-                                            const patient = patients.find(p => p.id === weekSheetSelectedAppointment.patient_id);
+                                            const patient = patientMap.get(weekSheetSelectedAppointment.patient_id);
                                             return patient?.photo_url ? (
                                               <img src={patient.photo_url} alt={weekSheetSelectedAppointment.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                             ) : (
@@ -3391,7 +3538,7 @@ export default function App() {
 
                                         <button
                                           onClick={() => {
-                                            const patient = patients.find(p => p.id === weekSheetSelectedAppointment.patient_id);
+                                            const patient = patientMap.get(weekSheetSelectedAppointment.patient_id);
                                             if (patient) openPatientRecord(patient.id);
                                             navigate(`/prontuario/${weekSheetSelectedAppointment.patient_id}`);
                                             setWeekSheetSelectedAppointment(null);
@@ -3437,9 +3584,13 @@ export default function App() {
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                                 className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pb-24"
                               >
-                                <div className="p-6 space-y-5">
+                                {/* Grab handle */}
+                                <div className="flex justify-center pt-3 pb-1">
+                                  <div className="w-9 h-1 rounded-full bg-slate-300" />
+                                </div>
+                                <div className="p-6 pt-2 space-y-5">
                                   <div className="flex items-center justify-between">
-                                    <p className="text-base font-semibold text-slate-800">Sugestao</p>
+                                    <p className="text-base font-semibold text-slate-800">Sugestão de encaixe</p>
                                     <button
                                       onClick={() => setWeekSuggestionSheet(null)}
                                       className="p-2 hover:bg-slate-100 rounded-full transition-colors"
@@ -3461,7 +3612,7 @@ export default function App() {
                                         patient_id: '',
                                         dentist_id: user?.id ? user.id.toString() : '',
                                         date: weekSuggestionSheet.date.toISOString().split('T')[0],
-                                        time: weekSuggestionSheet.start.replace(':', ''),
+                                        time: weekSuggestionSheet.start,
                                         duration: String(weekSuggestionSheet.duration),
                                         notes: weekSuggestionSheet.procedure
                                       });
@@ -3472,249 +3623,6 @@ export default function App() {
                                   >
                                     Agendar
                                   </button>
-                                </div>
-                              </motion.div>
-                            )}
-                          </div>
-                        );
-
-                        return (
-                          <div className="space-y-6">
-                            {/* Week grid */}
-                            <div className="space-y-4">
-                              {/* Week header with day names and dates */}
-                              <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
-                                <div className="grid grid-cols-[80px_repeat(7,1fr)] gap-0 border border-slate-200 rounded-2xl overflow-hidden shadow-sm divide-x divide-slate-200">
-                                  {/* Time column header */}
-                                  <div className="bg-slate-50 p-2 flex items-center justify-center">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Hora</span>
-                                  </div>
-                                  
-                                  {/* Day headers */}
-                                  {weekDays.map((day, idx) => {
-                                    const isToday = day.toDateString() === new Date().toDateString();
-                                    return (
-                                      <div 
-                                        key={idx} 
-                                        className={`p-3 text-center ${
-                                          isToday ? 'bg-primary/10' : 'bg-slate-50'
-                                        }`}
-                                      >
-                                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                          {dayLabels[idx]}
-                                        </div>
-                                        <div className={`text-lg font-bold mt-1 ${isToday ? 'text-primary' : 'text-slate-900'}`}>
-                                          {day.getDate()}
-                                        </div>
-                                        {isToday && (
-                                          <div className="w-1.5 h-1.5 rounded-full bg-primary mx-auto mt-1" />
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              {/* Time slots grid */}
-                              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                {timeSlots.map(hour => (
-                                  <div key={hour} className="grid grid-cols-[80px_repeat(7,1fr)] gap-0 border-b border-slate-200 last:border-b-0 min-h-[60px] divide-x divide-slate-200">
-                                    {/* Time label */}
-                                    <div className="bg-slate-50 p-2 flex items-center justify-center border-b border-slate-200">
-                                      <span className="text-[10px] font-bold text-slate-400">
-                                        {String(hour).padStart(2, '0')}:00
-                                      </span>
-                                    </div>
-
-                                    {/* Day columns */}
-                                    {weekDays.map((day, dayIdx) => {
-                                      const dayAppointments = filtered.filter(a => {
-                                        const appDate = new Date(a.start_time);
-                                        const appHour = appDate.getHours();
-                                        // Show appointment if it starts in this hour
-                                        return appDate.toDateString() === day.toDateString() && appHour === hour;
-                                      }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-                                      const isToday = day.toDateString() === new Date().toDateString();
-
-                                      return (
-                                        <div 
-                                          key={dayIdx}
-                                          className={`p-1.5 relative ${
-                                            isToday ? 'bg-primary/5' : 'bg-white'
-                                          } hover:bg-slate-50 transition-colors`}
-                                        >
-                                          <div className="space-y-1">
-                                            {dayAppointments.slice(0, 3).map(app => {
-                                              const firstName = (app.patient_name || '').split(' ')[0] || app.patient_name;
-                                              const colors = app.status === 'FINISHED'
-                                                ? { bg: '#e2e8f0', hover: '#cbd5e1' }
-                                                : getProcedureColor(app.notes || '');
-                                              const textColor = app.status === 'FINISHED' ? 'text-slate-600' : 'text-white';
-                                              return (
-                                                <div
-                                                  key={app.id}
-                                                  style={{
-                                                    backgroundColor: colors.bg,
-                                                  }}
-                                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.hover}
-                                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = colors.bg}
-                                                  className={`${textColor} rounded text-[8px] px-1 py-0.5 font-medium cursor-pointer transition-colors min-h-6 flex flex-col justify-center overflow-hidden`}
-                                                  title={`${app.patient_name} - ${new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
-                                                  onClick={() => setWeekSheetSelectedAppointment(app)}
-                                                >
-                                                  <div className="truncate leading-tight">{firstName}</div>
-                                                  <div className="text-[7px] opacity-90 leading-tight">
-                                                    {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                            {dayAppointments.length > 3 && (
-                                              <div className="text-[7px] text-primary font-bold px-1 py-0.5">
-                                                +{dayAppointments.length - 3}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Bottom Sheet for selected appointment in week view */}
-                            {weekSheetSelectedAppointment && (
-                              <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="fixed inset-0 z-[999] bg-slate-900/40 backdrop-blur-sm"
-                                onClick={() => setWeekSheetSelectedAppointment(null)}
-                              />
-                            )}
-                            {weekSheetSelectedAppointment && (
-                              <motion.div
-                                initial={{ y: '100%' }}
-                                animate={{ y: 0 }}
-                                exit={{ y: '100%' }}
-                                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pb-32"
-                              >
-                                <div className="p-6 space-y-6">
-                                  {/* Close button and header */}
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <h3 className="text-2xl font-bold text-slate-900">
-                                        {new Date(weekSheetSelectedAppointment.start_time).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', weekday: 'long' })}
-                                      </h3>
-                                      <p className="text-sm text-slate-500 mt-1">Detalhes do Agendamento</p>
-                                    </div>
-                                    <button
-                                      onClick={() => setWeekSheetSelectedAppointment(null)}
-                                      className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                                    >
-                                      <X size={24} className="text-slate-400" />
-                                    </button>
-                                  </div>
-
-                                  {/* Appointment details */}
-                                  <div className="pt-4 space-y-6">
-                                    {/* Time and duration */}
-                                    <div className="space-y-2">
-                                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Horário</p>
-                                      <div className="flex items-center gap-4">
-                                        <div>
-                                          <p className="text-2xl font-bold text-primary">
-                                            {new Date(weekSheetSelectedAppointment.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                          </p>
-                                          <p className="text-[10px] text-slate-400 mt-1">
-                                            {(() => {
-                                              const start = new Date(weekSheetSelectedAppointment.start_time);
-                                              const end = new Date(weekSheetSelectedAppointment.end_time);
-                                              const mins = Math.round((end.getTime() - start.getTime()) / 60000);
-                                              return `${mins}min`;
-                                            })()}
-                                          </p>
-                                        </div>
-                                        <div className="h-12 w-[1px] bg-slate-200" />
-                                        <div>
-                                          <p className="text-sm text-slate-500">Término</p>
-                                          <p className="text-lg font-bold text-slate-700 mt-0.5">
-                                            {new Date(weekSheetSelectedAppointment.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Patient info */}
-                                    <div className="border-t border-slate-100 pt-6 space-y-3">
-                                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Paciente</p>
-                                      <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 overflow-hidden border border-slate-200 shrink-0">
-                                          {(() => {
-                                            const patient = patients.find(p => p.id === weekSheetSelectedAppointment.patient_id);
-                                            return patient?.photo_url ? (
-                                              <img src={patient.photo_url} alt={weekSheetSelectedAppointment.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                            ) : (
-                                              <UserCircle size={24} />
-                                            );
-                                          })()}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <p className="font-bold text-slate-900">{weekSheetSelectedAppointment.patient_name}</p>
-                                          <p className="text-sm text-slate-500 truncate">{weekSheetSelectedAppointment.notes || 'Consulta'}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Status and controls */}
-                                    <div className="border-t border-slate-100 pt-6 space-y-4">
-                                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ações</p>
-                                      <div className="space-y-3">
-                                        <select
-                                          value={weekSheetSelectedAppointment.status}
-                                          onChange={(e) => {
-                                            updateStatus(weekSheetSelectedAppointment.id, e.target.value as Appointment['status']);
-                                            setWeekSheetSelectedAppointment(null);
-                                          }}
-                                          className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                        >
-                                          <option value="SCHEDULED">Agendado</option>
-                                          <option value="CONFIRMED">Confirmado</option>
-                                          <option value="IN_PROGRESS">Atendendo</option>
-                                          <option value="FINISHED">Finalizado</option>
-                                          <option value="CANCELLED">Cancelado</option>
-                                          <option value="NO_SHOW">Faltou</option>
-                                        </select>
-
-                                        <button
-                                          onClick={() => {
-                                            const patient = patients.find(p => p.id === weekSheetSelectedAppointment.patient_id);
-                                            if (patient) openPatientRecord(patient.id);
-                                            navigate(`/prontuario/${weekSheetSelectedAppointment.patient_id}`);
-                                            setWeekSheetSelectedAppointment(null);
-                                          }}
-                                          className="w-full bg-primary text-white px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all"
-                                        >
-                                          <Activity size={18} />
-                                          Iniciar Atendimento
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            sendReminder(weekSheetSelectedAppointment);
-                                            setWeekSheetSelectedAppointment(null);
-                                          }}
-                                          className="w-full bg-slate-50 text-primary px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 transition-all border border-slate-200"
-                                        >
-                                          <MessageCircle size={18} />
-                                          Enviar Lembrete WhatsApp
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
                                 </div>
                               </motion.div>
                             )}
@@ -3759,34 +3667,6 @@ export default function App() {
                           <div className="space-y-4">
                             {/* Calendar grid */}
                             <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-                              {/* Month header with navigation */}
-                              <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                                <div className="flex items-center justify-between">
-                                  <button
-                                    onClick={() => {
-                                      const newDate = new Date(selectedDate);
-                                      newDate.setMonth(newDate.getMonth() - 1);
-                                      setSelectedDate(newDate);
-                                    }}
-                                    className="p-2 hover:bg-white/50 rounded-full transition-colors"
-                                  >
-                                    <ChevronLeft size={20} className="text-slate-600" />
-                                  </button>
-                                  <h3 className="text-xl font-bold text-slate-900 capitalize">
-                                    {selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                                  </h3>
-                                  <button
-                                    onClick={() => {
-                                      const newDate = new Date(selectedDate);
-                                      newDate.setMonth(newDate.getMonth() + 1);
-                                      setSelectedDate(newDate);
-                                    }}
-                                    className="p-2 hover:bg-white/50 rounded-full transition-colors"
-                                  >
-                                    <ChevronRight size={20} className="text-slate-600" />
-                                  </button>
-                                </div>
-                              </div>
 
                               {/* Day headers */}
                               <div className="grid grid-cols-7 gap-0 border-b border-slate-200">
@@ -3881,7 +3761,11 @@ export default function App() {
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                                 className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pb-32"
                               >
-                                <div className="p-6 space-y-6">
+                                {/* Grab handle */}
+                                <div className="flex justify-center pt-3 pb-1">
+                                  <div className="w-9 h-1 rounded-full bg-slate-300" />
+                                </div>
+                                <div className="p-6 pt-2 space-y-6">
                                   {/* Close button and header */}
                                   <div className="flex items-center justify-between">
                                     <div>
@@ -3930,7 +3814,7 @@ export default function App() {
                                                 </div>
                                                 <button
                                                   onClick={() => {
-                                                    const patient = patients.find(p => p.id === app.patient_id);
+                                                    const patient = patientMap.get(app.patient_id);
                                                     if (patient) openPatientRecord(patient.id);
                                                     navigate(`/prontuario/${app.patient_id}`);
                                                     setMonthSheetSelectedDay(null);
@@ -3993,7 +3877,7 @@ export default function App() {
                                               patient_name: '',
                                               dentist_id: dentist_id || '',
                                               date: bestSlot.startTime.toISOString().split('T')[0],
-                                              time: bestSlot.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }).replace(':', ''),
+                                              time: bestSlot.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                                               duration: Math.floor(bestSlot.duration).toString(),
                                               notes: bestSlot.procedure
                                             });
@@ -4034,7 +3918,7 @@ export default function App() {
                       const pastFinishedAppointments = filtered.filter(a => {
                         const appDate = new Date(a.start_time);
                         return a.status === 'FINISHED' && appDate <= _now && appDate.toDateString() === selectedDate.toDateString();
-                      }).sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+                      }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
                       // Remaining appointments (exclude ones already shown above to avoid duplication)
                       const todayAppointments = filtered.filter(a => {
@@ -4151,6 +4035,7 @@ export default function App() {
                     })()}
                   </div>
                 </div>
+                )}
               </div>
             )}
 
@@ -4359,7 +4244,7 @@ export default function App() {
                         <PortalInbox
                           apiFetch={apiFetch}
                           onSchedulePatient={(patientId, _patientName, preferredDate) => {
-                            const p = patients.find(pt => pt.id === patientId);
+                            const p = patientMap.get(patientId);
                             if (p) openPatientAppointmentModal(p);
                           }}
                           onOpenPatient={(id) => {
@@ -4701,6 +4586,7 @@ export default function App() {
                 formatDate={formatDate}
                 setActiveTab={setActiveTab}
                 setIsModalOpen={setIsModalOpen}
+                profile={profile}
               />
             )}
 
@@ -4942,6 +4828,10 @@ export default function App() {
                 </div>
                 <Documents patients={patients} profile={profile} apiFetch={apiFetch} imprimirDocumento={imprimirDocumento} />
               </div>
+            )}
+
+            {activeTab === 'inteligencia' && (
+              <MLInsights openPatientRecord={openPatientRecord} />
             )}
 
             {activeTab === 'configuracoes' && profile && (
@@ -5416,6 +5306,17 @@ export default function App() {
 
               {/* Form - iOS Glass Style */}
               <form onSubmit={handleCreateAppointment} className="p-4 sm:p-5 space-y-4">
+
+                {/* Inline error banner */}
+                {appointmentFormError && (
+                  <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-rose-50/80 border border-rose-200/60 rounded-xl" role="alert">
+                    <AlertCircle size={16} className="text-rose-500 shrink-0" />
+                    <p className="text-[13px] font-medium text-rose-700 flex-1">{appointmentFormError}</p>
+                    <button type="button" onClick={() => { setAppointmentFormError(null); setAppointmentConflict(null); }} className="text-rose-400 hover:text-rose-600 shrink-0">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
                 
                 {/* SEÇÃO 1: Procedimento com sugestões pequenas */}
                 <div>
@@ -5431,13 +5332,14 @@ export default function App() {
                         key={proc.label}
                         type="button"
                         onClick={() => {
+                          setAppointmentFormError(null);
                           setNewAppointment({
                             ...newAppointment, 
                             notes: proc.label,
                             duration: proc.duration
                           });
                         }}
-                        className={`px-2.5 py-1 rounded-full font-medium text-[11px] transition-all border ${
+                        className={`px-3 py-1.5 rounded-full font-medium text-xs transition-all border min-h-[36px] ${
                           proc.label === newAppointment.notes
                             ? 'border-primary bg-primary/10 text-primary'
                             : 'border-slate-200/50 bg-slate-100/30 text-slate-600 hover:bg-slate-100/50'
@@ -5452,32 +5354,40 @@ export default function App() {
                   <input
                     type="text"
                     value={newAppointment.notes || ''}
-                    onChange={(e) => setNewAppointment({...newAppointment, notes: e.target.value})}
+                    onChange={(e) => { setAppointmentFormError(null); setNewAppointment({...newAppointment, notes: e.target.value}); }}
                     placeholder="Procedimento..."
                     maxLength={60}
-                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                    aria-label="Procedimento"
+                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
                   />
                 </div>
 
-                {/* SEÇÃO 2: Paciente (Campo de busca minimalista) */}
+                {/* SEÇÃO 2: Paciente (Campo de busca com feedback visual) */}
                 <div>
-                  <input 
-                    required
-                    type="text"
-                    placeholder="Paciente..."
-                    value={newAppointment.patient_name || ''}
-                    onChange={(e) => {
-                      const name = e.target.value;
-                      setNewAppointment({...newAppointment, patient_name: name});
-                      const matched = patients.find(p => p.name.toLowerCase() === name.toLowerCase());
-                      if (matched) {
-                        setNewAppointment(prev => ({...prev, patient_id: matched.id.toString()}));
-                      }
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
-                  />
+                  <div className="relative">
+                    <input 
+                      required
+                      type="text"
+                      placeholder="Paciente..."
+                      aria-label="Paciente"
+                      value={newAppointment.patient_name || ''}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        setAppointmentFormError(null);
+                        setNewAppointment({...newAppointment, patient_name: name, patient_id: ''});
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all ${
+                        newAppointment.patient_id ? 'border-primary/40 bg-primary/5' : 'border-slate-200/50'
+                      }`}
+                    />
+                    {newAppointment.patient_id && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <CheckCircle size={16} className="text-primary" />
+                      </div>
+                    )}
+                  </div>
                   {newAppointment.patient_name && !newAppointment.patient_id && (
-                    <div className="mt-2 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] max-h-40 overflow-y-auto shadow-lg">
+                    <div className="mt-2 bg-white/90 backdrop-blur-sm border border-slate-200/50 rounded-xl max-h-40 overflow-y-auto shadow-lg">
                       {patients.filter(p => p.name.toLowerCase().includes(newAppointment.patient_name?.toLowerCase() || '')).length > 0 ? (
                         patients.filter(p => p.name.toLowerCase().includes(newAppointment.patient_name?.toLowerCase() || '')).map(p => (
                           <button
@@ -5485,14 +5395,15 @@ export default function App() {
                             type="button"
                             onClick={() => {
                               setNewAppointment({...newAppointment, patient_id: p.id.toString(), patient_name: p.name});
+                              setAppointmentFormError(null);
                             }}
-                            className="w-full text-left px-3.5 py-2 hover:bg-slate-100/50 text-sm text-slate-700 font-medium border-b border-slate-100/30 last:border-b-0 transition-colors"
+                            className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 text-sm text-slate-700 font-medium border-b border-slate-100/30 last:border-b-0 transition-colors min-h-[44px] flex items-center"
                           >
                             {p.name}
                           </button>
                         ))
                       ) : (
-                        <div className="px-3.5 py-2.5 text-xs text-slate-400">Nenhum paciente</div>
+                        <div className="px-3.5 py-2.5 text-xs text-slate-400">Nenhum paciente encontrado</div>
                       )}
                     </div>
                   )}
@@ -5501,36 +5412,39 @@ export default function App() {
                 {/* SEÇÃO 3: Data, Hora, Duração */}
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[11px] text-slate-400 font-medium mb-1 block">Data</label>
+                    <label className="text-[11px] text-slate-500 font-semibold mb-1 block uppercase tracking-wider">Data</label>
                     <input 
                       required
                       type="date" 
                       value={newAppointment.date}
-                      onChange={(e) => setNewAppointment({...newAppointment, date: e.target.value})}
-                      className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
+                      onChange={(e) => { setAppointmentFormError(null); setAppointmentConflict(null); setNewAppointment({...newAppointment, date: e.target.value}); }}
+                      aria-label="Data da consulta"
+                      className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
                     />
                   </div>
                   <div className="grid grid-cols-[1fr_100px] gap-3">
                     <div>
-                      <label className="text-[11px] text-slate-400 font-medium mb-1 block">Horário</label>
+                      <label className="text-[11px] text-slate-500 font-semibold mb-1 block uppercase tracking-wider">Horário</label>
                       <input 
                         required
                         type="time" 
                         value={newAppointment.time}
-                        onChange={(e) => setNewAppointment({...newAppointment, time: e.target.value})}
-                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
+                        onChange={(e) => { setAppointmentFormError(null); setAppointmentConflict(null); setNewAppointment({...newAppointment, time: e.target.value}); }}
+                        aria-label="Horário da consulta"
+                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-slate-400 font-medium mb-1 block">Duração</label>
+                      <label className="text-[11px] text-slate-500 font-semibold mb-1 block uppercase tracking-wider">Duração</label>
                       <input 
                         required
                         type="number" 
                         min="1"
                         value={newAppointment.duration}
-                        onChange={(e) => setNewAppointment({...newAppointment, duration: e.target.value})}
+                        onChange={(e) => { setAppointmentFormError(null); setNewAppointment({...newAppointment, duration: e.target.value}); }}
                         placeholder="30 min"
-                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-[12px] focus:ring-1 focus:ring-primary focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                        aria-label="Duração em minutos"
+                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
                       />
                     </div>
                   </div>
@@ -5545,15 +5459,17 @@ export default function App() {
                       setSuggestedSlot(null);
                       setAppointmentModalMode('schedule');
                       setEditingAppointmentId(null);
+                      setAppointmentFormError(null);
+                      setAppointmentConflict(null);
                     }}
-                    className="flex-1 py-2.5 px-4 border border-slate-200/50 text-slate-700 font-medium rounded-[10px] hover:bg-slate-50/50 active:bg-slate-100/50 transition-all text-sm backdrop-blur-sm"
+                    className="flex-1 py-2.5 px-4 border border-slate-200/50 text-slate-700 font-medium rounded-xl hover:bg-slate-50/50 active:bg-slate-100/50 transition-all text-sm backdrop-blur-sm min-h-[44px]"
                   >
                     Cancelar
                   </button>
                   <button 
                     type="submit"
                     disabled={!newAppointment.patient_id || !newAppointment.date || !newAppointment.time}
-                    className="flex-1 py-2.5 px-4 bg-primary/90 hover:bg-primary text-white font-medium rounded-[10px] active:scale-95 transition-all text-sm shadow-lg shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm"
+                    className="flex-1 py-2.5 px-4 bg-primary/90 hover:bg-primary text-white font-medium rounded-xl active:scale-95 transition-all text-sm shadow-lg shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm min-h-[44px]"
                   >
                     {appointmentModalMode === 'reschedule' ? 'Confirmar reagendamento' : 'Agendar'}
                   </button>
@@ -6508,6 +6424,18 @@ export default function App() {
               <>
                 {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
                 <span className="font-bold text-sm">{notification.message}</span>
+                {notification.onUndo && (
+                  <button
+                    onClick={() => {
+                      notification.onUndo?.();
+                      setNotification(null);
+                      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+                    }}
+                    className="ml-1 px-3 py-1 text-sm font-bold rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                  >
+                    Desfazer
+                  </button>
+                )}
               </>
             )}
           </motion.div>
@@ -6571,11 +6499,12 @@ export default function App() {
                   </button>
                 </div>
                 <p className="text-sm text-slate-500 mb-5">
-                  Links gerados para <span className="font-semibold text-slate-700">{portalLinkData.patientName}</span>. Válidos por 7 dias.
+                  Links gerados para <span className="font-semibold text-slate-700">{portalLinkData.patientName}</span>.
                 </p>
 
                 <div className="space-y-3">
-                  {/* Pre-atendimento link */}
+                  {/* Pre-atendimento link — only for first visit */}
+                  {portalLinkData.preUrl && (
                   <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
                     <div className="flex items-center gap-2 mb-2">
                       <ClipboardList size={16} className="text-emerald-600" />
@@ -6589,13 +6518,14 @@ export default function App() {
                         className="flex-1 text-xs bg-white border border-emerald-200 rounded-lg px-3 py-2 text-slate-600 truncate"
                       />
                       <button
-                        onClick={() => { navigator.clipboard.writeText(portalLinkData.preUrl); }}
+                        onClick={() => { navigator.clipboard.writeText(portalLinkData.preUrl!); }}
                         className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
                       >
                         Copiar
                       </button>
                     </div>
                   </div>
+                  )}
 
                   {/* Portal link */}
                   <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">

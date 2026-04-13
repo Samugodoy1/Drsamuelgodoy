@@ -1,0 +1,603 @@
+/**
+ * Serviço de emissão de NFS-e (Nota Fiscal de Serviço Eletrônica)
+ * 
+ * Implementa o padrão ABRASF 2.04 que é usado pela maioria das prefeituras brasileiras
+ * (via Ginfes, Betha, ISSNet, IPM, SimplISS, etc.)
+ * 
+ * Fluxo real de emissão:
+ * 1. Montar XML do RPS (Recibo Provisório de Serviço)
+ * 2. Assinar o XML com certificado digital ICP-Brasil (A1)
+ * 3. Enviar para a API da prefeitura
+ * 4. Receber resposta com número da NFS-e e código de verificação
+ * 5. Atualizar registro no banco com dados oficiais
+ */
+
+import crypto from 'crypto';
+import { XMLBuilder } from 'fast-xml-parser';
+
+// ══════════════════════════════════════════════════════════════════════
+// TIPOS
+// ══════════════════════════════════════════════════════════════════════
+
+export interface FiscalConfig {
+  id: number;
+  dentist_id: number;
+  cnpj: string;
+  inscricao_municipal: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  regime_tributario: string;
+  endereco_logradouro: string;
+  endereco_numero: string;
+  endereco_complemento: string | null;
+  endereco_bairro: string;
+  endereco_cidade: string;
+  endereco_uf: string;
+  endereco_cep: string;
+  codigo_municipio_ibge: string;
+  telefone: string | null;
+  email: string | null;
+  certificado_base64: string | null;
+  certificado_senha: string | null;
+  certificado_validade: string | null;
+  nfse_provider: string;
+  nfse_ambiente: 'HOMOLOGACAO' | 'PRODUCAO';
+  nfse_url_homologacao: string | null;
+  nfse_url_producao: string | null;
+  nfse_usuario: string | null;
+  nfse_senha: string | null;
+  codigo_servico: string;
+  codigo_cnae: string;
+  aliquota_iss: number;
+  iss_retido: boolean;
+  ultimo_rps: number;
+  serie_rps: string;
+}
+
+export interface RpsData {
+  numero: number;
+  serie: string;
+  tipo: number; // 1 = RPS
+  dataEmissao: string; // YYYY-MM-DD
+  naturezaOperacao: number; // 1 = Tributação no município
+  optanteSimplesNacional: boolean;
+  incentivadorCultural: boolean;
+  // Serviço
+  valorServicos: number;
+  issRetido: boolean;
+  aliquotaIss: number;
+  valorIss: number;
+  valorLiquidoNfse: number;
+  codigoServico: string;
+  codigoCnae: string;
+  codigoMunicipioIncidencia: string;
+  discriminacao: string;
+  // Prestador
+  prestadorCnpj: string;
+  prestadorInscricaoMunicipal: string;
+  // Tomador
+  tomadorCpfCnpj: string | null;
+  tomadorRazaoSocial: string | null;
+  tomadorEmail: string | null;
+  tomadorLogradouro: string | null;
+  tomadorNumero: string | null;
+  tomadorBairro: string | null;
+  tomadorCidade: string | null;
+  tomadorUf: string | null;
+  tomadorCep: string | null;
+}
+
+export interface NfseResponse {
+  success: boolean;
+  nfseNumero: string | null;
+  codigoVerificacao: string | null;
+  protocolo: string | null;
+  xmlRetorno: string | null;
+  linkVisualizacao: string | null;
+  errorMessage: string | null;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PROVEDORES DISPONÍVEIS
+// ══════════════════════════════════════════════════════════════════════
+
+export const NFSE_PROVIDERS = [
+  { id: 'NENHUM', name: 'Nenhum (somente controle interno)', description: 'Notas fiscais são registradas internamente sem envio à prefeitura' },
+  { id: 'GINFES', name: 'Ginfes', description: 'Usado por centenas de municípios (padrão ABRASF)' },
+  { id: 'BETHA', name: 'Betha Sistemas', description: 'Provedor usado em SC, RS e outros estados' },
+  { id: 'ISSNET', name: 'ISS.NET', description: 'Provedor usado em diversos municípios' },
+  { id: 'SIMPLISS', name: 'SimplISS', description: 'Sistema simplificado de NFS-e' },
+  { id: 'IPM', name: 'IPM Sistemas', description: 'Usado em municípios do sul do Brasil' },
+  { id: 'NFSE_NACIONAL', name: 'NFS-e Nacional (SEFIN)', description: 'Ambiente nacional unificado (em implantação)' },
+] as const;
+
+export const REGIMES_TRIBUTARIOS = [
+  { id: 'SIMPLES_NACIONAL', name: 'Simples Nacional' },
+  { id: 'LUCRO_PRESUMIDO', name: 'Lucro Presumido' },
+  { id: 'LUCRO_REAL', name: 'Lucro Real' },
+  { id: 'MEI', name: 'MEI (Microempreendedor Individual)' },
+] as const;
+
+// ══════════════════════════════════════════════════════════════════════
+// GERAÇÃO DE XML - PADRÃO ABRASF 2.04
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Gera o XML do RPS no padrão ABRASF 2.04
+ * Este é o formato aceito pela maioria dos provedores (Ginfes, Betha, etc.)
+ */
+export function gerarXmlRps(rps: RpsData): string {
+  const builder = new XMLBuilder({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    format: true,
+    suppressEmptyNode: true,
+  });
+
+  const rpsXml: any = {
+    InfDeclaracaoPrestacaoServico: {
+      '@_Id': `rps_${rps.numero}`,
+      Rps: {
+        IdentificacaoRps: {
+          Numero: rps.numero,
+          Serie: rps.serie,
+          Tipo: rps.tipo,
+        },
+        DataEmissao: rps.dataEmissao,
+        Status: 1, // 1 = Normal
+      },
+      Competencia: rps.dataEmissao,
+      Servico: {
+        Valores: {
+          ValorServicos: rps.valorServicos.toFixed(2),
+          IssRetido: rps.issRetido ? 1 : 2,
+          ValorIss: rps.valorIss.toFixed(2),
+          Aliquota: (rps.aliquotaIss / 100).toFixed(4),
+          ValorLiquidoNfse: rps.valorLiquidoNfse.toFixed(2),
+        },
+        ItemListaServico: rps.codigoServico,
+        CodigoCnae: rps.codigoCnae,
+        CodigoTributacaoMunicipio: rps.codigoServico,
+        Discriminacao: rps.discriminacao,
+        CodigoMunicipio: rps.codigoMunicipioIncidencia,
+      },
+      Prestador: {
+        CpfCnpj: {
+          Cnpj: rps.prestadorCnpj.replace(/\D/g, ''),
+        },
+        InscricaoMunicipal: rps.prestadorInscricaoMunicipal,
+      },
+      ...(rps.tomadorCpfCnpj ? {
+        Tomador: {
+          IdentificacaoTomador: {
+            CpfCnpj: rps.tomadorCpfCnpj.replace(/\D/g, '').length === 11
+              ? { Cpf: rps.tomadorCpfCnpj.replace(/\D/g, '') }
+              : { Cnpj: rps.tomadorCpfCnpj.replace(/\D/g, '') },
+          },
+          RazaoSocial: rps.tomadorRazaoSocial || '',
+          ...(rps.tomadorLogradouro ? {
+            Endereco: {
+              Endereco: rps.tomadorLogradouro,
+              Numero: rps.tomadorNumero || 'S/N',
+              Bairro: rps.tomadorBairro || '',
+              CodigoMunicipio: rps.codigoMunicipioIncidencia,
+              Uf: rps.tomadorUf || '',
+              Cep: rps.tomadorCep?.replace(/\D/g, '') || '',
+            },
+          } : {}),
+          ...(rps.tomadorEmail ? {
+            Contato: { Email: rps.tomadorEmail },
+          } : {}),
+        },
+      } : {}),
+      OptanteSimplesNacional: rps.optanteSimplesNacional ? 1 : 2,
+      IncentivoFiscal: rps.incentivadorCultural ? 1 : 2,
+    },
+  };
+
+  return builder.build(rpsXml);
+}
+
+/**
+ * Envelopa o RPS no lote de envio ABRASF
+ */
+export function gerarXmlLoteRps(
+  rpsXmlContent: string,
+  cnpj: string,
+  inscricaoMunicipal: string,
+  numeroLote: number
+): string {
+  const loteXml = `<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+  <LoteRps Id="lote_${numeroLote}" versao="2.04">
+    <NumeroLote>${numeroLote}</NumeroLote>
+    <CpfCnpj>
+      <Cnpj>${cnpj.replace(/\D/g, '')}</Cnpj>
+    </CpfCnpj>
+    <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
+    <QuantidadeRps>1</QuantidadeRps>
+    <ListaRps>
+      <Rps>
+        ${rpsXmlContent}
+      </Rps>
+    </ListaRps>
+  </LoteRps>
+</EnviarLoteRpsEnvio>`;
+
+  return loteXml;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ASSINATURA DIGITAL (ICP-Brasil / A1)
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Valida se um certificado A1 (PFX/P12) é válido e está dentro da validade
+ */
+export function validarCertificado(pfxBase64: string, senha: string): { valid: boolean; subject?: string; validUntil?: Date; error?: string } {
+  try {
+    const pfxBuffer = Buffer.from(pfxBase64, 'base64');
+    
+    // Tenta carregar o certificado - se a senha estiver errada, vai lançar erro
+    // Node.js não tem API nativa para ler PFX metadata sem tls, então validamos
+    // tentando criar um SecureContext
+    const secureContext = require('tls').createSecureContext({
+      pfx: pfxBuffer,
+      passphrase: senha,
+    });
+
+    if (!secureContext) {
+      return { valid: false, error: 'Certificado inválido ou senha incorreta' };
+    }
+
+    return { valid: true };
+  } catch (error: any) {
+    return { valid: false, error: error.message || 'Certificado inválido ou senha incorreta' };
+  }
+}
+
+/**
+ * Assina o XML com o certificado digital A1 (PFX)
+ * Usa XMLDSig (XML Signature) conforme exigido pela prefeitura
+ * 
+ * NOTA: Para produção real, recomenda-se usar uma lib especializada
+ * como 'xml-crypto' ou 'node-signpdf'. Esta implementação cobre o básico.
+ */
+export function assinarXml(xml: string, pfxBase64: string, senha: string): string {
+  try {
+    const pfxBuffer = Buffer.from(pfxBase64, 'base64');
+    
+    // Extrair chave privada do PFX
+    // Em produção, use uma lib como 'node-forge' para manipulação completa de PKCS12
+    const privateKey = crypto.createPrivateKey({
+      key: pfxBuffer,
+      format: 'der',
+      type: 'pkcs12',
+      passphrase: senha,
+    });
+
+    // Criar hash SHA-256 do conteúdo a assinar
+    const canonicalXml = xml.trim();
+    const digestHash = crypto.createHash('sha256').update(canonicalXml).digest('base64');
+
+    // Assinar
+    const signer = crypto.createSign('SHA256');
+    signer.update(canonicalXml);
+    const signature = signer.sign(privateKey, 'base64');
+
+    // Inserir bloco de assinatura no XML (simplificado)
+    const signatureBlock = `
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+      <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+      <Reference URI="">
+        <Transforms>
+          <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+          <Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+        </Transforms>
+        <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <DigestValue>${digestHash}</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>${signature}</SignatureValue>
+  </Signature>`;
+
+    // Inserir antes do último tag de fechamento
+    const lastClosingTag = xml.lastIndexOf('</');
+    if (lastClosingTag === -1) return xml;
+    
+    return xml.slice(0, lastClosingTag) + signatureBlock + '\n' + xml.slice(lastClosingTag);
+  } catch (error: any) {
+    console.error('Erro ao assinar XML:', error);
+    throw new Error(`Falha na assinatura digital: ${error.message}`);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ENVIO PARA PREFEITURA
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Envia o lote de RPS assinado para a API da prefeitura
+ * Cada provedor tem sua URL e formato específico
+ */
+export async function enviarLoteParaPrefeitura(
+  xmlAssinado: string,
+  config: FiscalConfig
+): Promise<NfseResponse> {
+  const url = config.nfse_ambiente === 'PRODUCAO'
+    ? config.nfse_url_producao
+    : config.nfse_url_homologacao;
+
+  if (!url) {
+    return {
+      success: false,
+      nfseNumero: null,
+      codigoVerificacao: null,
+      protocolo: null,
+      xmlRetorno: null,
+      linkVisualizacao: null,
+      errorMessage: `URL do ambiente de ${config.nfse_ambiente === 'PRODUCAO' ? 'produção' : 'homologação'} não configurada para o provedor ${config.nfse_provider}`,
+    };
+  }
+
+  try {
+    // Montar envelope SOAP (padrão usado pela maioria dos provedores ABRASF)
+    const soapEnvelope = montarEnvelopeSoap(xmlAssinado, 'RecepcionarLoteRps', config);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': 'RecepcionarLoteRps',
+        ...(config.nfse_usuario && config.nfse_senha ? {
+          'Authorization': 'Basic ' + Buffer.from(`${config.nfse_usuario}:${config.nfse_senha}`).toString('base64'),
+        } : {}),
+      },
+      body: soapEnvelope,
+    });
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        nfseNumero: null,
+        codigoVerificacao: null,
+        protocolo: null,
+        xmlRetorno: responseText,
+        linkVisualizacao: null,
+        errorMessage: `HTTP ${response.status}: ${response.statusText}`,
+      };
+    }
+
+    // Parse da resposta - extrair dados da NFS-e
+    return parseRespostaPrefeitura(responseText, config);
+  } catch (error: any) {
+    return {
+      success: false,
+      nfseNumero: null,
+      codigoVerificacao: null,
+      protocolo: null,
+      xmlRetorno: null,
+      linkVisualizacao: null,
+      errorMessage: `Erro de comunicação: ${error.message}`,
+    };
+  }
+}
+
+function montarEnvelopeSoap(xmlContent: string, operation: string, config: FiscalConfig): string {
+  // Escape XML para inserir dentro do SOAP
+  const escapedXml = xmlContent
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:nfse="http://www.abrasf.org.br/nfse.xsd">
+  <soap:Body>
+    <nfse:${operation}Envio>
+      <nfseCabecMsg>
+        <![CDATA[<?xml version="1.0" encoding="UTF-8"?><cabecalho versao="2.04" xmlns="http://www.abrasf.org.br/nfse.xsd"><versaoDados>2.04</versaoDados></cabecalho>]]>
+      </nfseCabecMsg>
+      <nfseDadosMsg>
+        <![CDATA[${xmlContent}]]>
+      </nfseDadosMsg>
+    </nfse:${operation}Envio>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function parseRespostaPrefeitura(xmlResponse: string, config: FiscalConfig): NfseResponse {
+  // Parse simplificado - extrair campos comuns da resposta ABRASF
+  // Em produção, use fast-xml-parser para parse completo
+  
+  const extractTag = (xml: string, tag: string): string | null => {
+    const regex = new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`, 'i');
+    const match = xml.match(regex);
+    return match ? match[1] : null;
+  };
+
+  const nfseNumero = extractTag(xmlResponse, 'Numero') || extractTag(xmlResponse, 'NumeroNfse');
+  const codigoVerificacao = extractTag(xmlResponse, 'CodigoVerificacao');
+  const protocolo = extractTag(xmlResponse, 'Protocolo') || extractTag(xmlResponse, 'NumeroLote');
+  
+  // Verificar erros
+  const codigoErro = extractTag(xmlResponse, 'Codigo');
+  const mensagemErro = extractTag(xmlResponse, 'Mensagem') || extractTag(xmlResponse, 'MensagemRetorno');
+  
+  // Detectar se houve erro
+  const temErro = xmlResponse.includes('<ListaMensagemRetorno>') || 
+                  xmlResponse.includes('<MensagemRetorno>') ||
+                  xmlResponse.includes('<Fault>');
+
+  if (temErro && !nfseNumero) {
+    return {
+      success: false,
+      nfseNumero: null,
+      codigoVerificacao: null,
+      protocolo,
+      xmlRetorno: xmlResponse,
+      linkVisualizacao: null,
+      errorMessage: mensagemErro || `Erro ${codigoErro || 'desconhecido'} na emissão`,
+    };
+  }
+
+  // Montar link de visualização baseado no provedor
+  let linkVisualizacao: string | null = null;
+  if (nfseNumero && codigoVerificacao && config.codigo_municipio_ibge) {
+    // URL genérica Ginfes - ajustar conforme provedor
+    if (config.nfse_provider === 'GINFES') {
+      linkVisualizacao = `https://visualizar.ginfes.com.br/report/consultarNota?__report=nfs_ver4&cdVerificacao=${codigoVerificacao}&numNota=${nfseNumero}&cnpjPrestador=${config.cnpj?.replace(/\D/g, '')}`;
+    }
+  }
+
+  return {
+    success: !!nfseNumero,
+    nfseNumero,
+    codigoVerificacao,
+    protocolo,
+    xmlRetorno: xmlResponse,
+    linkVisualizacao,
+    errorMessage: null,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// EMISSÃO COMPLETA (ORQUETRADOR)
+// ══════════════════════════════════════════════════════════════════════
+
+export interface EmissaoInput {
+  config: FiscalConfig;
+  descricao: string;
+  valor: number;
+  tomadorCpfCnpj: string | null;
+  tomadorNome: string | null;
+  tomadorEmail: string | null;
+}
+
+/**
+ * Orquestra todo o fluxo de emissão de NFS-e:
+ * 1. Valida configuração fiscal
+ * 2. Gera RPS
+ * 3. Monta XML
+ * 4. Assina com certificado
+ * 5. Envia para prefeitura
+ * 6. Retorna resultado
+ */
+export async function emitirNfse(input: EmissaoInput): Promise<{
+  rpsNumero: number;
+  rpsSerie: string;
+  xmlEnvio: string;
+  resultado: NfseResponse;
+}> {
+  const { config, descricao, valor, tomadorCpfCnpj, tomadorNome, tomadorEmail } = input;
+
+  // 1. Validações
+  if (!config.cnpj) throw new Error('CNPJ do prestador não configurado');
+  if (!config.inscricao_municipal) throw new Error('Inscrição municipal não configurada');
+  if (config.nfse_provider === 'NENHUM') {
+    throw new Error('Nenhum provedor de NFS-e configurado. Configure o provedor nas configurações fiscais.');
+  }
+
+  // 2. Calcular valores
+  const aliquota = config.aliquota_iss || 5;
+  const valorIss = config.iss_retido ? 0 : parseFloat((valor * aliquota / 100).toFixed(2));
+  const valorLiquido = valor - (config.iss_retido ? parseFloat((valor * aliquota / 100).toFixed(2)) : 0);
+
+  // 3. Próximo número RPS
+  const rpsNumero = (config.ultimo_rps || 0) + 1;
+  const rpsSerie = config.serie_rps || 'OHB';
+
+  // 4. Montar dados do RPS
+  const rpsData: RpsData = {
+    numero: rpsNumero,
+    serie: rpsSerie,
+    tipo: 1,
+    dataEmissao: new Date().toISOString().split('T')[0],
+    naturezaOperacao: 1,
+    optanteSimplesNacional: config.regime_tributario === 'SIMPLES_NACIONAL',
+    incentivadorCultural: false,
+    valorServicos: valor,
+    issRetido: config.iss_retido,
+    aliquotaIss: aliquota,
+    valorIss,
+    valorLiquidoNfse: valorLiquido,
+    codigoServico: config.codigo_servico || '8630-5/04',
+    codigoCnae: config.codigo_cnae || '8630504',
+    codigoMunicipioIncidencia: config.codigo_municipio_ibge || '',
+    discriminacao: descricao,
+    prestadorCnpj: config.cnpj,
+    prestadorInscricaoMunicipal: config.inscricao_municipal,
+    tomadorCpfCnpj: tomadorCpfCnpj,
+    tomadorRazaoSocial: tomadorNome,
+    tomadorEmail: tomadorEmail,
+    tomadorLogradouro: null,
+    tomadorNumero: null,
+    tomadorBairro: null,
+    tomadorCidade: null,
+    tomadorUf: null,
+    tomadorCep: null,
+  };
+
+  // 5. Gerar XML do RPS
+  const rpsXml = gerarXmlRps(rpsData);
+
+  // 6. Montar lote
+  const loteXml = gerarXmlLoteRps(rpsXml, config.cnpj, config.inscricao_municipal, rpsNumero);
+
+  // 7. Assinar XML
+  let xmlAssinado = loteXml;
+  if (config.certificado_base64 && config.certificado_senha) {
+    xmlAssinado = assinarXml(loteXml, config.certificado_base64, config.certificado_senha);
+  } else {
+    throw new Error('Certificado digital A1 não configurado. Faça upload do certificado nas configurações fiscais.');
+  }
+
+  // 8. Enviar para prefeitura
+  const resultado = await enviarLoteParaPrefeitura(xmlAssinado, config);
+
+  return {
+    rpsNumero,
+    rpsSerie,
+    xmlEnvio: xmlAssinado,
+    resultado,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// EMISSÃO INTERNA (sem provedor - controle interno)
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Para quem não integrou com a prefeitura ainda,
+ * gera um registro interno com RPS para controle
+ */
+export function emitirInterna(
+  config: Partial<FiscalConfig>,
+  descricao: string,
+  valor: number,
+  rpsNumero: number
+): {
+  rpsNumero: number;
+  rpsSerie: string;
+  invoiceNumber: string;
+  aliquotaIss: number;
+  valorIss: number;
+  valorLiquido: number;
+} {
+  const aliquota = config.aliquota_iss || 5;
+  const valorIss = parseFloat((valor * aliquota / 100).toFixed(2));
+  const valorLiquido = valor - (config.iss_retido ? valorIss : 0);
+
+  return {
+    rpsNumero,
+    rpsSerie: config.serie_rps || 'OHB',
+    invoiceNumber: `RPS-${String(rpsNumero).padStart(6, '0')}`,
+    aliquotaIss: aliquota,
+    valorIss,
+    valorLiquido,
+  };
+}

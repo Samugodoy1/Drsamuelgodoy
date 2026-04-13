@@ -6,7 +6,7 @@ export const getProfile = async (req: Request, res: Response) => {
   const user = req.user!;
   try {
     const result = await dbQuery(
-      'SELECT id, name, email, role, phone, cro, specialty, bio, photo_url, clinic_name, clinic_address, onboarding_done, welcome_seen FROM users WHERE id = $1',
+      'SELECT id, name, email, role, phone, cro, specialty, bio, photo_url, clinic_name, clinic_address, onboarding_done, welcome_seen, pix_key, pix_key_type, pix_beneficiary_name FROM users WHERE id = $1',
       [user.id]
     );
     if (result.rows.length === 0) {

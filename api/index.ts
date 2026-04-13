@@ -32,7 +32,31 @@ import {
   getPaymentPlans,
   getInstallments,
   payInstallment,
-  getFinancialInsights
+  getFinancialInsights,
+  getInsurancePlans,
+  createInsurancePlan,
+  updateInsurancePlan,
+  deleteInsurancePlan,
+  linkPatientInsurance,
+  getInvoices,
+  createInvoice,
+  cancelInvoice,
+  retryInvoice,
+  downloadInvoiceXml,
+  getCityProviderMapEndpoint,
+  getDelinquencyRecords,
+  syncDelinquency,
+  updateDelinquencyRecord,
+  getPixConfig,
+  savePixConfig,
+  createPixPayment,
+  getPixPayments,
+  confirmPixPayment,
+  createAdvancedPaymentPlan,
+  getFiscalConfig,
+  saveFiscalConfig,
+  uploadCertificado,
+  getNfseProviders,
 } from '../server/controllers/financeController.js';
 import { 
   getDentists, 
@@ -59,6 +83,12 @@ import {
   getSchedulingSuggestionsEndpoint
 } from '../server/controllers/intelligenceController.js';
 import {
+  getAppointmentPredictions,
+  getDelinquencyPredictions,
+  getTreatmentSuggestions,
+  getMLDashboardData
+} from '../server/controllers/mlController.js';
+import {
   generatePortalLink,
   authenticatePortalToken,
   verifyPortalAuth,
@@ -70,7 +100,17 @@ import {
   updateAppointmentRequest,
   uploadPortalDocument,
   getIntakeForms,
-  reviewIntakeForm
+  reviewIntakeForm,
+  confirmAppointment,
+  cancelAppointment,
+  rescheduleAppointment,
+  sendPortalMessage,
+  getPortalMessages,
+  getDentistMessages,
+  sendDentistMessage,
+  getUnreadMessageCounts,
+  informPayment,
+  getClinicPixInfo
 } from '../server/controllers/portalController.js';
 import { authenticate, requireAdmin } from '../server/utils/auth.js';
 import { query } from '../server/utils/db.js';
@@ -118,6 +158,13 @@ app.get(['/portal/data', '/api/portal/data'], verifyPortalAuth, getPortalData);
 app.post(['/portal/intake', '/api/portal/intake'], verifyPortalAuth, submitIntakeForm);
 app.post(['/portal/consent', '/api/portal/consent'], verifyPortalAuth, signConsent);
 app.post(['/portal/request-appointment', '/api/portal/request-appointment'], verifyPortalAuth, requestAppointment);
+app.post(['/portal/confirm-appointment', '/api/portal/confirm-appointment'], verifyPortalAuth, confirmAppointment);
+app.post(['/portal/cancel-appointment', '/api/portal/cancel-appointment'], verifyPortalAuth, cancelAppointment);
+app.post(['/portal/reschedule-appointment', '/api/portal/reschedule-appointment'], verifyPortalAuth, rescheduleAppointment);
+app.post(['/portal/messages', '/api/portal/messages'], verifyPortalAuth, sendPortalMessage);
+app.get(['/portal/messages', '/api/portal/messages'], verifyPortalAuth, getPortalMessages);
+app.post(['/portal/inform-payment', '/api/portal/inform-payment'], verifyPortalAuth, informPayment);
+app.get(['/portal/pix-info', '/api/portal/pix-info'], verifyPortalAuth, getClinicPixInfo);
 app.post(['/portal/upload', '/api/portal/upload'], verifyPortalAuth, upload.single('file'), uploadPortalDocument);
 
 // Protected routes
@@ -149,11 +196,45 @@ app.get(['/finance', '/api/finance'], getTransactions);
 app.get(['/finance/summary', '/api/finance/summary'], getFinancialSummary);
 app.get(['/finance/payment-plans', '/api/finance/payment-plans'], getPaymentPlans);
 app.post(['/finance/payment-plans', '/api/finance/payment-plans'], createPaymentPlan);
+app.post(['/finance/payment-plans/advanced', '/api/finance/payment-plans/advanced'], createAdvancedPaymentPlan);
 app.get(['/finance/installments', '/api/finance/installments'], getInstallments);
 app.patch(['/finance/installments/:id/pay', '/api/finance/installments/:id/pay'], payInstallment);
 app.post(['/finance', '/api/finance'], createTransaction);
 app.delete(['/finance/:id', '/api/finance/:id'], deleteTransaction);
 app.get(['/finance/insights', '/api/finance/insights'], getFinancialInsights);
+
+// Convênios (ANS)
+app.get(['/finance/insurance-plans', '/api/finance/insurance-plans'], getInsurancePlans);
+app.post(['/finance/insurance-plans', '/api/finance/insurance-plans'], createInsurancePlan);
+app.patch(['/finance/insurance-plans/:id', '/api/finance/insurance-plans/:id'], updateInsurancePlan);
+app.delete(['/finance/insurance-plans/:id', '/api/finance/insurance-plans/:id'], deleteInsurancePlan);
+app.post(['/finance/patient-insurance', '/api/finance/patient-insurance'], linkPatientInsurance);
+
+// Notas Fiscais
+app.get(['/finance/invoices', '/api/finance/invoices'], getInvoices);
+app.post(['/finance/invoices', '/api/finance/invoices'], createInvoice);
+app.patch(['/finance/invoices/:id/cancel', '/api/finance/invoices/:id/cancel'], cancelInvoice);
+app.patch(['/finance/invoices/:id/retry', '/api/finance/invoices/:id/retry'], retryInvoice);
+app.get(['/finance/invoices/:id/xml', '/api/finance/invoices/:id/xml'], downloadInvoiceXml);
+
+// Configuração Fiscal (NFS-e)
+app.get(['/finance/fiscal-config', '/api/finance/fiscal-config'], getFiscalConfig);
+app.post(['/finance/fiscal-config', '/api/finance/fiscal-config'], saveFiscalConfig);
+app.post(['/finance/fiscal-config/certificado', '/api/finance/fiscal-config/certificado'], uploadCertificado);
+app.get(['/finance/nfse-providers', '/api/finance/nfse-providers'], getNfseProviders);
+app.get(['/finance/nfse-city-map', '/api/finance/nfse-city-map'], getCityProviderMapEndpoint);
+
+// Inadimplência
+app.get(['/finance/delinquency', '/api/finance/delinquency'], getDelinquencyRecords);
+app.post(['/finance/delinquency/sync', '/api/finance/delinquency/sync'], syncDelinquency);
+app.patch(['/finance/delinquency/:id', '/api/finance/delinquency/:id'], updateDelinquencyRecord);
+
+// Pix
+app.get(['/finance/pix/config', '/api/finance/pix/config'], getPixConfig);
+app.post(['/finance/pix/config', '/api/finance/pix/config'], savePixConfig);
+app.get(['/finance/pix/payments', '/api/finance/pix/payments'], getPixPayments);
+app.post(['/finance/pix/payments', '/api/finance/pix/payments'], createPixPayment);
+app.patch(['/finance/pix/:id/confirm', '/api/finance/pix/:id/confirm'], confirmPixPayment);
 
 // Dentists
 app.get(['/dentists', '/api/dentists'], getDentists);
@@ -174,6 +255,12 @@ app.get(['/intelligence/patients', '/api/intelligence/patients'], getPatientsInt
 app.get(['/intelligence/dashboard', '/api/intelligence/dashboard'], getDashboardData);
 app.get(['/intelligence/scheduling', '/api/intelligence/scheduling'], getSchedulingSuggestionsEndpoint);
 
+// ML Predictions
+app.get(['/ml/dashboard', '/api/ml/dashboard'], getMLDashboardData);
+app.get(['/ml/appointments', '/api/ml/appointments'], getAppointmentPredictions);
+app.get(['/ml/delinquency', '/api/ml/delinquency'], getDelinquencyPredictions);
+app.get(['/ml/treatments', '/api/ml/treatments'], getTreatmentSuggestions);
+
 // Admin
 app.get(['/admin/users', '/api/admin/users'], requireAdmin, getUsers);
 app.patch(['/admin/users/:id', '/api/admin/users/:id'], requireAdmin, updateUser);
@@ -185,5 +272,8 @@ app.get(['/portal/appointment-requests', '/api/portal/appointment-requests'], ge
 app.patch(['/portal/appointment-requests/:id', '/api/portal/appointment-requests/:id'], updateAppointmentRequest);
 app.get(['/portal/intake-forms', '/api/portal/intake-forms'], getIntakeForms);
 app.patch(['/portal/intake-forms/:id/review', '/api/portal/intake-forms/:id/review'], reviewIntakeForm);
+app.get(['/portal/messages/unread', '/api/portal/messages/unread'], getUnreadMessageCounts);
+app.get(['/portal/messages/:patient_id', '/api/portal/messages/:patient_id'], getDentistMessages);
+app.post(['/portal/messages/:patient_id', '/api/portal/messages/:patient_id'], sendDentistMessage);
 
 export default app;

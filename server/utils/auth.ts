@@ -68,6 +68,12 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     path.includes('/portal/intake') ||
     path.includes('/portal/consent') ||
     path.includes('/portal/request-appointment') ||
+    path.includes('/portal/confirm-appointment') ||
+    path.includes('/portal/cancel-appointment') ||
+    path.includes('/portal/reschedule-appointment') ||
+    path.includes('/portal/messages') ||
+    path.includes('/portal/inform-payment') ||
+    path.includes('/portal/pix-info') ||
     path.includes('/portal/upload') ||
     url.includes('/auth/login') || 
     url.includes('/auth/register') || 
@@ -77,6 +83,12 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     url.includes('/portal/intake') ||
     url.includes('/portal/consent') ||
     url.includes('/portal/request-appointment') ||
+    url.includes('/portal/confirm-appointment') ||
+    url.includes('/portal/cancel-appointment') ||
+    url.includes('/portal/reschedule-appointment') ||
+    url.includes('/portal/messages') ||
+    url.includes('/portal/inform-payment') ||
+    url.includes('/portal/pix-info') ||
     url.includes('/portal/upload') ||
     originalUrl.includes('/auth/login') || 
     originalUrl.includes('/auth/register') || 
@@ -86,6 +98,12 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     originalUrl.includes('/portal/intake') ||
     originalUrl.includes('/portal/consent') ||
     originalUrl.includes('/portal/request-appointment') ||
+    originalUrl.includes('/portal/confirm-appointment') ||
+    originalUrl.includes('/portal/cancel-appointment') ||
+    originalUrl.includes('/portal/reschedule-appointment') ||
+    originalUrl.includes('/portal/messages') ||
+    originalUrl.includes('/portal/inform-payment') ||
+    originalUrl.includes('/portal/pix-info') ||
     originalUrl.includes('/portal/upload');
 
   if (isPublic) {

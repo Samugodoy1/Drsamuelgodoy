@@ -58,12 +58,19 @@ interface PortalInboxProps {
 }
 
 export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: PortalInboxProps) {
-  const [activeSection, setActiveSection] = useState<'requests' | 'intake'>('requests');
+  const [activeSection, setActiveSection] = useState<'requests' | 'intake' | 'messages'>('requests');
   const [requests, setRequests] = useState<AppointmentRequest[]>([]);
   const [intakeForms, setIntakeForms] = useState<IntakeForm[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState<IntakeForm | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  // Messages
+  const [unreadThreads, setUnreadThreads] = useState<Array<{ patient_id: number; patient_name: string; unread_count: number; last_message_at: string }>>([]);
+  const [openThread, setOpenThread] = useState<{ patient_id: number; patient_name: string } | null>(null);
+  const [threadMessages, setThreadMessages] = useState<Array<{ id: number; sender: string; message: string; created_at: string }>>([]);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -72,17 +79,43 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
   const loadData = async () => {
     setLoading(true);
     try {
-      const [reqRes, formRes] = await Promise.all([
+      const [reqRes, formRes, msgRes] = await Promise.all([
         apiFetch('/api/portal/appointment-requests'),
-        apiFetch('/api/portal/intake-forms')
+        apiFetch('/api/portal/intake-forms'),
+        apiFetch('/api/portal/messages/unread')
       ]);
       if (reqRes.ok) setRequests(await reqRes.json());
       if (formRes.ok) setIntakeForms(await formRes.json());
+      if (msgRes.ok) setUnreadThreads(await msgRes.json());
     } catch (e) {
       console.error('Error loading portal inbox:', e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadThread = async (patientId: number) => {
+    try {
+      const res = await apiFetch(`/api/portal/messages/${patientId}`);
+      if (res.ok) setThreadMessages(await res.json());
+    } catch {}
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim() || !openThread || sendingReply) return;
+    setSendingReply(true);
+    try {
+      const res = await apiFetch(`/api/portal/messages/${openThread.patient_id}`, {
+        method: 'POST', body: JSON.stringify({ message: replyText.trim() })
+      });
+      if (res.ok) {
+        setReplyText('');
+        loadThread(openThread.patient_id);
+        // Refresh unread counts
+        const msgRes = await apiFetch('/api/portal/messages/unread');
+        if (msgRes.ok) setUnreadThreads(await msgRes.json());
+      }
+    } finally { setSendingReply(false); }
   };
 
   const handleUpdateRequest = async (id: number, status: 'APPROVED' | 'REJECTED') => {
@@ -107,7 +140,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
   const pendingRequests = requests.filter(r => r.status === 'PENDING');
   const pendingForms = intakeForms.filter(f => f.status === 'SUBMITTED');
 
-  const totalPending = pendingRequests.length + pendingForms.length;
+  const totalPending = pendingRequests.length + pendingForms.length + unreadThreads.length;
 
   const formatDateBR = (d: string) => {
     try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
@@ -212,6 +245,73 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
             ))
           )}
         </div>
+
+      {/* ── Mensagens dos Pacientes ── */}
+      {(unreadThreads.length > 0 || openThread) && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <AlertCircle size={14} className="text-blue-500" />
+            Mensagens de Pacientes
+            {unreadThreads.length > 0 && (
+              <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full">{unreadThreads.length}</span>
+            )}
+          </h3>
+
+          {openThread ? (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 p-4 border-b border-slate-100">
+                <button onClick={() => { setOpenThread(null); setThreadMessages([]); }}
+                  className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">
+                  <ChevronRight size={14} className="text-slate-500 rotate-180" />
+                </button>
+                <p className="font-bold text-slate-800 text-sm">{openThread.patient_name}</p>
+              </div>
+              <div className="max-h-80 overflow-y-auto p-4 space-y-2.5 bg-slate-50/50">
+                {threadMessages.map(msg => (
+                  <div key={msg.id} className={`flex ${msg.sender === 'dentist' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                      msg.sender === 'dentist' ? 'bg-emerald-600 text-white rounded-br-md' : 'bg-white text-slate-800 rounded-bl-md shadow-sm border border-slate-100'
+                    }`}>
+                      <p className="whitespace-pre-wrap">{msg.message}</p>
+                      <p className={`text-[10px] mt-1 ${msg.sender === 'dentist' ? 'text-white/60' : 'text-slate-400'}`}>
+                        {new Date(msg.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3 border-t border-slate-100 flex gap-2">
+                <input
+                  type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSendReply(); }}
+                  placeholder="Responder..."
+                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-emerald-300"
+                />
+                <button onClick={handleSendReply} disabled={!replyText.trim() || sendingReply}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-30">
+                  Enviar
+                </button>
+              </div>
+            </div>
+          ) : (
+            unreadThreads.map(thread => (
+              <button key={thread.patient_id}
+                onClick={() => { setOpenThread({ patient_id: thread.patient_id, patient_name: thread.patient_name }); loadThread(thread.patient_id); }}
+                className="w-full flex items-center gap-3 p-4 bg-white rounded-2xl border border-blue-100 shadow-sm hover:bg-blue-50/30 transition-colors text-left"
+              >
+                <div className="w-10 h-10 bg-blue-500/10 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                  {thread.patient_name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-800 text-sm">{thread.patient_name}</p>
+                  <p className="text-xs text-slate-400">{thread.unread_count} mensagem(ns) não lida(s)</p>
+                </div>
+                <ChevronRight size={14} className="text-slate-300 shrink-0" />
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
