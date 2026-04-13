@@ -235,12 +235,63 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isUploadingClinicalImage, setIsUploadingClinicalImage] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
 
+  const selectedActionRef = useRef<HTMLDivElement | null>(null);
+  const paymentModalRef = useRef<HTMLDivElement | null>(null);
+
   // Auto-dismiss upload feedback
   useEffect(() => {
     if (!uploadFeedback) return;
     const timer = setTimeout(() => setUploadFeedback(null), 3500);
     return () => clearTimeout(timer);
   }, [uploadFeedback]);
+
+  // Focus management for selected treatment action modal
+  useEffect(() => {
+    if (!selectedTreatmentAction) return;
+    const el = selectedActionRef.current;
+    const first = el?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"]), input, textarea, select');
+    first?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedTreatmentAction(null);
+      if (e.key === 'Tab') {
+        const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
+        if (!focusable || focusable.length === 0) return;
+        const nodes = Array.from(focusable);
+        const idx = nodes.indexOf(document.activeElement as HTMLElement);
+        if (e.shiftKey) {
+          if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
+        } else {
+          if (idx === nodes.length - 1) { nodes[0].focus(); e.preventDefault(); }
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [selectedTreatmentAction]);
+
+  // Focus management for payment modal
+  useEffect(() => {
+    if (!showPaymentModal) return;
+    const el = paymentModalRef.current;
+    const first = el?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"]), input, textarea, select');
+    first?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowPaymentModal(false);
+      if (e.key === 'Tab') {
+        const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
+        if (!focusable || focusable.length === 0) return;
+        const nodes = Array.from(focusable);
+        const idx = nodes.indexOf(document.activeElement as HTMLElement);
+        if (e.shiftKey) {
+          if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
+        } else {
+          if (idx === nodes.length - 1) { nodes[0].focus(); e.preventDefault(); }
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showPaymentModal]);
   const [isEditingAnamnese, setIsEditingAnamnese] = useState(false);
   const [anamneseForm, setAnamneseForm] = useState({ medical_history: '', allergies: '', medications: '' });
   const [isSavingAnamnese, setIsSavingAnamnese] = useState(false);
@@ -1135,6 +1186,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
   return (
     <div className="min-h-screen bg-[#F7F7F8] pb-24 text-slate-900">
+      <div aria-live="polite" className="sr-only">{uploadFeedback || (isSavingAnamnese ? 'Salvando anamnese' : '')}</div>
       <header className="sticky top-0 z-40 border-b border-slate-100/60 ios-glass-heavy">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-3">
           <div className="rounded-[26px] border border-slate-200/60 bg-white/95 px-4 py-3.5 sm:px-5 shadow-[0_6px_24px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]">
@@ -2199,6 +2251,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       {selectedTreatmentAction && (
         <div className="fixed inset-0 z-[210] flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-[6px] p-0 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedTreatmentAction(null); }}>
           <motion.div
+            ref={selectedActionRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="treatment-action-title"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
@@ -2208,9 +2264,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             {/* iOS drag handle */}
             <div className="ios-drag-handle sm:hidden" />
 
-            <div className="mb-5">
+              <div className="mb-5">
               <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">O que fazer agora?</p>
-              <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">{selectedTreatmentAction.procedure}</h3>
+              <h3 id="treatment-action-title" className="text-xl font-bold text-slate-950 tracking-[-0.02em]">{selectedTreatmentAction.procedure}</h3>
               {selectedTreatmentAction.tooth_number && (
                 <span className="mt-2 inline-flex text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                   dente {selectedTreatmentAction.tooth_number}
@@ -2310,18 +2366,22 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
         ];
         return (
           <div className="fixed inset-0 z-[220] flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-[6px] p-0 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPaymentModal(false); }}>
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-              className="w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] border border-slate-200/60 bg-white p-5 sm:p-6 shadow-[0_-8px_40px_rgba(15,23,42,0.12),0_28px_70px_rgba(15,23,42,0.18)] max-h-[85vh] overflow-y-auto"
-            >
+              <motion.div
+                ref={paymentModalRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="payment-modal-title"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 40 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+                className="w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] border border-slate-200/60 bg-white p-5 sm:p-6 shadow-[0_-8px_40px_rgba(15,23,42,0.12),0_28px_70px_rgba(15,23,42,0.18)] max-h-[85vh] overflow-y-auto"
+              >
               {/* iOS drag handle */}
               <div className="ios-drag-handle sm:hidden" />
               <div className="mb-5">
                 <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 mb-1.5">Pagamento</p>
-                <h3 className="text-xl font-bold text-slate-950 tracking-[-0.02em]">Receber pagamento</h3>
+                <h3 id="payment-modal-title" className="text-xl font-bold text-slate-950 tracking-[-0.02em]">Receber pagamento</h3>
                 <div className="mt-3 flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-slate-50 border border-slate-200/70">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] text-slate-500 font-medium">{unpaid.length} procedimento{unpaid.length !== 1 ? 's' : ''} pendente{unpaid.length !== 1 ? 's' : ''}</p>
