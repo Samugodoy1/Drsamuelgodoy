@@ -44,6 +44,7 @@ export const getAppointments = async (req: Request, res: Response) => {
 export const createAppointment = async (req: Request, res: Response) => {
   const user = req.user!;
   const { patient_id, start_time, end_time, notes } = req.body;
+
   try {
     // Verify patient belongs to this dentist
     const patientCheck = await query('SELECT id FROM patients WHERE id = $1 AND dentist_id = $2', [patient_id, user.id]);
@@ -55,10 +56,10 @@ export const createAppointment = async (req: Request, res: Response) => {
         WHERE dentist_id = $1
           AND status NOT IN ('CANCELLED')
           AND (
-            (start_time < $4 AND end_time > $3)
+            (start_time < $3::timestamp AND end_time > $2::timestamp)
           )
       `,
-      [user.id, patient_id, start_time, end_time]
+      [user.id, start_time, end_time]
     );
     if (conflictCheck.rows.length > 0) {
       return res.status(409).json({ error: 'Já existe um agendamento conflitante neste horário.' });
@@ -66,7 +67,13 @@ export const createAppointment = async (req: Request, res: Response) => {
 
     const result = await query(
       'INSERT INTO appointments (patient_id, dentist_id, start_time, end_time, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [patient_id, user.id, start_time, end_time, notes]
+      [
+        patient_id,
+        user.id,
+        new Date(start_time).toISOString(),
+        new Date(end_time).toISOString(),
+        notes
+      ]
     );
     return res.status(201).json({ id: result.rows[0].id });
   } catch (error: any) {

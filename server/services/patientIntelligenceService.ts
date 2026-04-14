@@ -556,10 +556,7 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
   // The frontend stores appointments in the user's local time as ISO strings,
   // so we must compare using the raw stored values, not JS Date re-interpretation.
   const slotsResult = await query(`
-    SELECT
-      TO_CHAR(start_time, 'YYYY-MM-DD') as slot_date,
-      TO_CHAR(start_time, 'HH24:MI') as slot_start,
-      TO_CHAR(end_time, 'HH24:MI') as slot_end
+    SELECT start_time, end_time
     FROM appointments
     WHERE dentist_id = $1
       AND start_time >= CURRENT_DATE
@@ -573,30 +570,63 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
     return h * 60 + m;
   }
 
-  const bookedSlots = slotsResult.rows.map((r: any) => ({
-    date: r.slot_date as string,
-    startMin: slotTimeToMinutes(r.slot_start),
-    endMin: slotTimeToMinutes(r.slot_end),
-  }));
+  const bookedSlots = slotsResult.rows.map((r: any) => {
+    const startStr = r.start_time.toISOString();
+    const endStr = r.end_time.toISOString();
+
+    const date = startStr.split('T')[0];
+
+    const [startHour, startMinute] = startStr.split('T')[1].slice(0,5).split(':');
+    const [endHour, endMinute] = endStr.split('T')[1].slice(0,5).split(':');
+
+    return {
+      date,
+      startMin: Number(startHour) * 60 + Number(startMinute),
+      endMin: Number(endHour) * 60 + Number(endMinute),
+    };
+  });
+  
 
   // 4. Build all possible (candidate, slot) pairs and score them
   type ScoredPair = { candidate: PatientIntelligence; slot: { date: string; start: string; end: string }; score: number; slotHour: number; durationMinutes: number };
   const scoredPairs: ScoredPair[] = [];
 
   // Build list of next 6 calendar days (as YYYY-MM-DD strings) using the DB server's date
-  const todayResult = await query(`SELECT TO_CHAR(CURRENT_DATE + i, 'YYYY-MM-DD') as d, EXTRACT(DOW FROM CURRENT_DATE + i)::int as dow FROM generate_series(0, 5) i`);
+  const todayResult = [];
+
+  const today = new Date();
+
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+
+    todayResult.push({
+      d: `${year}-${month}-${day}`,
+      dow: d.getDay(),
+    });
+  }
   const nowResult = await query(`SELECT EXTRACT(HOUR FROM NOW())::int as h, EXTRACT(MINUTE FROM NOW())::int as m`);
   const nowHour = nowResult.rows[0].h;
   const nowMinute = nowResult.rows[0].m;
-  const todayStr = todayResult.rows[0].d;
+  const todayStr = todayResult[0].d;
 
-  for (const dayRow of todayResult.rows) {
+  for (const dayRow of todayResult) {
     const dayStr = dayRow.d as string;
     const dow = dayRow.dow as number;
     if (dow === 0) continue; // skip Sunday
 
     const dayBooked = bookedSlots.filter(s => s.date === dayStr);
+    console.log("========");
+    console.log("DIA:", dayStr);
+    console.log("BOOKED DO DIA:", dayBooked);
 
+    for (const b of dayBooked) {
+      console.log("HORARIO OCUPADO:", b.startMin, "-", b.endMin);
+    }
     for (let hour = 8; hour < 18; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         // Skip past slots for today
@@ -613,9 +643,7 @@ export async function getSchedulingSuggestions(dentistId: number): Promise<Sched
 
           // Check if slot overlaps any booked appointment (all in minutes, same date)
           const isOccupied = dayBooked.some(b =>
-            (slotStartMin >= b.startMin && slotStartMin < b.endMin) ||
-            (slotEndMin > b.startMin && slotEndMin <= b.endMin) ||
-            (slotStartMin <= b.startMin && slotEndMin >= b.endMin)
+            slotStartMin < b.endMin && slotEndMin > b.startMin
           );
           if (isOccupied) continue;
 
