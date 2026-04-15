@@ -491,7 +491,7 @@ export default function App() {
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ id: number; name: string; role: string; onboarding_done?: boolean; welcome_seen?: boolean } | null>(null);
+  const [user, setUser] = useState<{ id: number; name: string; role: string; onboarding_done?: boolean; welcome_seen?: boolean; record_opened?: boolean } | null>(null);
   const [loginData, setLoginData] = useState({ email: '', password: '', rememberMe: false });
   const [registerData, setRegisterData] = useState({ 
     name: '', 
@@ -696,7 +696,7 @@ export default function App() {
 
   const getGuideStep = (): { message: string; action: string; tab?: string; onClick?: () => void } | null => {
     if (guideDismissedUntil === activeTab) return null;
-    if (!user) return null;
+    if (!user || loading) return null;
     if (patients.length === 0) {
       if (activeTab === 'pacientes') return null; // already there
       return {
@@ -713,7 +713,8 @@ export default function App() {
         tab: 'agenda',
       };
     }
-    if (!hasMilestone('recordOpened')) {
+    const recordOpened = user?.record_opened || hasMilestone('recordOpened');
+    if (!recordOpened) {
       if (activeTab === 'prontuario') return null;
       return {
         message: 'Explore o prontuário de um paciente — tudo fica reunido ali',
@@ -1337,7 +1338,16 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  const openPatientAppointmentModal = (patient: Patient) => {
+  const getTimeFromPreferredSlot = (preferredTime?: string | null) => {
+    switch (preferredTime) {
+      case 'manha': return '08:00';
+      case 'tarde': return '13:00';
+      case 'noite': return '18:00';
+      default: return '';
+    }
+  };
+
+  const openPatientAppointmentModal = (patient: Patient, preferredDate?: string, preferredTime?: string | null) => {
     const dentistId = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
 
     setAppointmentModalMode('schedule');
@@ -1347,8 +1357,8 @@ export default function App() {
       patient_id: patient.id.toString(),
       patient_name: patient.name,
       dentist_id: dentistId || '',
-      date: new Date().toLocaleDateString('en-CA'),
-      time: '',
+      date: preferredDate || new Date().toLocaleDateString('en-CA'),
+      time: getTimeFromPreferredSlot(preferredTime),
       duration: '30',
       notes: ''
     });
@@ -2033,6 +2043,17 @@ export default function App() {
       const data = await res.json();
       setSelectedPatient(data);
       setMilestone('recordOpened');
+      try {
+        await apiFetch('/api/profile/onboarding', {
+          method: 'PATCH',
+          body: JSON.stringify({ record_opened: true })
+        });
+        const updatedUser = { ...user, record_opened: true };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error('Error saving record opened state:', error);
+      }
       navigate(`/prontuario/${id}`);
     } catch (error) {
       console.error('Error fetching patient record:', error);
@@ -4243,9 +4264,9 @@ export default function App() {
                       {patientsSubView === 'portal' ? (
                         <PortalInbox
                           apiFetch={apiFetch}
-                          onSchedulePatient={(patientId, _patientName, preferredDate) => {
+                          onSchedulePatient={(patientId, _patientName, preferredDate, preferredTime) => {
                             const p = patientMap.get(patientId);
-                            if (p) openPatientAppointmentModal(p);
+                            if (p) openPatientAppointmentModal(p, preferredDate, preferredTime);
                           }}
                           onOpenPatient={(id) => {
                             openPatientRecord(id);
@@ -4983,7 +5004,7 @@ export default function App() {
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Nome Completo</label>
                           <input required type="text" value={profile.name}
                             onChange={(e) => setProfile({...profile, name: e.target.value})}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm" />
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base" />
                         </div>
                         {user.role === 'DENTIST' && (
                           <>
@@ -4992,14 +5013,14 @@ export default function App() {
                                 <label className="text-[11px] text-slate-400 mb-1.5 block">CRO</label>
                                 <input type="text" value={profile.cro || ''}
                                   onChange={(e) => setProfile({...profile, cro: e.target.value})}
-                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                                   placeholder="12345-SP" />
                               </div>
                               <div>
                                 <label className="text-[11px] text-slate-400 mb-1.5 block">Especialidade</label>
                                 <input type="text" value={profile.specialty || ''}
                                   onChange={(e) => setProfile({...profile, specialty: e.target.value})}
-                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                                   placeholder="Ortodontia" />
                               </div>
                             </div>
@@ -5007,7 +5028,7 @@ export default function App() {
                               <label className="text-[11px] text-slate-400 mb-1.5 block">Bio / Descrição Profissional</label>
                               <textarea rows={3} value={profile.bio || ''}
                                 onChange={(e) => setProfile({...profile, bio: e.target.value})}
-                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm resize-none"
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base resize-none"
                                 placeholder="Conte um pouco sobre sua trajetória..." />
                             </div>
                           </>
@@ -5023,13 +5044,13 @@ export default function App() {
                           <label className="text-[11px] text-slate-400 mb-1.5 block">E-mail</label>
                           <input required type="email" value={profile.email}
                             onChange={(e) => setProfile({...profile, email: e.target.value})}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm" />
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base" />
                         </div>
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Telefone</label>
-                          <input type="text" value={profile.phone || ''}
+                          <input type="tel" inputMode="tel" value={profile.phone || ''}
                             onChange={(e) => setProfile({...profile, phone: e.target.value})}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                             placeholder="(00) 00000-0000" />
                         </div>
                       </div>
@@ -5044,14 +5065,14 @@ export default function App() {
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Nome da Clínica</label>
                             <input type="text" value={profile.clinic_name || ''}
                               onChange={(e) => setProfile({...profile, clinic_name: e.target.value})}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                               placeholder="Clínica Sorriso Perfeito" />
                           </div>
                           <div>
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Endereço</label>
                             <input type="text" value={profile.clinic_address || ''}
                               onChange={(e) => setProfile({...profile, clinic_address: e.target.value})}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                               placeholder="Rua Exemplo, 123 - Centro" />
                           </div>
                         </div>
@@ -5065,7 +5086,7 @@ export default function App() {
                         <label className="text-[11px] text-slate-400 mb-1.5 block">Nova Senha</label>
                         <input type="password" value={profilePassword}
                           onChange={(e) => setProfilePassword(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                           placeholder="Deixe em branco para manter a atual" />
                       </div>
                     </div>

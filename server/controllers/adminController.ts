@@ -41,6 +41,9 @@ export const updateSchema = async (req: Request, res: Response) => {
       ADD COLUMN IF NOT EXISTS photo_url TEXT,
       ADD COLUMN IF NOT EXISTS clinic_name TEXT,
       ADD COLUMN IF NOT EXISTS clinic_address TEXT,
+      ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS welcome_seen BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS record_opened BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
       ALTER TABLE patients

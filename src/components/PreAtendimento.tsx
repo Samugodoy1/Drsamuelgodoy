@@ -51,6 +51,9 @@ export function PreAtendimento() {
     chief_complaint: '',
     habits: '',
     family_history: '',
+    cpf: '',
+    birth_date: '',
+    personal_documents: '',
     emergency_contact_name: '',
     emergency_contact_phone: '',
     health_insurance: '',
@@ -202,7 +205,7 @@ export function PreAtendimento() {
   const steps = [
     { title: 'Dados de Saúde', icon: Heart, desc: 'Histórico médico e condições' },
     { title: 'Queixa & Hábitos', icon: Stethoscope, desc: 'Motivo da consulta' },
-    { title: 'Contato de Emergência', icon: Phone, desc: 'Informações adicionais' },
+    { title: 'Informações Pessoais', icon: Phone, desc: 'Dados do paciente e contato' },
     { title: 'Documentos', icon: Upload, desc: 'Envie exames e documentos' },
     { title: 'Termos & Assinatura', icon: Shield, desc: 'Consentimentos legais' }
   ];
@@ -363,31 +366,74 @@ export function PreAtendimento() {
             )}
 
             {step === 2 && (
-              <div className="space-y-4">
-                <FormField
-                  label="Nome do Contato de Emergência"
-                  placeholder="Nome completo"
-                  value={form.emergency_contact_name}
-                  onChange={(v) => setForm({ ...form, emergency_contact_name: v })}
-                />
-                <FormField
-                  label="Telefone de Emergência"
-                  placeholder="(11) 99999-9999"
-                  value={form.emergency_contact_phone}
-                  onChange={(v) => setForm({ ...form, emergency_contact_phone: v })}
-                />
-                <FormField
-                  label="Convênio / Plano de Saúde"
-                  placeholder="Nome do convênio (ou 'Particular')"
-                  value={form.health_insurance}
-                  onChange={(v) => setForm({ ...form, health_insurance: v })}
-                />
-                <FormField
-                  label="Número da Carteirinha"
-                  placeholder="Número do plano/carteirinha"
-                  value={form.health_insurance_number}
-                  onChange={(v) => setForm({ ...form, health_insurance_number: v })}
-                />
+              <div className="space-y-5">
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados do Paciente</p>
+                    <p className="text-sm text-slate-500 mt-1">Complete as informações pessoais do paciente.</p>
+                  </div>
+                  <FormField
+                    label="CPF"
+                    placeholder="000.000.000-00"
+                    type="text"
+                    inputMode="numeric"
+                    value={form.cpf}
+                    onChange={(v) => setForm({ ...form, cpf: v })}
+                  />
+                  <FormField
+                    label="Data de Nascimento"
+                    placeholder="Informe sua data de nascimento"
+                    type="date"
+                    value={form.birth_date}
+                    onChange={(v) => setForm({ ...form, birth_date: v })}
+                  />
+                  <FormField
+                    label="Documentos Pessoais"
+                    placeholder="RG, Cartão SUS, etc."
+                    value={form.personal_documents}
+                    onChange={(v) => setForm({ ...form, personal_documents: v })}
+                  />
+                </div>
+
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Contato de Emergência</p>
+                    <p className="text-sm text-slate-500 mt-1">Pessoa a ser contatada em caso de urgência.</p>
+                  </div>
+                  <FormField
+                    label="Nome do Contato"
+                    placeholder="Nome completo"
+                    value={form.emergency_contact_name}
+                    onChange={(v) => setForm({ ...form, emergency_contact_name: v })}
+                  />
+                  <FormField
+                    label="Telefone de Emergência"
+                    placeholder="(11) 99999-9999"
+                    type="tel"
+                    inputMode="tel"
+                    value={form.emergency_contact_phone}
+                    onChange={(v) => setForm({ ...form, emergency_contact_phone: v })}
+                  />
+                </div>
+
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Convênio</p>
+                    <p className="text-sm text-slate-500 mt-1">Informações do plano de saúde, se houver.</p>
+                  </div>
+                  <FormField
+                    label="Convênio / Plano de Saúde"
+                    placeholder="Nome do convênio (ou 'Particular')"
+                    value={form.health_insurance}
+                    onChange={(v) => setForm({ ...form, health_insurance: v })}
+                  />
+                  <FormField
+                    label="Número da Carteirinha"
+                    placeholder="Número do plano/carteirinha"
+                    value={form.health_insurance_number}
+                    onChange={(v) => setForm({ ...form, health_insurance_number: v })}
+                  />
+                </div>
               </div>
             )}
 
@@ -557,14 +603,16 @@ export function PreAtendimento() {
 
 // ─── Helper components ───
 
-function FormField({ label, placeholder, value, onChange, multiline = false }: {
+function FormField({ label, placeholder, value, onChange, multiline = false, type = 'text', inputMode }: {
   label: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
   multiline?: boolean;
+  type?: string;
+  inputMode?: string;
 }) {
-  const baseClass = "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100";
+  const baseClass = "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-base text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100";
 
   return (
     <div>
@@ -579,7 +627,8 @@ function FormField({ label, placeholder, value, onChange, multiline = false }: {
         />
       ) : (
         <input
-          type="text"
+          type={type}
+          inputMode={inputMode}
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}

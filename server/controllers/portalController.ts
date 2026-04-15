@@ -153,8 +153,8 @@ export const submitIntakeForm = async (req: Request, res: Response) => {
     const portal = (req as any).portal;
     const {
       medical_history, allergies, medications, chief_complaint,
-      habits, family_history, emergency_contact_name,
-      emergency_contact_phone, health_insurance, health_insurance_number
+      habits, family_history, cpf, birth_date, personal_documents,
+      emergency_contact_name, emergency_contact_phone, health_insurance, health_insurance_number
     } = req.body;
 
     // Upsert anamnesis
@@ -173,15 +173,17 @@ export const submitIntakeForm = async (req: Request, res: Response) => {
     );
 
     // Update patient contact info if provided
-    if (emergency_contact_name || emergency_contact_phone || health_insurance) {
+    if (emergency_contact_name || emergency_contact_phone || health_insurance || cpf || birth_date) {
       await query(
         `UPDATE patients SET
            emergency_contact_name = COALESCE($2, emergency_contact_name),
            emergency_contact_phone = COALESCE($3, emergency_contact_phone),
            health_insurance = COALESCE($4, health_insurance),
-           health_insurance_number = COALESCE($5, health_insurance_number)
+           health_insurance_number = COALESCE($5, health_insurance_number),
+           cpf = COALESCE($6, cpf),
+           birth_date = COALESCE($7, birth_date)
          WHERE id = $1`,
-        [portal.patient_id, emergency_contact_name, emergency_contact_phone, health_insurance, health_insurance_number]
+        [portal.patient_id, emergency_contact_name, emergency_contact_phone, health_insurance, health_insurance_number, cpf, birth_date]
       );
     }
 
@@ -365,7 +367,9 @@ export const getAppointmentRequests = async (req: Request, res: Response) => {
   try {
     const dentistId = req.user?.id;
     const result = await query(
-      `SELECT ar.*, p.name as patient_name, p.phone as patient_phone
+      `SELECT ar.id, ar.patient_id, ar.dentist_id, ar.status, ar.notes, ar.preferred_time,
+              ar.preferred_date::text as preferred_date, ar.created_at,
+              p.name as patient_name, p.phone as patient_phone
        FROM appointment_requests ar
        JOIN patients p ON p.id = ar.patient_id
        WHERE ar.dentist_id = $1

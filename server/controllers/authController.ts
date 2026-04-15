@@ -42,7 +42,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const result = await query(
-      'SELECT id, name, email, password, role, status, onboarding_done, welcome_seen FROM users WHERE email = $1',
+      'SELECT id, name, email, password, role, status, onboarding_done, welcome_seen, record_opened FROM users WHERE email = $1',
       [email]
     );
 

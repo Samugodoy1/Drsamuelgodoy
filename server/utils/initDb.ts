@@ -24,6 +24,7 @@ export async function initDb() {
         accepted_privacy_policy BOOLEAN DEFAULT FALSE,
         onboarding_done BOOLEAN DEFAULT FALSE,
         welcome_seen BOOLEAN DEFAULT FALSE,
+        record_opened BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -47,6 +48,12 @@ export async function initDb() {
         END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='welcome_seen') THEN
           ALTER TABLE users ADD COLUMN welcome_seen BOOLEAN DEFAULT FALSE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='record_opened') THEN
+          ALTER TABLE users ADD COLUMN record_opened BOOLEAN DEFAULT FALSE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='record_opened') THEN
+          ALTER TABLE users ADD COLUMN record_opened BOOLEAN DEFAULT FALSE;
         END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='pix_key') THEN
           ALTER TABLE users ADD COLUMN pix_key TEXT;
