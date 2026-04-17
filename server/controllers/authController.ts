@@ -75,7 +75,8 @@ export const login = async (req: Request, res: Response) => {
 
         // Don't send password back
         const { password: _, ...userWithoutPassword } = user;
-        return res.status(200).json({ user: userWithoutPassword, token });
+        const demoMode = user.email === 'demo@clinica.com';
+        return res.status(200).json({ user: { ...userWithoutPassword, demo_mode: demoMode }, token });
       }
     }
 
@@ -86,6 +87,34 @@ export const login = async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error('Login error:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+};
+
+export const demoLogin = async (req: Request, res: Response) => {
+  console.log('demoLogin called - incoming request');
+  try {
+    const result = await query(
+      'SELECT id, name, email, role, status, clinic_name, clinic_address, phone FROM users WHERE email = $1',
+      ['demo@clinica.com']
+    );
+
+    const user = result.rows[0];
+    if (!user || user.status !== 'active') {
+      console.log('Demo user not found or inactive:', user);
+      return res.status(404).json({ error: 'Conta de demonstração não disponível no momento.' });
+    }
+
+    console.log('Demo user found:', user.name);
+    const token = jwt.sign(
+      { id: user.id, name: user.name, role: user.role },
+      getJwtSecret(),
+      { expiresIn: '24h' }
+    );
+
+    return res.status(200).json({ user: { ...user, demo_mode: true }, token });
+  } catch (error: any) {
+    console.error('Demo login error:', error);
     return res.status(500).json({ error: 'Erro interno no servidor' });
   }
 };

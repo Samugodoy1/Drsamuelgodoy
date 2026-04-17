@@ -58,6 +58,7 @@ import { PreAtendimento } from './components/PreAtendimento';
 import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
 import { MLInsights } from './components/MLInsights';
+import { ExploreDemo } from './components/ExploreDemo';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
 // Types
@@ -183,6 +184,7 @@ interface Dentist {
   accepted_terms?: boolean;
   accepted_terms_at?: string;
   accepted_privacy_policy?: boolean;
+  demoMode?: boolean;
 }
 
 interface Appointment {
@@ -697,6 +699,8 @@ export default function App() {
   const getGuideStep = (): { message: string; action: string; tab?: string; onClick?: () => void } | null => {
     if (guideDismissedUntil === activeTab) return null;
     if (!user || loading) return null;
+    // In demo mode, always show guides (fresh experience for each session)
+    const isDemo = user?.demoMode;
     if (patients.length === 0) {
       if (activeTab === 'pacientes') return null; // already there
       return {
@@ -713,7 +717,8 @@ export default function App() {
         tab: 'agenda',
       };
     }
-    const recordOpened = user?.record_opened || hasMilestone('recordOpened');
+    // Force show record guide in demo mode
+    const recordOpened = isDemo ? false : (user?.record_opened || hasMilestone('recordOpened'));
     if (!recordOpened) {
       if (activeTab === 'prontuario') return null;
       return {
@@ -1135,11 +1140,12 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
+        const demoUser = data.user.demo_mode ? { ...data.user, demoMode: true } : data.user;
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(demoUser));
+        setUser(demoUser);
         fetchData(data.token);
-        if (data.user.role === 'DENTIST') {
+        if (demoUser.role === 'DENTIST') {
           // No filter needed
         }
       } else {
@@ -2288,6 +2294,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/explore" element={<ExploreDemo />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/portal/:token" element={<PatientPortal />} />
@@ -2334,6 +2341,17 @@ export default function App() {
               </nav>
             </aside>
             <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col pt-4 md:pt-6 lg:pt-8">
+              {user?.demoMode && (
+                <div className="mx-6 mb-4 rounded-[18px] border border-[#D1E7DB] bg-[#F3FBF6] px-4 py-3 text-sm text-[#1F4D3E] shadow-sm flex items-start justify-between">
+                  <div>
+                    <strong className="block text-[#16432C]">Modo Exploração</strong>
+                    <p className="mt-1 text-[#3F5C4F] text-xs">Dados de exemplo · Sem impacto em produção</p>
+                  </div>
+                  <button onClick={() => { localStorage.clear(); window.location.href = '/'; }} className="text-[#1F4D3E] hover:text-[#16432C] transition-colors text-xs font-medium whitespace-nowrap ml-4">
+                    Sair
+                  </button>
+                </div>
+              )}
               <ClinicalPageRoute 
                 transactions={transactions}
                 appointments={appointments}
@@ -2543,6 +2561,8 @@ export default function App() {
                   <Link to="/termos" className="hover:text-[#8B918E] transition-colors duration-200">Termos</Link>
                   <span>·</span>
                   <Link to="/privacidade" className="hover:text-[#8B918E] transition-colors duration-200">Privacidade</Link>
+                  <span>·</span>
+                  <Link to="/explore" className="hover:text-[#8B918E] transition-colors duration-200">Explorar</Link>
                 </div>
               </div>
             </motion.div>

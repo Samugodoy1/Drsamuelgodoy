@@ -1,4 +1,5 @@
 import { query } from './db.js';
+import bcrypt from 'bcryptjs';
 
 export async function initDb() {
   console.log('Initializing database schema...');
@@ -624,6 +625,107 @@ export async function initDb() {
     // Wait, I'll use a real one I just generated: $2a$10$vI8aWBnW3fID.99Y.99Y.99Y.99Y.99Y.99Y.99Y.99Y.99Y.99Y.
     const validHash = '$2a$10$vI8aWBnW3fID.99Y.99Y.99Y.99Y.99Y.99Y.99Y.99Y.99Y.99Y.';
     await query("UPDATE users SET password = $1 WHERE email = 'admin@clinica.com' AND password LIKE '$2a$10$X/Vl/%'", [validHash]);
+
+    const demoEmail = 'demo@clinica.com';
+    const demoAccount = await query('SELECT id FROM users WHERE email = $1', [demoEmail]);
+    if (demoAccount.rows.length === 0) {
+      const demoPasswordHash = await bcrypt.hash('demo1234', 10);
+      const demoUser = await query(
+        `INSERT INTO users (name, email, password, role, status, clinic_name, clinic_address, phone, bio, accepted_terms, accepted_terms_at, accepted_privacy_policy, onboarding_done, welcome_seen, record_opened)
+         VALUES ($1, $2, $3, 'DENTIST', 'active', $4, $5, $6, $7, TRUE, CURRENT_TIMESTAMP, TRUE, TRUE, TRUE, TRUE)
+         RETURNING id`,
+        [
+          'Clínica Demonstração',
+          demoEmail,
+          demoPasswordHash,
+          'Odonto Demo',
+          'Rua da Demonstração, 456 - Centro, São Paulo',
+          '(11) 98888-7777',
+          'Conta de demonstração com fluxo completo para explorar pacientes, agenda e financeiro.'
+        ]
+      );
+
+      const demoUserId = demoUser.rows[0].id;
+
+      await query(
+        `INSERT INTO patients (dentist_id, name, cpf, birth_date, phone, email, address, treatment_plan, procedures)
+         VALUES
+         ($1, 'Laura Souza', '123.456.789-00', '1984-08-15', '(11) 91234-5678', 'laura.souza@example.com', 'Rua das Flores, 123, São Paulo', $2, $3),
+         ($1, 'Bruno Almeida', '987.654.321-00', '1990-03-25', '(11) 93456-7890', 'bruno.almeida@example.com', 'Av. Paulista, 987, São Paulo', $4, $5);`,
+        [
+          demoUserId,
+          JSON.stringify([{
+            id: 1,
+            procedure: 'Clareamento dental',
+            value: 980.00,
+            status: 'APROVADO',
+            created_at: '2026-02-01'
+          }]),
+          JSON.stringify([{
+            id: 1,
+            procedure: 'Consulta inicial',
+            date: '2026-02-01'
+          }]),
+          JSON.stringify([{
+            id: 2,
+            procedure: 'Restauração em resina',
+            value: 420.00,
+            status: 'PLANEJADO',
+            created_at: '2026-02-03'
+          }]),
+          JSON.stringify([{
+            id: 2,
+            procedure: 'Dente sensível',
+            date: '2026-02-02'
+          }])
+        ]
+      );
+
+      const demoPatients = await query('SELECT id, name FROM patients WHERE dentist_id = $1 ORDER BY name ASC', [demoUserId]);
+      const patientMap: Record<string, number> = {};
+      demoPatients.rows.forEach((row) => {
+        patientMap[row.name] = row.id;
+      });
+
+      await query(
+        `INSERT INTO appointments (patient_id, dentist_id, start_time, end_time, status, notes)
+         VALUES
+         ($1, $2, NOW() + INTERVAL '2 hours', NOW() + INTERVAL '2 hours' + INTERVAL '45 minutes', 'CONFIRMED', 'Revisão de tratamento e alinhamento de agenda.'),
+         ($3, $2, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day' + INTERVAL '50 minutes', 'SCHEDULED', 'Primeira consulta de planejamento.'),
+         ($4, $2, NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days' + INTERVAL '50 minutes', 'FINISHED', 'Consulta realizada com sucesso.');`,
+        [
+          patientMap['Bruno Almeida'],
+          demoUserId,
+          patientMap['Laura Souza'],
+          patientMap['Bruno Almeida']
+        ]
+      );
+
+      await query(
+        `INSERT INTO transactions (dentist_id, type, description, category, amount, payment_method, date, status, patient_id, patient_name, procedure, notes)
+         VALUES
+         ($1, 'INCOME', 'Recebimento de consulta', 'Consulta', 280.00, 'PIX', CURRENT_DATE - INTERVAL '2 days', 'PAID', $2, 'Laura Souza', 'Consulta inicial', 'Recebido via PIX.'),
+         ($1, 'INCOME', 'Pagamento de clareamento', 'Procedimento', 980.00, 'CARTÃO', CURRENT_DATE - INTERVAL '1 day', 'PAID', $2, 'Laura Souza', 'Clareamento dental', 'Entrada recebida.'),
+         ($1, 'EXPENSE', 'Compra de materiais', 'Materiais', 120.00, 'PIX', CURRENT_DATE - INTERVAL '3 days', 'PAID', NULL, NULL, NULL, 'Compra de resinas e anestésicos.');`,
+        [demoUserId, patientMap['Laura Souza']]
+      );
+
+      const paymentPlanResult = await query(
+        `INSERT INTO payment_plans (dentist_id, patient_id, procedure, total_amount, installments_count, status)
+         VALUES ($1, $2, 'Implante unitário + acompanhamento', 2480.00, 3, 'ACTIVE') RETURNING id`,
+        [demoUserId, patientMap['Bruno Almeida']]
+      );
+
+      const paymentPlanId = paymentPlanResult.rows[0].id;
+      await query(
+        `INSERT INTO installments (payment_plan_id, dentist_id, patient_id, number, amount, due_date, status)
+         VALUES
+         ($1, $2, $3, 1, 860.00, CURRENT_DATE + INTERVAL '10 days', 'PENDING'),
+         ($1, $2, $3, 2, 810.00, CURRENT_DATE + INTERVAL '40 days', 'PENDING'),
+         ($1, $2, $3, 3, 810.00, CURRENT_DATE + INTERVAL '70 days', 'PENDING')`,
+        [paymentPlanId, demoUserId, patientMap['Bruno Almeida']]
+      );
+    }
 
     console.log('Database schema initialized successfully.');
   } catch (error) {

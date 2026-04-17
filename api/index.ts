@@ -2,7 +2,7 @@ import '../server/utils/env.js';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 
-import { login, register, requestPasswordReset, resetPassword } from '../server/controllers/authController.js';
+import { login, register, requestPasswordReset, resetPassword, demoLogin } from '../server/controllers/authController.js';
 import { 
   getPatients, 
   getPatientById, 
@@ -148,6 +148,7 @@ app.get('/health', async (req, res) => {
 
 // Auth
 app.post(['/auth/login', '/api/auth/login'], login);
+app.post(['/auth/demo', '/api/auth/demo'], demoLogin);
 app.post(['/auth/register', '/api/auth/register'], register);
 app.post(['/auth/request-password-reset', '/api/auth/request-password-reset'], requestPasswordReset);
 app.post(['/auth/reset-password', '/api/auth/reset-password'], resetPassword);
