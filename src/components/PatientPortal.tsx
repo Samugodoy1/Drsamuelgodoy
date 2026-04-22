@@ -21,6 +21,10 @@ import {
   ClipboardList,
   Phone
 } from '../icons';
+import { getStatusConfig, APPOINTMENT_STATUS_CONFIG, getCountdownLabel, getCountdownColor } from '../constants/statusConfig';
+import { COLORS, getStatusColors } from '../constants/colors';
+import { PatientPortalHome } from './PatientPortalHome';
+import { PatientPortalDepth } from './PatientPortalDepth';
 
 interface PortalData {
   patient: {
@@ -117,17 +121,25 @@ interface PortalData {
   } | null;
 }
 
-type Tab = 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro' | 'agendar';
-
 export function PatientPortal() {
   const { token } = useParams<{ token: string }>();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('inicio');
+  const [showDepth, setShowDepth] = useState(false);
 
-  // Appointment request form
+  // DEBUG: Log token on mount
+  useEffect(() => {
+    console.log('🔧 PatientPortal mounted with token:', token);
+  }, []);
+
+  // Appointment state — needed for home component
+  const [appointmentSubmittingId, setAppointmentSubmittingId] = useState<number | null>(null);
+  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<number | null>(null);
+  const [rescheduleRequestedAppointmentId, setRescheduleRequestedAppointmentId] = useState<number | null>(null);
+
+  // Schedule modal state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     preferred_date: '',
@@ -138,21 +150,19 @@ export function PatientPortal() {
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'new' | 'reschedule'>('new');
   const [scheduleTargetAppointment, setScheduleTargetAppointment] = useState<PortalData['appointments'][number] | null>(null);
-  const [appointmentSubmittingId, setAppointmentSubmittingId] = useState<number | null>(null);
-  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<number | null>(null);
-  const [rescheduleRequestedAppointmentId, setRescheduleRequestedAppointmentId] = useState<number | null>(null);
 
-  const scheduleModalRef = useRef<HTMLDivElement | null>(null);
-  const pixModalRef = useRef<HTMLDivElement | null>(null);
-
-  // Payment
+  // Payment state
   const [actionSubmitting, setActionSubmitting] = useState(false);
-
-  // Payment
   const [showPixModal, setShowPixModal] = useState<{ amount: number; installment_id?: number; label: string } | null>(null);
   const [pixInfo, setPixInfo] = useState<{ has_pix: boolean; pix_key?: string; pix_key_type?: string; beneficiary_name?: string } | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
   const [paymentInformed, setPaymentInformed] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro'>('inicio');
+
+  const scheduleModalRef = useRef<HTMLDivElement | null>(null);
+  const pixModalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     authenticateAndLoad();
@@ -160,8 +170,13 @@ export function PatientPortal() {
 
   const authenticateAndLoad = async () => {
     try {
+      console.log('🔐 PatientPortal: Starting auth with token:', token); // DEBUG
+      
       const authRes = await fetch(`/api/portal/auth/${token}`);
       const authData = await authRes.json();
+      
+      console.log('🔐 Auth response:', { status: authRes.status, ok: authRes.ok, data: authData }); // DEBUG
+      
       if (!authRes.ok) {
         setError(authData.error || 'Link inválido ou expirado');
         setLoading(false);
@@ -170,14 +185,20 @@ export function PatientPortal() {
       setSessionToken(authData.session_token);
 
       // Load portal data
+      console.log('📊 PatientPortal: Fetching /api/portal/data'); // DEBUG
       const dataRes = await fetch('/api/portal/data', {
         headers: { 'Authorization': `Bearer ${authData.session_token}` }
       });
       const portalData = await dataRes.json();
-      if (!dataRes.ok) throw new Error(portalData.error);
+      
+      console.log('📊 Data response:', { status: dataRes.status, ok: dataRes.ok, keys: portalData ? Object.keys(portalData) : 'null' }); // DEBUG
+      
+      if (!dataRes.ok) throw new Error(portalData.error || 'Erro ao carregar dados (status ' + dataRes.status + ')');
       setData(portalData);
+      console.log('✅ Portal data loaded successfully'); // DEBUG
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados');
+      console.error('❌ PatientPortal error:', err); // DEBUG
+      setError(err.message || 'Erro ao carregar dados: ' + String(err));
     } finally {
       setLoading(false);
     }
@@ -386,7 +407,7 @@ export function PatientPortal() {
     </div>
   );
 
-  if (error && !data) return (
+  if (error) return (
     <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center px-6">
       <div className="text-center max-w-sm">
         <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
@@ -398,7 +419,17 @@ export function PatientPortal() {
     </div>
   );
 
-  if (!data) return null;
+  if (!data) return (
+    <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center px-6">
+      <div className="text-center max-w-sm">
+        <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
+          <AlertCircle size={28} className="text-[#FF3B30]" />
+        </div>
+        <h2 className="text-[20px] font-semibold text-[#1C1C1E] mb-2 tracking-tight">Dados não disponíveis</h2>
+        <p className="text-[#8E8E93] text-[15px] leading-relaxed">Não foi possível carregar seus dados. Tente recarregar a página.</p>
+      </div>
+    </div>
+  );
 
   const { patient, clinic, appointments, evolution, files, payment_plans, transactions = [], installments = [] } = data;
 
@@ -445,18 +476,6 @@ export function PatientPortal() {
       : `dia ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
 
     return `Você vem ${dayLabel} às ${formatTimeBR(appointmentDate)}?`;
-  };
-
-  const statusLabel = (s: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      'SCHEDULED': { label: 'Agendado', color: 'bg-[#007AFF]/10 text-[#007AFF]' },
-      'CONFIRMED': { label: 'Confirmado', color: 'bg-[#34C759]/10 text-[#34C759]' },
-      'IN_PROGRESS': { label: 'Em Atendimento', color: 'bg-[#FF9500]/10 text-[#FF9500]' },
-      'FINISHED': { label: 'Finalizado', color: 'bg-[#E5E5EA] text-[#8E8E93]' },
-      'CANCELLED': { label: 'Cancelado', color: 'bg-[#FF3B30]/10 text-[#FF3B30]' },
-      'NO_SHOW': { label: 'Faltou', color: 'bg-[#FF3B30]/10 text-[#FF3B30]' }
-    };
-    return map[s] || { label: s, color: 'bg-[#E5E5EA] text-[#8E8E93]' };
   };
 
   const getGreeting = () => {
@@ -714,132 +733,48 @@ export function PatientPortal() {
         </div>
       </div>
 
-      {/* ─── Content ─── */}
-      <div className="max-w-lg mx-auto px-5 pt-6">
+      {/* ─── Content: Apple-Style Home ─── */}
+      <div className="max-w-lg mx-auto px-5 pt-6 pb-24">
         <AnimatePresence mode="wait">
           <motion.div
-            key={activeTab}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
           >
-            {/* ═══ HOME TAB ═══ */}
-            {activeTab === 'inicio' && (
+            {data && (
+              <PatientPortalHome
+                patient={data.patient}
+                clinic={data.clinic}
+                futureAppointments={futureAppointments}
+                recentProcedures={recentProcedures}
+                onOpenDepth={() => setShowDepth(true)}
+                onConfirmAppointment={handleConfirmAppointment}
+                onRescheduleAppointment={openRescheduleModal}
+                appointmentSubmittingId={appointmentSubmittingId}
+                confirmedAppointmentId={confirmedAppointmentId}
+                rescheduleRequestedAppointmentId={rescheduleRequestedAppointmentId}
+                sessionToken={sessionToken}
+                onChangeTab={setActiveTab}
+                activeTab={activeTab}
+              />
+            )}
+            {activeTab === 'inicio' && false && (
               <div className="space-y-6">
-                {/* ── Greeting with dentist's personal touch ── */}
+                {/* ── Simple greeting: Step back, let appointment shine ── */}
                 {(() => {
                   const firstName = patient.name.split(' ')[0];
-                  const dentistFirstName = clinic?.name?.split(' ').slice(0, 2).join(' ') || 'seu dentista';
-                  const treatmentPlan = patient.treatment_plan || [];
-                  const hasActiveTreatment = treatmentPlan.some((t: any) => String(t.status || '').toUpperCase() !== 'REALIZADO');
-                  const completed = treatmentPlan.filter((t: any) => String(t.status || '').toUpperCase() === 'REALIZADO').length;
-                  const total = treatmentPlan.length;
-                  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-                  const nextStep = treatmentPlan.find((t: any) => String(t.status || '').toUpperCase() !== 'REALIZADO');
-
-                  // Build a warm, contextual dentist message
-                  const lastEvolution = evolution.length > 0 ? evolution[0] : null;
-                  const nextAppt = futureAppointments.length > 0 ? futureAppointments[0] : null;
-
-                  let personalMessage = '';
-                  if (pct === 100 && total > 0) {
-                    personalMessage = `${firstName}, seu tratamento foi concluído com sucesso! Cuide bem do seu sorriso e lembre-se dos retornos periódicos.`;
-                  } else if (nextStep && pct >= 50) {
-                    personalMessage = `${firstName}, estamos na reta final! A próxima etapa é ${nextStep.procedure || 'importante'} — cada passo conta para o resultado.`;
-                  } else if (nextStep && lastEvolution) {
-                    personalMessage = `${firstName}, na última sessão fizemos ${lastEvolution.procedure_performed || 'um bom avanço'}. Agora o próximo passo é ${nextStep.procedure || 'continuar o tratamento'}.`;
-                  } else if (nextAppt && !hasActiveTreatment) {
-                    personalMessage = `${firstName}, te espero na próxima consulta! Qualquer dúvida, é só chamar.`;
-                  } else if (nextStep) {
-                    personalMessage = `${firstName}, vamos começar com ${nextStep.procedure || 'o tratamento'}. Estou te acompanhando em cada etapa.`;
-                  } else {
-                    personalMessage = `${firstName}, que bom ter você aqui! Estou acompanhando sua saúde bucal de perto.`;
-                  }
-
-                  // Treatment case name (derived from plan procedures)
-                  const uniqueProcedures = [...new Set(treatmentPlan.map((t: any) => t.procedure).filter(Boolean))];
-                  const caseName = uniqueProcedures.length === 1
-                    ? uniqueProcedures[0]
-                    : uniqueProcedures.length <= 3
-                    ? uniqueProcedures.join(', ')
-                    : `${uniqueProcedures.slice(0, 2).join(', ')} e mais ${uniqueProcedures.length - 2}`;
-
                   return (
-                    <>
-                      <div>
-                        <p className="text-[#8E8E93] text-[13px] font-medium tracking-wide uppercase">{getGreeting()}</p>
-                        <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight mt-1">
-                          {firstName}
-                        </h1>
-                      </div>
-
-                      {/* Dentist message card */}
-                      <div className="relative overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-                        <div className="absolute top-0 right-0 w-40 h-40 bg-[#0C9B72]/[0.02] rounded-full blur-3xl -translate-y-10 translate-x-10" />
-                        <div className="p-5">
-                          <div className="flex items-start gap-3.5">
-                            {clinic?.photo_url ? (
-                              <img src={clinic.photo_url} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-[#0C9B72]/20 shrink-0 mt-0.5" />
-                            ) : (
-                              <div className="w-10 h-10 bg-[#0C9B72]/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                                <Stethoscope size={18} className="text-[#0C9B72]" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[#1C1C1E] text-[14px] font-semibold tracking-tight">Dr(a). {dentistFirstName}</p>
-                              <p className="text-[#3A3A3C] text-[14px] leading-relaxed mt-1.5 italic">
-                                "{personalMessage}"
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Treatment progress — only if has plan */}
-                      {total > 0 && (
-                        <div className="rounded-2xl bg-white shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[#8E8E93] text-[11px] font-medium uppercase tracking-wider">Seu tratamento</p>
-                              {caseName && (
-                                <p className="text-[#1C1C1E] text-[15px] font-semibold tracking-tight mt-0.5 truncate">{caseName}</p>
-                              )}
-                              <p className="text-[#8E8E93] text-[12px] mt-1">{completed} de {total} etapas</p>
-                            </div>
-                            {/* Minimal thin bar */}
-                            <div className="w-12 h-12 shrink-0 ml-4 relative">
-                              <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
-                                <circle cx="24" cy="24" r="20" fill="none" stroke="#F2F2F7" strokeWidth="3" />
-                                <circle
-                                  cx="24" cy="24" r="20" fill="none"
-                                  stroke="#0C9B72"
-                                  strokeWidth="3"
-                                  strokeLinecap="round"
-                                  strokeDasharray={`${2 * Math.PI * 20}`}
-                                  strokeDashoffset={`${2 * Math.PI * 20 * (1 - pct / 100)}`}
-                                />
-                              </svg>
-                              <span className="absolute inset-0 flex items-center justify-center text-[#1C1C1E] text-[11px] font-bold">{pct}%</span>
-                            </div>
-                          </div>
-
-                          {/* Next step — one line */}
-                          {nextStep && (
-                            <div className="mt-3 pt-3 border-t border-[#F2F2F7] flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#0C9B72] shrink-0" />
-                              <p className="text-[#3A3A3C] text-[13px] truncate">
-                                Próxima: <span className="font-medium">{nextStep.procedure || nextStep.id}</span>
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
+                    <div>
+                      <p className="text-[#8E8E93] text-[13px] font-medium tracking-wide uppercase">{getGreeting()}</p>
+                      <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight mt-1">
+                        {firstName}
+                      </h1>
+                    </div>
                   );
                 })()}
 
-                {/* Hero: Next Appointment + Checklist */}
+                {/* HERO: Next Appointment — Main Focus */}
                 {futureAppointments.length > 0 && (() => {
                   const next = futureAppointments[0];
                   const nextDate = new Date(next.start_time);
@@ -890,95 +825,319 @@ export function PatientPortal() {
                   const singleReminder = reminders[todayIndex];
 
                   return (
-                    <div className="relative overflow-hidden rounded-2xl bg-white shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-[#0C9B72]/[0.03] rounded-full blur-2xl -translate-y-8 translate-x-8" />
-
-                      {/* Countdown badge */}
-                      <div className="px-5 pt-5 pb-0 flex items-start justify-between">
-                        <div>
-                          <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-2">Próxima consulta</p>
-                          <p className="text-[#1C1C1E] text-[22px] font-bold tracking-tight">
-                            {nextDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-                          </p>
-                          <p className="text-[#8E8E93] text-[14px] mt-0.5">
-                            {formatTimeBR(next.start_time)} · Dr(a). {next.dentist_name}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                          <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
-                            daysUntil <= 1
-                              ? 'bg-[#FF9500]/10 text-[#FF9500]'
-                              : next.status === 'CONFIRMED'
-                              ? 'bg-[#34C759]/10 text-[#34C759]'
-                              : 'bg-[#007AFF]/10 text-[#007AFF]'
-                          }`}>
-                            {countdownLabel}
-                          </span>
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusLabel(next.status).color}`}>
-                            {statusLabel(next.status).label}
-                          </span>
-                        </div>
-                      </div>
-
-                      {next.notes && (
-                        <div className="px-5 pt-2">
-                          <p className="text-[#AEAEB2] text-[13px] leading-relaxed">{next.notes}</p>
-                        </div>
-                      )}
-
-                      {/* Friendly reminder */}
-                      {singleReminder && (
-                        <div className="mx-5 mt-4 mb-5 bg-[#F9F5EC] rounded-xl px-4 py-3">
-                          <p className="text-[#5C4A1E] text-[13px] leading-relaxed">
-                            💡 {singleReminder}
-                          </p>
-                        </div>
-                      )}
-
-                      {next.status === 'SCHEDULED' && (
-                        <div className="mx-5 mb-4 border-t border-[#F2F2F7] pt-4">
-                          <p className="text-[#1C1C1E] text-[15px] font-semibold tracking-tight mb-3">
-                            {getConfirmationQuestion(next.start_time)}
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleConfirmAppointment(next.id)}
-                              disabled={appointmentSubmittingId === next.id}
-                              className="h-9 px-5 rounded-full bg-[#1C1C1E] text-white text-[13px] font-semibold tracking-tight active:scale-[0.97] transition-transform disabled:opacity-40 flex items-center justify-center"
-                            >
-                              {appointmentSubmittingId === next.id ? (
-                                <div className="w-4 h-4 border-2 border-white/25 border-t-white rounded-full animate-spin" />
-                              ) : 'Confirmar'}
-                            </button>
-                            <button
-                              onClick={() => openRescheduleModal(next)}
-                              disabled={appointmentSubmittingId === next.id}
-                              className="h-9 px-5 rounded-full border border-[#D1D1D6] text-[#3A3A3C] text-[13px] font-semibold tracking-tight active:scale-[0.97] transition-transform"
-                            >
-                              Reagendar
-                            </button>
+                    <motion.div 
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-[#F9FAFB] backdrop-blur-xl border border-white/80 group transition-all duration-300"
+                    >
+                      {/* Animated gradient accent: more prominent */}
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-[#0C9B72]/[0.08] rounded-full blur-3xl group-hover:opacity-100 opacity-60 transition-opacity duration-500" />
+                      {/* Left accent */}
+                      <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#0C9B72]/[0.04] rounded-full blur-3xl" />
+                      
+                      <div className="relative z-10 p-8 sm:p-10">
+                        {/* Header with countdown */}
+                        <div className="flex items-start justify-between gap-4 mb-7">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[#0C9B72] text-[12px] font-bold uppercase tracking-wider">Próxima Consulta</p>
+                            <p className="text-[#1C1C1E] text-[40px] font-bold tracking-tight mt-2 leading-tight">
+                              {nextDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                            </p>
+                            <div className="mt-4 space-y-1">
+                              <p className="text-[#0C9B72] text-[16px] font-semibold">{formatTimeBR(next.start_time)}</p>
+                              <p className="text-[#8E8E93] text-[14px] font-medium">
+                                Dr(a). {next.dentist_name}
+                              </p>
+                            </div>
                           </div>
-                          {confirmedAppointmentId === next.id && (
-                            <p className="text-[#34C759] text-[12px] font-medium mt-2.5">Horário confirmado ✓</p>
-                          )}
-                          {rescheduleRequestedAppointmentId === next.id && (
-                            <p className="text-[#007AFF] text-[12px] font-medium mt-2.5">Pedido enviado à clínica.</p>
-                          )}
+                          
+                          {/* Status badges — larger, prominent */}
+                          <div className="flex flex-col gap-2.5 shrink-0">
+                            <motion.span 
+                              whileHover={{ scale: 1.05 }}
+                              className={`px-5 py-3 rounded-full text-[13px] font-bold ${getCountdownColor(daysUntil)}`}
+                            >
+                              {countdownLabel}
+                            </motion.span>
+                            <span className={`px-5 py-2.5 rounded-full text-[12px] font-semibold ${getStatusConfig(next.status).color}`}>
+                              {getStatusConfig(next.status).label}
+                            </span>
+                          </div>
                         </div>
-                      )}
 
-                      {!singleReminder && <div className="pb-5" />}
-                    </div>
+                        {/* Notes section */}
+                        {next.notes && (
+                          <div className="pb-7 border-b border-[#E5E5EA]">
+                            <p className="text-[#3A3A3C] text-[15px] leading-relaxed font-medium">{next.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Smart reminder with gradient background */}
+                        {singleReminder && (
+                          <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="mt-7 p-5 bg-gradient-to-br from-[#FFA500]/[0.08] to-[#FF6347]/[0.04] rounded-2xl border border-[#FFA500]/20 group/reminder hover:border-[#FFA500]/40 transition-all duration-300"
+                          >
+                            <p className="text-[#FF9500] text-[14px] leading-relaxed font-medium">
+                              💡 {singleReminder}
+                            </p>
+                          </motion.div>
+                        )}
+
+                        {/* Confirmation section */}
+                        {next.status === 'SCHEDULED' && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="mt-7 pt-7 border-t border-[#E5E5EA]"
+                          >
+                            <p className="text-[#1C1C1E] text-[16px] font-semibold mb-4">
+                              {getConfirmationQuestion(next.start_time)}
+                            </p>
+                            <div className="flex gap-3">
+                              <motion.button
+                                whileHover={{ y: -2 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleConfirmAppointment(next.id)}
+                                disabled={appointmentSubmittingId === next.id}
+                                className="flex-1 h-12 px-5 rounded-full bg-gradient-to-r from-[#0C9B72] to-[#0A7D5C] text-white text-[15px] font-semibold tracking-tight active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center"
+                              >
+                                {appointmentSubmittingId === next.id ? (
+                                  <div className="w-5 h-5 border-2 border-white/25 border-t-white rounded-full animate-spin" />
+                                ) : 'Confirmar'}
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ y: -2 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => openRescheduleModal(next)}
+                                disabled={appointmentSubmittingId === next.id}
+                                className="flex-1 h-12 px-5 rounded-full border-2 border-[#0C9B72]/30 text-[#1C1C1E] text-[15px] font-semibold tracking-tight active:scale-95 transition-all hover:border-[#0C9B72]/60 hover:bg-[#0C9B72]/5"
+                              >
+                                Reagendar
+                              </motion.button>
+                            </div>
+                            {confirmedAppointmentId === next.id && (
+                              <motion.p 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-[#34C759] text-[14px] font-semibold mt-4 flex items-center gap-2"
+                              >
+                                <CheckCircle2 size={18} /> Horário confirmado
+                              </motion.p>
+                            )}
+                            {rescheduleRequestedAppointmentId === next.id && (
+                              <motion.p 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-[#007AFF] text-[14px] font-semibold mt-4"
+                              >
+                                Pedido de reagendamento enviado à clínica
+                              </motion.p>
+                            )}
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
                   );
                 })()}
 
-                {/* Quick actions row */}
-                <div className="grid grid-cols-4 gap-3">
-                  <PortalQuickAction icon={CalendarPlus} label="Agendar" onClick={openNewScheduleModal} />
-                  <PortalQuickAction icon={Activity} label="Evolução" onClick={() => setActiveTab('evolucao')} />
-                  <PortalQuickAction icon={FileText} label="Arquivos" onClick={() => setActiveTab('documentos')} />
-                  <PortalQuickAction icon={DollarSign} label="Pagamentos" onClick={() => setActiveTab('financeiro')} />
+                {/* Divider: Secondary content below */}
+                <div className="h-px bg-gradient-to-r from-transparent via-[#E5E5EA] to-transparent" />
+
+                {/* Secondary Info: Dentist message + Treatment progress (reduced visual weight) */}
+                <div className="space-y-4">
+                  {(() => {
+                    const firstName = patient.name.split(' ')[0];
+                    const dentistFirstName = clinic?.name?.split(' ').slice(0, 2).join(' ') || 'seu dentista';
+                    const treatmentPlan = patient.treatment_plan || [];
+                    const completed = treatmentPlan.filter((t: any) => String(t.status || '').toUpperCase() === 'REALIZADO').length;
+                    const total = treatmentPlan.length;
+                    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+                    const nextStep = treatmentPlan.find((t: any) => String(t.status || '').toUpperCase() !== 'REALIZADO');
+                    const lastEvolution = evolution.length > 0 ? evolution[0] : null;
+                    const nextAppt = futureAppointments.length > 0 ? futureAppointments[0] : null;
+
+                    let personalMessage = '';
+                    if (pct === 100 && total > 0) {
+                      personalMessage = `${firstName}, seu tratamento foi concluído com sucesso! Cuide bem do seu sorriso e lembre-se dos retornos periódicos.`;
+                    } else if (nextStep && pct >= 50) {
+                      personalMessage = `${firstName}, estamos na reta final! A próxima etapa é ${nextStep.procedure || 'importante'} — cada passo conta para o resultado.`;
+                    } else if (nextStep && lastEvolution) {
+                      personalMessage = `${firstName}, na última sessão fizemos ${lastEvolution.procedure_performed || 'um bom avanço'}. Agora o próximo passo é ${nextStep.procedure || 'continuar o tratamento'}.`;
+                    } else if (nextAppt) {
+                      personalMessage = `${firstName}, te espero na próxima consulta! Qualquer dúvida, é só chamar.`;
+                    } else {
+                      personalMessage = `${firstName}, que bom ter você aqui! Estou acompanhando sua saúde bucal de perto.`;
+                    }
+
+                    const uniqueProcedures = [...new Set(treatmentPlan.map((t: any) => t.procedure).filter(Boolean))];
+                    const caseName = uniqueProcedures.length === 1
+                      ? uniqueProcedures[0]
+                      : uniqueProcedures.length <= 3
+                      ? uniqueProcedures.join(', ')
+                      : `${uniqueProcedures.slice(0, 2).join(', ')} e mais ${uniqueProcedures.length - 2}`;
+
+                    return (
+                      <>
+                        {/* Dentist message — secondary */}
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.4 }}
+                          className="relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-xl border border-white/50 p-5"
+                        >
+                          <div className="flex items-start gap-3">
+                            {clinic?.photo_url ? (
+                              <img src={clinic.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover ring-1 ring-[#0C9B72]/10 shrink-0" />
+                            ) : (
+                              <div className="w-10 h-10 bg-[#0C9B72]/10 rounded-xl flex items-center justify-center shrink-0">
+                                <Stethoscope size={16} className="text-[#0C9B72]" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[#0C9B72] text-[11px] font-bold uppercase tracking-wide">Mensagem do seu dentista</p>
+                              <p className="text-[#1C1C1E] text-[13px] leading-relaxed mt-1.5">{personalMessage}</p>
+                            </div>
+                          </div>
+                        </motion.div>
+
+                        {/* Treatment progress — secondary */}
+                        {total > 0 && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.5 }}
+                            className="relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-xl border border-white/50 p-5"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[#0C9B72] text-[11px] font-bold uppercase tracking-wide">Progresso do Tratamento</p>
+                                {caseName && (
+                                  <p className="text-[#1C1C1E] text-[14px] font-semibold mt-1">{caseName}</p>
+                                )}
+                                <p className="text-[#8E8E93] text-[12px] mt-1">{completed} de {total} etapas</p>
+                              </div>
+                              
+                              <div className="w-14 h-14 shrink-0 relative">
+                                <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
+                                  <circle cx="24" cy="24" r="20" fill="none" stroke="#F2F2F7" strokeWidth="2" />
+                                  <motion.circle
+                                    cx="24" cy="24" r="20" fill="none"
+                                    stroke="#0C9B72"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    initial={{ strokeDashoffset: `${2 * Math.PI * 20}` }}
+                                    animate={{ strokeDashoffset: `${2 * Math.PI * 20 * (1 - pct / 100)}` }}
+                                    strokeDasharray={`${2 * Math.PI * 20}`}
+                                    transition={{ duration: 0.8, ease: "easeInOut" }}
+                                  />
+                                </svg>
+                                <span className="absolute inset-0 flex items-center justify-center text-[#1C1C1E] text-[11px] font-bold">{pct}%</span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
+
+                {/* Dynamic contextual actions: Apple-style, no color pollution */}
+                {(() => {
+                  // Dynamically choose actions based on patient context
+                  const actions: Array<{
+                    id: string;
+                    title: string;
+                    subtitle?: string;
+                    icon: React.ElementType;
+                    action: () => void;
+                    highlight?: boolean;
+                  }> = [];
+
+                  // 1. If next appointment exists and not confirmed
+                  if (futureAppointments.length > 0 && futureAppointments[0].status !== 'CONFIRMED') {
+                    actions.push({
+                      id: 'confirm',
+                      title: 'Confirmar minha consulta',
+                      subtitle: `${new Date(futureAppointments[0].start_time).toLocaleDateString('pt-BR')}`,
+                      icon: CheckCircle2,
+                      action: () => handleConfirmAppointment(futureAppointments[0].id),
+                      highlight: true,
+                    });
+                  }
+
+                  // 2. If no next appointment
+                  if (futureAppointments.length === 0) {
+                    actions.push({
+                      id: 'schedule',
+                      title: 'Gostaria de agendar uma consulta',
+                      subtitle: 'Reserve seu horário',
+                      icon: CalendarPlus,
+                      action: openNewScheduleModal,
+                      highlight: true,
+                    });
+                  }
+
+                  // 3. If has pending payments
+                  if (installments.some(i => i.status === 'PENDING' || i.status === 'OVERDUE')) {
+                    actions.push({
+                      id: 'payments',
+                      title: 'Ver meus pagamentos',
+                      subtitle: 'Pendências',
+                      icon: DollarSign,
+                      action: () => setActiveTab('financeiro'),
+                    });
+                  }
+
+                  // 4. If has documents
+                  if (files.length > 0) {
+                    actions.push({
+                      id: 'docs',
+                      title: 'Baixar meus documentos',
+                      subtitle: `${files.length} arquivo${files.length !== 1 ? 's' : ''}`,
+                      icon: Download,
+                      action: () => setActiveTab('documentos'),
+                    });
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {actions.map((action, idx) => (
+                        <motion.button
+                          key={action.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          onClick={action.action}
+                          className={`w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl transition-all duration-300 group ${
+                            action.highlight
+                              ? 'bg-[#0C9B72]/8 border border-[#0C9B72]/30 hover:bg-[#0C9B72]/12 hover:border-[#0C9B72]/50'
+                              : 'bg-white/40 backdrop-blur-xl border border-white/60 hover:bg-white/50 hover:border-[#0C9B72]/20'
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                            action.highlight
+                              ? 'bg-[#0C9B72]/15 group-hover:bg-[#0C9B72]/25'
+                              : 'bg-[#E5E5EA] group-hover:bg-[#0C9B72]/10'
+                          }`}>
+                            <action.icon size={18} className={action.highlight ? 'text-[#0C9B72]' : 'text-[#8E8E93]'} />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <p className="text-[#1C1C1E] text-[14px] font-semibold leading-tight">{action.title}</p>
+                            {action.subtitle && (
+                              <p className="text-[#8E8E93] text-[12px] mt-0.5">{action.subtitle}</p>
+                            )}
+                          </div>
+                          <ChevronRight size={16} className="text-[#C6C6C8] group-hover:text-[#0C9B72] transition-colors shrink-0" />
+                        </motion.button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Post-procedure care guides */}
                 {recentProcedures.map((proc, idx) => {
@@ -1024,60 +1183,87 @@ export function PatientPortal() {
                   );
                 })}
 
-                {/* Stats row */}
-                <div className="grid grid-cols-3 gap-3">
-                  <PortalStatCard value={appointments.length} label="Consultas" />
-                  <PortalStatCard value={files.length} label="Documentos" />
-                  <PortalStatCard value={payment_plans.length} label="Planos" />
-                </div>
-
-                {/* Upcoming appointments scroll */}
+                {/* Upcoming appointments scroll: elegant card carousel */}
                 {futureAppointments.length > 1 && (
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-[#1C1C1E] text-[17px] font-semibold tracking-tight">Próximas Consultas</h2>
-                      <button onClick={() => setActiveTab('consultas')} className="text-[#0C9B72] text-[13px] font-medium">
-                        Ver tudo
+                    <div className="flex items-center justify-between mb-4 px-0">
+                      <div>
+                        <h2 className="text-[#1C1C1E] text-[22px] font-bold tracking-tight">Próximas Consultas</h2>
+                        <p className="text-[#8E8E93] text-[13px] mt-1.5 font-medium">Seus horários próximos</p>
+                      </div>
+                      <button onClick={() => setActiveTab('consultas')} className="text-[#0C9B72] text-[14px] font-semibold hover:text-[#0C9B72]/80 transition-colors duration-200">
+                        Ver tudo →
                       </button>
                     </div>
-                    <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 pb-1">
-                      {futureAppointments.slice(1, 6).map(a => (
-                        <div key={a.id} className="min-w-[200px] bg-white rounded-2xl p-4 shrink-0 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-                          <p className="text-[#1C1C1E] text-[15px] font-semibold tracking-tight">
-                            {new Date(a.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-                          </p>
-                          <p className="text-[#8E8E93] text-[13px] mt-0.5">{formatTimeBR(a.start_time)}</p>
-                          <p className="text-[#AEAEB2] text-[12px] mt-2 truncate">Dr(a). {a.dentist_name}</p>
-                        </div>
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-5 px-5 pb-2 snap-x">
+                      {futureAppointments.slice(1, 6).map((a, idx) => (
+                        <motion.div 
+                          key={a.id} 
+                          initial={{ opacity: 0, x: 20 }}
+                          whileInView={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.3, delay: idx * 0.05 }}
+                          viewport={{ once: true }}
+                          className="min-w-[240px] group snap-start"
+                        >
+                          <div className="relative overflow-hidden rounded-3xl bg-white/40 backdrop-blur-xl border border-white/60 p-5 shrink-0 transition-shadow duration-300 h-full">
+                            {/* Accent line */}
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0C9B72]/40 via-[#0C9B72]/20 to-transparent" />
+                            
+                            {/* Animated background glow on hover */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-[#0C9B72]/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                            
+                            {/* Date with refined styling */}
+                            <p className="text-[#1C1C1E] text-[32px] font-bold tracking-tight leading-none">
+                              {new Date(a.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                            </p>
+                            
+                            {/* Time and doctor with subtle color */}
+                            <div className="space-y-2 mt-4">
+                              <p className="text-[#0C9B72] text-[14px] font-semibold">{formatTimeBR(a.start_time)}</p>
+                              <p className="text-[#8E8E93] text-[13px] font-medium leading-relaxed">Dr(a). {a.dentist_name}</p>
+                            </div>
+                            
+                            {/* Status badge with refined design */}
+                            <div className="mt-4 pt-4 border-t border-white/40">
+                              <span className={`inline-block text-[11px] font-semibold px-3 py-1.5 rounded-full ${getStatusConfig(a.status).color}`}>
+                                {getStatusConfig(a.status).label}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Health summary */}
+                {/* Health summary: refined elegant section */}
                 {data.anamnesis && (data.anamnesis.allergies || data.anamnesis.medications) && (
                   <div>
-                    <h2 className="text-[#1C1C1E] text-[17px] font-semibold tracking-tight mb-3">Saúde</h2>
-                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                    <h2 className="text-[#1C1C1E] text-[22px] font-bold tracking-tight mb-4">Saúde e Alergias</h2>
+                    <div className="space-y-3">
                       {data.anamnesis.allergies && (
-                        <div className="px-4 py-3.5 flex items-start gap-3">
-                          <div className="w-8 h-8 bg-[#FF3B30]/10 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                            <AlertCircle size={15} className="text-[#FF3B30]" />
-                          </div>
-                          <div>
-                            <p className="text-[#8E8E93] text-[11px] font-medium uppercase tracking-wider">Alergias</p>
-                            <p className="text-[#3A3A3C] text-[14px] mt-0.5 leading-relaxed">{data.anamnesis.allergies}</p>
+                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FF3B30]/[0.06] to-[#FF3B30]/[0.02] border border-[#FF3B30]/20 p-5 group hover:border-[#FF3B30]/40 transition-all duration-300">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 bg-[#FF3B30]/15 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-[#FF3B30]/20 transition-colors duration-300">
+                              <AlertCircle size={18} className="text-[#FF3B30]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[#FF3B30] text-[12px] font-bold uppercase tracking-wider">Alergias</p>
+                              <p className="text-[#1C1C1E] text-[14px] leading-relaxed mt-2">{data.anamnesis.allergies}</p>
+                            </div>
                           </div>
                         </div>
                       )}
                       {data.anamnesis.medications && (
-                        <div className="px-4 py-3.5 flex items-start gap-3">
-                          <div className="w-8 h-8 bg-[#AF52DE]/10 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                            <Heart size={15} className="text-[#AF52DE]" />
-                          </div>
-                          <div>
-                            <p className="text-[#8E8E93] text-[11px] font-medium uppercase tracking-wider">Medicamentos</p>
-                            <p className="text-[#3A3A3C] text-[14px] mt-0.5 leading-relaxed">{data.anamnesis.medications}</p>
+                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#AF52DE]/[0.06] to-[#AF52DE]/[0.02] border border-[#AF52DE]/20 p-5 group hover:border-[#AF52DE]/40 transition-all duration-300">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 bg-[#AF52DE]/15 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-[#AF52DE]/20 transition-colors duration-300">
+                              <Heart size={18} className="text-[#AF52DE]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[#AF52DE] text-[12px] font-bold uppercase tracking-wider">Medicamentos</p>
+                              <p className="text-[#1C1C1E] text-[14px] leading-relaxed mt-2">{data.anamnesis.medications}</p>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1085,31 +1271,34 @@ export function PatientPortal() {
                   </div>
                 )}
 
-                {/* Clinic contact */}
+                {/* Clinic contact: elegant and prominent */}
                 {clinic && (
-                  <div className="bg-white rounded-2xl p-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-                    <div className="flex items-center gap-3">
+                  <div className="relative overflow-hidden rounded-3xl bg-white/40 backdrop-blur-xl border border-white/60 p-6 group transition-all duration-300">
+                    {/* Accent gradient */}
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-[#0C9B72]/[0.04] rounded-full blur-3xl group-hover:opacity-100 opacity-0 transition-opacity duration-500" />
+                    
+                    <div className="relative z-10 flex items-start gap-4">
                       {clinic.photo_url ? (
-                        <img src={clinic.photo_url} alt="" className="w-11 h-11 rounded-xl object-cover" />
+                        <img src={clinic.photo_url} alt="" className="w-16 h-16 rounded-2xl object-cover ring-2 ring-[#0C9B72]/10" />
                       ) : (
-                        <div className="w-11 h-11 bg-[#E5E5EA] rounded-xl flex items-center justify-center">
-                          <Stethoscope size={20} className="text-[#8E8E93]" />
+                        <div className="w-16 h-16 bg-[#0C9B72]/10 rounded-2xl flex items-center justify-center ring-2 ring-[#0C9B72]/10">
+                          <Stethoscope size={24} className="text-[#0C9B72]" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-[#1C1C1E] text-[15px] font-semibold truncate">{clinic.clinic_name || clinic.name}</p>
+                        <p className="text-[#1C1C1E] text-[18px] font-bold truncate">{clinic.clinic_name || clinic.name}</p>
                         {clinic.clinic_address && (
-                          <p className="text-[#8E8E93] text-[13px] truncate mt-0.5">{clinic.clinic_address}</p>
+                          <p className="text-[#8E8E93] text-[13px] leading-relaxed mt-1">{clinic.clinic_address}</p>
+                        )}
+                        {clinic.phone && (
+                          <a
+                            href={`tel:${clinic.phone}`}
+                            className="inline-block mt-3 text-[#0C9B72] font-semibold text-[14px] hover:text-[#0C9B72]/80 transition-colors duration-200"
+                          >
+                            {clinic.phone} · Ligar
+                          </a>
                         )}
                       </div>
-                      {clinic.phone && (
-                        <a
-                          href={`tel:${clinic.phone}`}
-                          className="w-10 h-10 bg-[#0C9B72]/10 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform"
-                        >
-                          <Phone size={16} className="text-[#0C9B72]" />
-                        </a>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1132,14 +1321,13 @@ export function PatientPortal() {
                 {futureAppointments.length > 0 && (
                   <div>
                     <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Próximas</p>
-                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
                       {futureAppointments.map(a => (
                         <PortalAppointmentRow
                           key={a.id}
                           appointment={a}
                           formatDate={formatDateBR}
                           formatTime={formatTimeBR}
-                          statusLabel={statusLabel}
                           actionContent={a.status === 'SCHEDULED' ? (
                             <div className="flex gap-2">
                               <button
@@ -1173,9 +1361,9 @@ export function PatientPortal() {
                 {pastAppointments.length > 0 && (
                   <div>
                     <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Histórico</p>
-                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
                       {pastAppointments.slice(0, 20).map(a => (
-                        <PortalAppointmentRow key={a.id} appointment={a} formatDate={formatDateBR} formatTime={formatTimeBR} statusLabel={statusLabel} past />
+                        <PortalAppointmentRow key={a.id} appointment={a} formatDate={formatDateBR} formatTime={formatTimeBR} past />
                       ))}
                     </div>
                   </div>
@@ -1192,7 +1380,7 @@ export function PatientPortal() {
               <div className="space-y-5">
                 <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">Evolução</h1>
                 {evolution.length > 0 ? (
-                  <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                  <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
                     {evolution.map(e => (
                       <div key={e.id} className="px-4 py-4">
                         <div className="flex items-center justify-between mb-2">
@@ -1219,7 +1407,7 @@ export function PatientPortal() {
               <div className="space-y-5">
                 <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">Documentos</h1>
                 {files.length > 0 ? (
-                  <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                  <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
                     {files.map(f => (
                       <a
                         key={f.id}
@@ -1270,7 +1458,7 @@ export function PatientPortal() {
                   if (financialTotal === 0 && received === 0 && payment_plans.length === 0 && transactions.length === 0) return null;
 
                   return (
-                    <div className="bg-white rounded-2xl p-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)] space-y-3">
+                    <div className="bg-white rounded-2xl p-4 space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-1">Orçamento total</p>
@@ -1363,7 +1551,7 @@ export function PatientPortal() {
                       const progress = Math.round((paidCount / total) * 100);
 
                       return (
-                        <div key={plan.id} className="bg-white rounded-2xl overflow-hidden shadow-[0_1px_6px_rgba(0,0,0,0.05)] mb-3">
+                        <div key={plan.id} className="bg-white rounded-2xl overflow-hidden mb-3">
                           <div className="p-4">
                             <div className="flex items-start justify-between mb-3">
                               <div>
@@ -1430,7 +1618,7 @@ export function PatientPortal() {
                 {transactions.length > 0 && (
                   <div>
                     <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Movimentações</p>
-                    <div className="bg-white rounded-2xl divide-y divide-[#F2F2F7] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+                    <div className="bg-white rounded-2xl divide-y divide-[#F2F2F7]">
                       {transactions.map(t => {
                         const isIncome = t.type === 'INCOME';
                         return (
@@ -1469,30 +1657,20 @@ export function PatientPortal() {
         </AnimatePresence>
       </div>
 
-      {/* ─── Bottom Tab Bar (iOS style) ─── */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-[#E5E5EA]">
-        <div className="max-w-lg mx-auto flex pb-[env(safe-area-inset-bottom)]">
-          {tabs.map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 active:opacity-60 transition-opacity"
-              >
-                <tab.icon
-                  size={22}
-                  className={isActive ? 'text-[#0C9B72]' : 'text-[#C7C7CC]'}
-                  strokeWidth={isActive ? 2.2 : 1.5}
-                />
-                <span className={`text-[10px] font-medium ${isActive ? 'text-[#0C9B72]' : 'text-[#C7C7CC]'}`}>
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* ─── Depth Drawer (Historical Data Access) ─── */}
+      {data && (
+        <PatientPortalDepth
+          isOpen={showDepth}
+          onClose={() => setShowDepth(false)}
+          data={{
+            appointments: data.appointments,
+            evolution: data.evolution,
+            files: data.files,
+            payment_plans: data.payment_plans,
+            transactions: data.transactions
+          }}
+        />
+      )}
 
       {/* ─── Schedule Modal (iOS sheet) ─── */}
       <AnimatePresence>
@@ -1696,41 +1874,40 @@ export function PatientPortal() {
 
 // ─── Helper Components ───
 
-function PortalQuickAction({ icon: Icon, label, onClick }: {
-  icon: React.ElementType; label: string; onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-white shadow-[0_1px_6px_rgba(0,0,0,0.05)] active:scale-95 transition-transform"
-    >
-      <div className="w-10 h-10 bg-[#F2F2F7] rounded-full flex items-center justify-center">
-        <Icon size={18} className="text-[#0C9B72]" />
-      </div>
-      <span className="text-[#8E8E93] text-[11px] font-medium">{label}</span>
-    </button>
-  );
-}
-
 function PortalStatCard({ value, label }: { value: number; label: string }) {
   return (
-    <div className="bg-white rounded-2xl p-4 text-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-      <p className="text-[#1C1C1E] text-[24px] font-bold tracking-tight">{value}</p>
-      <p className="text-[#AEAEB2] text-[11px] font-medium uppercase tracking-wider mt-0.5">{label}</p>
-    </div>
+    <motion.div 
+      whileHover={{ y: -1 }}
+      className="relative overflow-hidden group"
+    >
+      {/* Glassmorphic background with subtle gradient */}
+      <div className="absolute inset-0 bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 -z-10" />
+      
+      {/* Animated accent on hover */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-[#0C9B72]/[0.04] rounded-full blur-3xl group-hover:opacity-100 opacity-0 transition-opacity duration-500" />
+      
+      <div className="p-5 flex flex-col items-start">
+        {/* Number with refined styling */}
+        <motion.p 
+          initial={{ opacity: 0.6 }}
+          whileInView={{ opacity: 1 }}
+          className="text-[#1C1C1E] text-[40px] font-bold tracking-tighter leading-none"
+        >
+          {value}
+        </motion.p>
+        
+        {/* Label subtle and refined */}
+        <p className="text-[#8E8E93] text-[12px] font-medium uppercase tracking-widest mt-3">{label}</p>
+      </div>
+      
+      {/* Subtle border accent */}
+      <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-[#0C9B72] to-transparent group-hover:w-full transition-all duration-500" />
+    </motion.div>
   );
 }
 
-function PortalAppointmentRow({ appointment, formatDate, formatTime, statusLabel, past, actionContent, actionNotice }: any) {
-  const s = statusLabel(appointment.status);
-  const statusColors: Record<string, string> = {
-    'SCHEDULED': 'bg-[#007AFF]/10 text-[#007AFF]',
-    'CONFIRMED': 'bg-[#34C759]/10 text-[#34C759]',
-    'IN_PROGRESS': 'bg-[#FF9500]/10 text-[#FF9500]',
-    'FINISHED': 'bg-[#E5E5EA] text-[#8E8E93]',
-    'CANCELLED': 'bg-[#FF3B30]/10 text-[#FF3B30]',
-    'NO_SHOW': 'bg-[#FF3B30]/10 text-[#FF3B30]',
-  };
+function PortalAppointmentRow({ appointment, formatDate, formatTime, past, actionContent, actionNotice }: any) {
+  const config = getStatusConfig(appointment.status);
   return (
     <div className={`px-4 py-3.5 ${past ? 'opacity-40' : ''}`}>
       <div className="flex items-center gap-3.5">
@@ -1743,8 +1920,8 @@ function PortalAppointmentRow({ appointment, formatDate, formatTime, statusLabel
             {formatTime(appointment.start_time)} · Dr(a). {appointment.dentist_name}
           </p>
         </div>
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${statusColors[appointment.status] || 'bg-[#E5E5EA] text-[#8E8E93]'}`}>
-          {s.label}
+        <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${config.color}`}>
+          {config.label}
         </span>
       </div>
       {appointment.notes && (
@@ -1765,7 +1942,7 @@ function PortalAppointmentRow({ appointment, formatDate, formatTime, statusLabel
 function PortalEmptyState({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
   return (
     <div className="py-16 text-center">
-      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
         <Icon size={24} className="text-[#C7C7CC]" />
       </div>
       <p className="text-[#AEAEB2] text-[15px]">{text}</p>

@@ -1,0 +1,139 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Home, Calendar, FileText, DollarSign, User } from '../icons';
+import { usePatientMoment, type PatientMomentState } from '../hooks/usePatientMoment';
+import { GuidedConversation } from './GuidedConversation';
+import { PostOperativeCheckIn } from './PostOperativeCheckIn';
+import { getStatusConfig, getCountdownLabel, getCountdownColor } from '../constants/statusConfig';
+
+interface PatientPortalHomeProps {
+  patient: {
+    name: string;
+    photo_url: string;
+  };
+  clinic: {
+    name?: string;
+    clinic_name?: string;
+    photo_url?: string;
+  } | null;
+  futureAppointments: Array<{
+    id: number;
+    start_time: string;
+    end_time: string;
+    status: string;
+    notes: string;
+    dentist_name: string;
+  }>;
+  recentProcedures: Array<{
+    date: string;
+    procedure: string;
+    category: string;
+  }>;
+  onOpenDepth: () => void;
+  onConfirmAppointment: (id: number) => void;
+  onRescheduleAppointment: (apt: any) => void;
+  appointmentSubmittingId: number | null;
+  confirmedAppointmentId: number | null;
+  rescheduleRequestedAppointmentId: number | null;
+  sessionToken: string | null;
+}
+
+export function PatientPortalHome({
+  patient,
+  clinic,
+  futureAppointments,
+  recentProcedures,
+  onOpenDepth,
+  onConfirmAppointment,
+  onRescheduleAppointment,
+  appointmentSubmittingId,
+  confirmedAppointmentId,
+  rescheduleRequestedAppointmentId,
+  onChangeTab,
+  activeTab,
+  sessionToken,
+}: PatientPortalHomeProps) {
+  const momentState = usePatientMoment({ 
+    futureAppointments, 
+    recentProcedures,
+    pendingComplaints: [] // Sem queixas pendentes por enquanto
+  });
+  const { moment, urgency, needsImmediateEncaixe, context } = momentState;
+  const [showGuidedConversation, setShowGuidedConversation] = useState(false);
+  const [showPostOpCheckIn, setShowPostOpCheckIn] = useState(false);
+  const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
+
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  const formatDateBR = (d: string) => {
+    try {
+      return new Date(d).toLocaleDateString('pt-BR');
+    } catch {
+      return d;
+    }
+  };
+
+  const formatTimeBR = (d: string) => {
+    try {
+      return new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
+  const getConfirmationQuestion = (appointmentDate: string) => {
+    const date = new Date(appointmentDate);
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+
+    const isSameDay = (left: Date, right: Date) =>
+      left.getFullYear() === right.getFullYear() &&
+      left.getMonth() === right.getMonth() &&
+      left.getDate() === right.getDate();
+
+    const dayLabel = isSameDay(date, today)
+      ? 'hoje'
+      : isSameDay(date, tomorrow)
+      ? 'amanhã'
+      : `dia ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+
+    return `Você vem ${dayLabel} às ${formatTimeBR(appointmentDate)}?`;
+  };
+
+  const handleScheduleRequest = async (complaint: string, duration: string, isUrgent?: boolean) => {
+    setIsSubmittingSchedule(true);
+    try {
+      const res = await fetch('/api/portal/request-appointment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+          preferred_date: '',
+          preferred_time: '',
+          is_urgent: isUrgent ?? false,
+          notes: `${complaint} - há ${duration}${isUrgent ? ' [URGENTE]' : ''}`
+        })
+      });
+      if (!res.ok) throw new Error('Erro ao solicitar');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmittingSchedule(false);
+    }
+  };
+
+  const firstName = patient.name.split(' ')[0];
+  const nextAppointment = futureAppointments[0];
+
+  // Debug: Se nenhum momento for renderizado, mostrar fallback
+  if (!moment || !['emergency', 'confirming_appointment', 'treatment_progress', 'no_appointment', 'has_appointment_confirmed', 'post_operative', 'idle'].includes(moment)) {
+  );
+}
