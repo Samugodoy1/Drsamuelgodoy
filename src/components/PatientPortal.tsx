@@ -705,14 +705,20 @@ export function PatientPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7] pb-24">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#F5F5F7] pb-24 text-[#1D1D1F]">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#BEE3D3]/40 blur-3xl" />
+        <div className="absolute top-48 -left-20 h-64 w-64 rounded-full bg-[#D7E8FF]/55 blur-3xl" />
+        <div className="absolute bottom-8 right-[-60px] h-72 w-72 rounded-full bg-[#EFE8FF]/60 blur-3xl" />
+      </div>
+
       {/* Accessible announcer for screen readers */}
       <div id="a11y-announcer" aria-live="polite" className="sr-only">
         {error || (scheduleSuccess ? (scheduleMode === 'reschedule' ? 'Pedido de reagendamento enviado' : 'Solicitação de agendamento enviada') : '') || (paymentInformed ? 'Pagamento informado' : '') || (pixCopied ? 'Chave PIX copiada' : '')}
       </div>
       {/* ─── Header: frosted, minimal ─── */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#E5E5EA]">
-        <div className="max-w-lg mx-auto px-5 py-4 flex items-center gap-3.5">
+      <div className="sticky top-0 z-50 border-b border-white/70 bg-white/70 shadow-[0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl">
+        <div className="max-w-xl mx-auto px-5 py-4 flex items-center gap-3.5">
           {clinic?.photo_url ? (
             <img src={clinic.photo_url} alt={clinic?.clinic_name || clinic?.name || 'Minha Clínica'} className="w-9 h-9 rounded-full object-cover ring-1 ring-[#C6C6C8]/40" />
           ) : (
@@ -736,7 +742,8 @@ export function PatientPortal() {
       </div>
 
       {/* ─── Content: Apple-Style Home ─── */}
-      <div className="max-w-lg mx-auto px-5 pt-6 pb-24">
+      <div className="relative z-10 max-w-xl mx-auto px-4 pt-6 pb-24 sm:px-5">
+        <div className="rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-[0_25px_60px_-40px_rgba(17,24,39,0.38)] backdrop-blur-2xl sm:p-6">
         <AnimatePresence mode="wait">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -1657,6 +1664,7 @@ export function PatientPortal() {
             )}
           </motion.div>
         </AnimatePresence>
+        </div>
       </div>
 
       {/* ─── Depth Drawer (Historical Data Access) ─── */}
