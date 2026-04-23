@@ -163,40 +163,31 @@ export function PatientPortalHome({
 
   return (
     <>
-      <div className="mx-auto flex min-h-[840px] w-full max-w-[460px] flex-col overflow-hidden rounded-[38px] border border-[#E5E5EA] bg-[#F4F4F6]">
-        <div className="px-6 pt-6 text-[34px] font-semibold text-[#0A0A0A] leading-none">9:41</div>
-
-        <div className="px-6 pt-8 pb-4 flex items-start justify-between gap-4">
+      <div className="flex min-h-[calc(100vh-110px)] w-full flex-col">
+        <div className="px-1 pt-1 pb-4">
           <div>
-            <h1 className="text-[52px] leading-[1.02] font-semibold tracking-[-0.02em] text-[#0A0F1A]">Olá, {firstName} 👋</h1>
-            <p className="mt-2 text-[36px] leading-[1.2] text-[#5D6575]">
+            <h1 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.02em] text-[#0A0F1A] sm:text-[40px]">Olá, {firstName} 👋</h1>
+            <p className="mt-2 text-[20px] leading-[1.25] text-[#5D6575] sm:text-[24px]">
               {moment === 'emergency' ? 'Conte com a gente.' : moment === 'post_operative' ? 'Sua recuperação é importante para nós.' : 'Estamos aqui para cuidar de você.'}
             </p>
           </div>
-          <div className="mt-1 h-[60px] w-[60px] overflow-hidden rounded-full bg-[#D9DDE6]">
-            {patient.photo_url ? (
-              <img src={patient.photo_url} alt={patient.name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-[#546074]">{firstName[0]}</div>
-            )}
-          </div>
         </div>
 
-        <div className="flex flex-1 flex-col items-center px-8 pt-12 text-center">
-          <div className={`flex h-[112px] w-[112px] items-center justify-center rounded-full ${content.iconWrap}`}>
+        <div className="flex flex-1 flex-col items-center rounded-[24px] border border-[#E5E5EA] bg-[#F4F4F6] px-5 pt-8 text-center sm:px-8 sm:pt-12">
+          <div className={`flex h-[88px] w-[88px] items-center justify-center rounded-full sm:h-[112px] sm:w-[112px] ${content.iconWrap}`}>
             {content.icon}
           </div>
 
-          <p className={`mt-8 text-[40px] font-semibold ${content.accent}`}>{content.kicker}</p>
-          <h2 className="mt-5 whitespace-pre-line text-[72px] font-semibold leading-[1.08] tracking-[-0.02em] text-[#090F1D]">
+          <p className={`mt-6 text-[26px] font-semibold sm:mt-8 sm:text-[30px] ${content.accent}`}>{content.kicker}</p>
+          <h2 className="mt-4 whitespace-pre-line text-[44px] font-semibold leading-[1.08] tracking-[-0.02em] text-[#090F1D] sm:mt-5 sm:text-[56px]">
             {content.title}
           </h2>
-          <p className="mt-7 text-[46px] leading-[1.26] text-[#5D6575] whitespace-pre-line">{content.subtitle}</p>
-          {content.tertiary && <p className="mt-5 text-[38px] text-[#5D6575]">🦷 {content.tertiary}</p>}
+          <p className="mt-5 text-[30px] leading-[1.26] text-[#5D6575] whitespace-pre-line sm:mt-7 sm:text-[38px]">{content.subtitle}</p>
+          {content.tertiary && <p className="mt-4 text-[24px] text-[#5D6575] sm:mt-5 sm:text-[28px]">🦷 {content.tertiary}</p>}
 
           <button
             onClick={content.onPrimaryClick}
-            className={`mt-14 flex h-[84px] w-full items-center justify-center gap-3 rounded-full text-[44px] font-semibold transition active:scale-[0.99] ${content.primaryClass}`}
+            className={`mt-10 flex h-[64px] w-full items-center justify-center gap-2 rounded-full px-4 text-[26px] font-semibold transition active:scale-[0.99] sm:mt-14 sm:h-[76px] sm:text-[34px] ${content.primaryClass}`}
           >
             {content.primaryIcon}
             {content.primaryLabel}
@@ -206,20 +197,20 @@ export function PatientPortalHome({
             <>
               <div className="my-8 flex w-full items-center gap-4 text-[#6F7685]">
                 <div className="h-px flex-1 bg-[#D9DCE3]" />
-                <span className="text-[34px]">ou</span>
+                <span className="text-[24px] sm:text-[28px]">ou</span>
                 <div className="h-px flex-1 bg-[#D9DCE3]" />
               </div>
 
               <div className="grid w-full grid-cols-2 gap-3">
                 <button
                   onClick={() => onRescheduleAppointment(nextAppointment)}
-                  className="h-[78px] rounded-full bg-[#ECEDEF] text-[36px] font-medium text-[#1D2433]"
+                  className="h-[60px] rounded-full bg-[#ECEDEF] text-[22px] font-medium text-[#1D2433] sm:h-[68px] sm:text-[26px]"
                 >
                   Reagendar
                 </button>
                 <button
                   onClick={() => window.open('https://maps.google.com', '_blank')}
-                  className="h-[78px] rounded-full bg-[#ECEDEF] text-[36px] font-medium text-[#1D2433]"
+                  className="h-[60px] rounded-full bg-[#ECEDEF] text-[22px] font-medium text-[#1D2433] sm:h-[68px] sm:text-[26px]"
                 >
                   Como chegar
                 </button>
@@ -227,28 +218,28 @@ export function PatientPortalHome({
             </>
           )}
 
-          {content.secondaryLabel && <p className="mt-6 text-[40px] text-[#5D6575]">{content.secondaryLabel}</p>}
+          {content.secondaryLabel && <p className="mt-6 text-[24px] text-[#5D6575] sm:text-[30px]">{content.secondaryLabel}</p>}
 
-          <button onClick={onOpenDepth} className="mt-8 text-[34px] text-[#6B7280]">Ver histórico completo</button>
+          <button onClick={onOpenDepth} className="mt-8 text-[22px] text-[#6B7280] sm:text-[26px]">Ver histórico completo</button>
 
-          <div className="mt-auto pb-8 pt-8 flex items-center gap-2 text-[34px] text-[#6B7280]">
+          <div className="mt-auto pb-8 pt-8 flex items-center gap-2 text-[20px] text-[#6B7280] sm:text-[24px]">
             <Lock size={20} />
             Seus dados estão protegidos
           </div>
         </div>
 
-        <div className="grid grid-cols-3 border-t border-[#E5E5EA] bg-[#F9F9FB] px-3 py-4">
+        <div className="mt-4 grid grid-cols-3 border-t border-[#E5E5EA] bg-[#F9F9FB] px-3 py-4 rounded-t-2xl">
           <button className="flex flex-col items-center gap-2 text-[#08A055]">
             <Home size={24} />
-            <span className="text-[30px]">Início</span>
+            <span className="text-[18px] sm:text-[20px]">Início</span>
           </button>
           <button className="flex flex-col items-center gap-2 text-[#6B7280]" onClick={() => setShowGuidedConversation(true)}>
             <MessageCircle size={24} />
-            <span className="text-[30px]">Mensagens</span>
+            <span className="text-[18px] sm:text-[20px]">Mensagens</span>
           </button>
           <button className="flex flex-col items-center gap-2 text-[#6B7280]" onClick={onOpenDepth}>
             <User size={24} />
-            <span className="text-[30px]">Perfil</span>
+            <span className="text-[18px] sm:text-[20px]">Perfil</span>
           </button>
         </div>
       </div>
