@@ -26,6 +26,7 @@ interface AppointmentRequest {
   preferred_date: string;
   preferred_time: string | null;
   notes: string | null;
+  is_urgent: boolean;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   created_at: string;
 }
@@ -182,7 +183,14 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
                       <p className="text-xs text-slate-400">{req.patient_phone}</p>
                     </div>
                   </div>
-                  <StatusBadgeReq status={req.status} />
+                  <div className="flex items-center gap-2">
+                    {req.is_urgent && (
+                      <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-bold whitespace-nowrap">
+                        🚨 URGENTE
+                      </span>
+                    )}
+                    <StatusBadgeReq status={req.status} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mb-3">

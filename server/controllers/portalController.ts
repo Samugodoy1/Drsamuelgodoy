@@ -343,16 +343,16 @@ export const getPortalData = async (req: Request, res: Response) => {
 export const requestAppointment = async (req: Request, res: Response) => {
   try {
     const portal = (req as any).portal;
-    const { preferred_date, preferred_time, notes } = req.body;
+    const { preferred_date, preferred_time, notes, is_urgent } = req.body;
 
     if (!preferred_date) {
       return res.status(400).json({ error: 'Data preferencial é obrigatória' });
     }
 
     await query(
-      `INSERT INTO appointment_requests (patient_id, dentist_id, preferred_date, preferred_time, notes, status)
-       VALUES ($1, $2, $3, $4, $5, 'PENDING')`,
-      [portal.patient_id, portal.dentist_id, preferred_date, preferred_time || null, notes || null]
+      `INSERT INTO appointment_requests (patient_id, dentist_id, preferred_date, preferred_time, notes, is_urgent, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')`,
+      [portal.patient_id, portal.dentist_id, preferred_date, preferred_time || null, notes || null, is_urgent || false]
     );
 
     res.json({ message: 'Solicitação de agendamento enviada! A clínica entrará em contato para confirmar.' });
@@ -367,13 +367,13 @@ export const getAppointmentRequests = async (req: Request, res: Response) => {
   try {
     const dentistId = req.user?.id;
     const result = await query(
-      `SELECT ar.id, ar.patient_id, ar.dentist_id, ar.status, ar.notes, ar.preferred_time,
+      `SELECT ar.id, ar.patient_id, ar.dentist_id, ar.status, ar.notes, ar.preferred_time, ar.is_urgent,
               ar.preferred_date::text as preferred_date, ar.created_at,
               p.name as patient_name, p.phone as patient_phone
        FROM appointment_requests ar
        JOIN patients p ON p.id = ar.patient_id
        WHERE ar.dentist_id = $1
-       ORDER BY ar.created_at DESC
+       ORDER BY ar.is_urgent DESC, ar.created_at DESC
        LIMIT 50`,
       [dentistId]
     );

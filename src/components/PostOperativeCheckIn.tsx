@@ -40,15 +40,66 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
 
   const getSymptomOptions = () => {
     return [
-      { id: 'no_issues', label: '✓ Tudo bem, sem problemas', severity: 'none' },
-      { id: 'mild_discomfort', label: '⚠ Incômodo leve', severity: 'mild' },
-      { id: 'moderate_pain', label: '⚠ Dor moderada', severity: 'moderate' },
-      { id: 'severe_pain', label: '🚨 Dor forte', severity: 'severe' },
-      { id: 'swelling', label: '⚠ Inchaço', severity: 'mild' },
-      { id: 'bleeding', label: '🚨 Sangramento', severity: 'severe' },
-      { id: 'fever', label: '🚨 Febre', severity: 'severe' },
-      { id: 'other', label: '❓ Outro problema', severity: 'moderate' },
+      { id: 'no_issues', label: '✓ Tudo bem, sem problemas', severity: 'none', emoji: '😊' },
+      { id: 'mild_discomfort', label: '⚠ Incômodo leve', severity: 'mild', emoji: '😐' },
+      { id: 'moderate_pain', label: '⚠ Dor moderada', severity: 'moderate', emoji: '😟' },
+      { id: 'severe_pain', label: '🚨 Dor forte', severity: 'severe', emoji: '😣' },
+      { id: 'swelling', label: '⚠ Inchaço', severity: 'mild', emoji: '😐' },
+      { id: 'bleeding', label: '🚨 Sangramento', severity: 'severe', emoji: '⚠️' },
+      { id: 'fever', label: '🚨 Febre', severity: 'severe', emoji: '🌡️' },
+      { id: 'other', label: '❓ Outro problema', severity: 'moderate', emoji: '🤔' },
     ];
+  };
+
+  // Orientações inteligentes por tipo de sintoma
+  const getSmartGuidance = () => {
+    const symptomId = symptomData?.symptom;
+    const daysSince = daysSinceProc;
+    
+    const guidanceMap: Record<string, { title: string; message: string; isNormal: boolean }> = {
+      'no_issues': {
+        title: '✓ Excelente!',
+        message: 'Sua recuperação está dentro do esperado. Continue com os cuidados recomendados.',
+        isNormal: true,
+      },
+      'mild_discomfort': {
+        title: 'Normal para esta fase',
+        message: `Incômodo leve é comum ${daysSince <= 2 ? 'nos primeiros dias' : 'durante alguns dias'}. Se persistir além de ${daysSince <= 2 ? '5 dias' : '3 dias'}, nos avise.`,
+        isNormal: true,
+      },
+      'moderate_pain': {
+        title: 'Vamos tornar mais confortável',
+        message: 'Dor moderada pode ser controlada com analgésicos. Se não melhorar com repouso e medicação em 24h, entre em contato.',
+        isNormal: daysSince <= 1,
+      },
+      'severe_pain': {
+        title: '⚠️ Precisamos agir agora',
+        message: 'Dor forte é um sinal que precisa de orientação profissional. Vamos agendar um contato imediato.',
+        isNormal: false,
+      },
+      'swelling': {
+        title: 'Inchaço é normal',
+        message: `O inchaço tende a diminuir nos próximos dias com repouso, gelo nas primeiras 48h e elevação. Monitore a evolução.`,
+        isNormal: daysSince <= 3,
+      },
+      'bleeding': {
+        title: '⚠️ Ação imediata necessária',
+        message: 'Sangramento persistente precisa de avaliação. Vamos conectá-lo com a clínica agora mesmo.',
+        isNormal: false,
+      },
+      'fever': {
+        title: '🚨 Isso não é normal',
+        message: 'Febre pode indicar infecção. Precisamos de uma avaliação imediata. Vamos agendar um contato urgente.',
+        isNormal: false,
+      },
+      'other': {
+        title: 'Queremos entender melhor',
+        message: 'Vamos conhecer mais sobre o que você está sentindo para orientá-lo corretamente.',
+        isNormal: false,
+      },
+    };
+
+    return guidanceMap[symptomId || ''] || guidanceMap['other'];
   };
 
   const handleFeelingResponse = (isComfortable: boolean) => {
@@ -254,11 +305,19 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-4"
                 >
-                  <div className="bg-[#F2F2F7] rounded-2xl p-4 mb-6">
-                    <p className="text-[#1C1C1E] text-[14px]">
-                      {symptomData?.severity === 'severe'
-                        ? '⚠️ Recomendamos contato imediato com a clínica para orientação'
-                        : '💡 Podemos ajudar você de algumas formas'}
+                  {/* Smart Guidance Box */}
+                  <div className={`rounded-2xl p-4 mb-6 ${
+                    !getSmartGuidance().isNormal
+                      ? 'bg-[#FF3B30]/10 border border-[#FF3B30]/30'
+                      : 'bg-[#0C9B72]/10 border border-[#0C9B72]/30'
+                  }`}>
+                    <p className={`text-[14px] font-semibold ${
+                      !getSmartGuidance().isNormal ? 'text-[#FF3B30]' : 'text-[#0C9B72]'
+                    }`}>
+                      {getSmartGuidance().title}
+                    </p>
+                    <p className="text-[#1C1C1E] text-[13px] mt-2 leading-relaxed">
+                      {getSmartGuidance().message}
                     </p>
                   </div>
 
@@ -322,9 +381,9 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   {symptomData?.isComfortable ? (
                     <>
                       <div>
-                        <h3 className="text-[#1C1C1E] text-[18px] font-bold">Ótimo!</h3>
+                        <h3 className="text-[#1C1C1E] text-[18px] font-bold">Que alívio!</h3>
                         <p className="text-[#8E8E93] text-[14px] mt-2">
-                          Continue seguindo as orientações recebidas e nos contacte se surgir qualquer dúvida.
+                          Sua recuperação está indo bem. Continue seguindo as orientações e nos contacte se surgir qualquer dúvida.
                         </p>
                       </div>
                     </>
@@ -332,12 +391,12 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                     <>
                       <div>
                         <h3 className="text-[#1C1C1E] text-[18px] font-bold">
-                          {symptomData?.severity === 'severe' ? 'Em breve!' : 'Recebemos seu relato'}
+                          {symptomData?.severity === 'severe' ? 'Já estamos aqui para você' : 'Recebemos seu relato'}
                         </h3>
                         <p className="text-[#8E8E93] text-[14px] mt-2">
                           {symptomData?.severity === 'severe'
-                            ? 'A clínica entrará em contato em breve para orientação.'
-                            : 'Entraremos em contato para ajudá-lo.'}
+                            ? 'A clínica está acompanhando. Entraremos em contato nos próximos minutos.'
+                            : getSmartGuidance().message}
                         </p>
                       </div>
                     </>

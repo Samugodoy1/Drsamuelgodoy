@@ -144,7 +144,8 @@ export function PatientPortal() {
   const [scheduleForm, setScheduleForm] = useState({
     preferred_date: '',
     preferred_time: '',
-    notes: ''
+    notes: '',
+    is_urgent: false
   });
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
@@ -236,7 +237,7 @@ export function PatientPortal() {
         setScheduleSuccess(false);
         setScheduleMode('new');
         setScheduleTargetAppointment(null);
-        setScheduleForm({ preferred_date: '', preferred_time: '', notes: '' });
+        setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
       }, 2000);
     } catch {
       setError(scheduleMode === 'reschedule' ? 'Erro ao solicitar reagendamento' : 'Erro ao solicitar agendamento');
@@ -373,7 +374,7 @@ export function PatientPortal() {
     setScheduleMode('new');
     setScheduleTargetAppointment(null);
     setScheduleSuccess(false);
-    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '' });
+    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
     setShowScheduleModal(true);
   };
 
@@ -384,7 +385,8 @@ export function PatientPortal() {
     setScheduleForm({
       preferred_date: new Date(appointment.start_time).toLocaleDateString('en-CA'),
       preferred_time: '',
-      notes: ''
+      notes: '',
+      is_urgent: false
     });
     setShowScheduleModal(true);
   };
@@ -395,7 +397,7 @@ export function PatientPortal() {
     setScheduleSuccess(false);
     setScheduleMode('new');
     setScheduleTargetAppointment(null);
-    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '' });
+    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
   };
 
   if (loading) return (

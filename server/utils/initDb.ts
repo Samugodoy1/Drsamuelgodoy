@@ -329,9 +329,18 @@ export async function initDb() {
         preferred_date DATE NOT NULL,
         preferred_time TEXT,
         notes TEXT,
+        is_urgent BOOLEAN DEFAULT FALSE,
         status TEXT NOT NULL DEFAULT 'PENDING',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Migração: adicionar coluna is_urgent se não existir
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appointment_requests' AND column_name='is_urgent') THEN
+          ALTER TABLE appointment_requests ADD COLUMN is_urgent BOOLEAN DEFAULT FALSE;
+        END IF;
+      END $$;
 
       -- Campos extras no paciente para pré-atendimento
       DO $$
