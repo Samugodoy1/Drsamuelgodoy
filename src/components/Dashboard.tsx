@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, Bell, Clock } from '../icons';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -147,7 +147,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
-  const [isIslandExpanded, setIsIslandExpanded] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -359,33 +358,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const insightCard = !loading ? getInsightCard() : null;
-  const dynamicIslandStatus = (() => {
-    if (todayAppointmentsRemainingCount > 0) {
-      return {
-        label: 'Agora',
-        title: nextPatient ? `Próximo: ${nextPatient.patient_name}` : 'Consultas em andamento',
-        detail: nextPatient ? getCountdown(nextPatient) : `${todayAppointmentsRemainingCount} atendimentos hoje`,
-        accent: 'bg-emerald-400',
-        icon: <Calendar size={14} />,
-      };
-    }
-    if (tomorrowUnconfirmedCount > 0) {
-      return {
-        label: 'Lembretes',
-        title: `${tomorrowUnconfirmedCount} confirmação${tomorrowUnconfirmedCount > 1 ? 'ões' : ''} pendente${tomorrowUnconfirmedCount > 1 ? 's' : ''}`,
-        detail: 'Amanhã',
-        accent: 'bg-amber-400',
-        icon: <Bell size={14} />,
-      };
-    }
-    return {
-      label: 'Status',
-      title: 'Agenda em dia',
-      detail: 'Tudo certo por aqui',
-      accent: 'bg-sky-400',
-      icon: <Clock size={14} />,
-    };
-  })();
 
   const getEffectiveStatus = (appointment: any): string => {
     const now = new Date();
@@ -936,54 +908,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <p className="text-[13px] font-medium text-[#8E8E93] px-1 tracking-wide">
           {timeGreeting.text}, {getGreetingName()} {timeGreeting.emoji}
         </p>
-
-        {/* Dynamic Island - Apple inspired */}
-        <div className="flex justify-center">
-          <motion.button
-            type="button"
-            layout
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsIslandExpanded((v) => !v)}
-            className={`w-full max-w-[420px] rounded-full bg-black text-white shadow-[0_16px_40px_rgba(0,0,0,0.22)] px-4 py-3 transition-all ${
-              isIslandExpanded ? 'max-w-[520px] rounded-[28px]' : ''
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${dynamicIslandStatus.accent}`} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
-                {dynamicIslandStatus.label}
-              </span>
-              <span className="ml-auto text-white/75">{dynamicIslandStatus.icon}</span>
-            </div>
-
-            <AnimatePresence initial={false}>
-              {isIslandExpanded ? (
-                <motion.div
-                  key="expanded"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.2 }}
-                  className="pt-3 text-left"
-                >
-                  <p className="text-[16px] font-semibold leading-tight">{dynamicIslandStatus.title}</p>
-                  <p className="text-[13px] text-white/70 mt-1">{dynamicIslandStatus.detail}</p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="compact"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -3 }}
-                  transition={{ duration: 0.2 }}
-                  className="pt-2 text-left"
-                >
-                  <p className="text-[14px] font-semibold truncate">{dynamicIslandStatus.title}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        </div>
 
         {/* Mensagem principal — headline dominante */}
         <h1 className="text-[28px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2] px-1">
