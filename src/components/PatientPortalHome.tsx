@@ -178,13 +178,17 @@ export function PatientPortalHome({
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
+          className="rounded-3xl border border-white/70 bg-white/70 p-5 shadow-[0_20px_45px_-35px_rgba(17,24,39,0.5)] backdrop-blur-xl"
         >
-          <p className="text-[#8E8E93] text-[13px] font-medium tracking-wide uppercase">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#86868B]">
             {getGreeting()}
           </p>
-          <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight mt-1">
+          <h1 className="mt-1 text-[31px] font-semibold tracking-[-0.02em] text-[#1D1D1F]">
             {firstName}
           </h1>
+          <p className="mt-2 text-[14px] text-[#6E6E73]">
+            Seu painel foi desenhado para guiar cada próxima decisão com clareza.
+          </p>
         </motion.div>
 
         {/* ─── ATO 2: EMERGÊNCIA ─── */}
@@ -435,17 +439,19 @@ END:VCALENDAR`;
         })()}
 
         {/* ─── Divider ─── */}
-        <div className="h-px bg-gradient-to-r from-transparent via-[#E5E5EA] to-transparent" />
+        <div className="h-px bg-gradient-to-r from-transparent via-[#D2D2D7] to-transparent" />
 
         {/* ─── ATO 6: Ver Mais (Profundidade) ─── */}
         <motion.button
           whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.95 }}
+          whileTap={{ scale: 0.97 }}
           onClick={onOpenDepth}
-          className="w-full flex items-center justify-center gap-2 py-4 text-[#0C9B72] text-[15px] font-semibold hover:opacity-70 transition-opacity"
+          className="group w-full rounded-2xl border border-[#0C9B72]/20 bg-white/70 px-5 py-4 text-[15px] font-semibold text-[#0C9B72] shadow-[0_12px_30px_-24px_rgba(12,155,114,0.55)] transition-all hover:border-[#0C9B72]/40 hover:bg-white"
         >
-          Ver seu histórico completo
-          <ChevronDown size={16} className="rotate-90" />
+          <span className="flex items-center justify-center gap-2">
+            Ver seu histórico completo
+            <ChevronDown size={16} className="rotate-90 transition-transform group-hover:translate-x-0.5" />
+          </span>
         </motion.button>
       </div>
 
