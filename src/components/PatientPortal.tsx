@@ -742,8 +742,7 @@ export function PatientPortal() {
       </div>
 
       {/* ─── Content: Apple-Style Home ─── */}
-      <div className="relative z-10 max-w-xl mx-auto px-4 pt-6 pb-24 sm:px-5">
-        <div className="rounded-[30px] border border-white/80 bg-white/75 p-5 shadow-[0_25px_60px_-40px_rgba(17,24,39,0.38)] backdrop-blur-2xl sm:p-6">
+      <div className="relative z-10 max-w-xl mx-auto px-4 pt-4 pb-24 sm:px-5 sm:pt-6">
         <AnimatePresence mode="wait">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -1664,7 +1663,6 @@ export function PatientPortal() {
             )}
           </motion.div>
         </AnimatePresence>
-        </div>
       </div>
 
       {/* ─── Depth Drawer (Historical Data Access) ─── */}
