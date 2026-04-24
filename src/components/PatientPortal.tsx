@@ -705,14 +705,44 @@ export function PatientPortal() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-white pb-24 text-[#1D1D1F]">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#F5F5F7] pb-24 text-[#1D1D1F]">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#BEE3D3]/40 blur-3xl" />
+        <div className="absolute top-48 -left-20 h-64 w-64 rounded-full bg-[#D7E8FF]/55 blur-3xl" />
+        <div className="absolute bottom-8 right-[-60px] h-72 w-72 rounded-full bg-[#EFE8FF]/60 blur-3xl" />
+      </div>
 
       {/* Accessible announcer for screen readers */}
       <div id="a11y-announcer" aria-live="polite" className="sr-only">
         {error || (scheduleSuccess ? (scheduleMode === 'reschedule' ? 'Pedido de reagendamento enviado' : 'Solicitação de agendamento enviada') : '') || (paymentInformed ? 'Pagamento informado' : '') || (pixCopied ? 'Chave PIX copiada' : '')}
       </div>
+      {/* ─── Header: frosted, minimal ─── */}
+      <div className="sticky top-0 z-50 border-b border-white/70 bg-white/70 shadow-[0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl">
+        <div className="max-w-xl mx-auto px-5 py-4 flex items-center gap-3.5">
+          {clinic?.photo_url ? (
+            <img src={clinic.photo_url} alt={clinic?.clinic_name || clinic?.name || 'Minha Clínica'} className="w-9 h-9 rounded-full object-cover ring-1 ring-[#C6C6C8]/40" />
+          ) : (
+            <div className="w-9 h-9 bg-[#E5E5EA] rounded-full flex items-center justify-center">
+              <Stethoscope size={18} className="text-[#8E8E93]" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-[#1C1C1E] text-[15px] font-semibold tracking-tight truncate">
+              {clinic?.clinic_name || clinic?.name || 'Minha Clínica'}
+            </p>
+          </div>
+          {patient.photo_url ? (
+            <img src={patient.photo_url} alt={patient.name} className="w-8 h-8 rounded-full object-cover ring-1 ring-[#C6C6C8]/40" />
+          ) : (
+            <div className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center text-[13px] font-semibold text-[#8E8E93]">
+              {patient.name.charAt(0)}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ─── Content: Apple-Style Home ─── */}
-      <div className="relative z-10 max-w-xl mx-auto px-4 pt-2 pb-24 sm:px-5 sm:pt-4">
+      <div className="relative z-10 max-w-xl mx-auto px-4 pt-4 pb-24 sm:px-5 sm:pt-6">
         <AnimatePresence mode="wait">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
