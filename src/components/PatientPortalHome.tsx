@@ -35,10 +35,13 @@ interface PatientPortalHomeProps {
   confirmedAppointmentId: number | null;
   rescheduleRequestedAppointmentId: number | null;
   sessionToken: string | null;
+  activeTab: 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro';
+  onChangeTab: (tab: 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro') => void;
 }
 
 export function PatientPortalHome({
   patient,
+  clinic,
   futureAppointments,
   recentProcedures,
   onOpenDepth,
@@ -46,6 +49,8 @@ export function PatientPortalHome({
   onRescheduleAppointment,
   appointmentSubmittingId,
   sessionToken,
+  activeTab,
+  onChangeTab,
 }: PatientPortalHomeProps) {
   const momentState = usePatientMoment({
     futureAppointments,
@@ -163,31 +168,29 @@ export function PatientPortalHome({
 
   return (
     <>
-      <div className="flex min-h-[calc(100vh-110px)] w-full flex-col">
-        <div className="px-1 pt-1 pb-4">
-          <div>
-            <h1 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.02em] text-[#0A0F1A] sm:text-[40px]">Olá, {firstName} 👋</h1>
-            <p className="mt-2 text-[20px] leading-[1.25] text-[#5D6575] sm:text-[24px]">
-              {moment === 'emergency' ? 'Conte com a gente.' : moment === 'post_operative' ? 'Sua recuperação é importante para nós.' : 'Estamos aqui para cuidar de você.'}
-            </p>
-          </div>
+      <div className="flex min-h-[calc(100vh-132px)] w-full flex-col pb-[112px]">
+        <div className="px-1 pb-3 pt-1">
+          <h1 className="text-[42px] font-semibold leading-[1.02] tracking-[-0.03em] text-[#0A0F1A]">Olá, {firstName} 👋</h1>
+          <p className="mt-1.5 text-[18px] leading-[1.3] text-[#5D6575]">
+            {moment === 'emergency' ? 'Conte com a gente.' : moment === 'post_operative' ? 'Sua recuperação é importante para nós.' : 'Estamos aqui para cuidar de você.'}
+          </p>
         </div>
 
-        <div className="flex flex-1 flex-col items-center rounded-[24px] border border-[#E5E5EA] bg-[#F4F4F6] px-5 pt-8 text-center sm:px-8 sm:pt-12">
-          <div className={`flex h-[88px] w-[88px] items-center justify-center rounded-full sm:h-[112px] sm:w-[112px] ${content.iconWrap}`}>
+        <div className="flex flex-1 flex-col items-center rounded-[28px] border border-white/70 bg-white/60 px-5 pt-6 text-center shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:px-6">
+          <div className={`flex h-[76px] w-[76px] items-center justify-center rounded-full ${content.iconWrap}`}>
             {content.icon}
           </div>
 
-          <p className={`mt-6 text-[26px] font-semibold sm:mt-8 sm:text-[30px] ${content.accent}`}>{content.kicker}</p>
-          <h2 className="mt-4 whitespace-pre-line text-[44px] font-semibold leading-[1.08] tracking-[-0.02em] text-[#090F1D] sm:mt-5 sm:text-[56px]">
+          <p className={`mt-4 text-[19px] font-semibold tracking-[-0.01em] ${content.accent}`}>{content.kicker}</p>
+          <h2 className="mt-2 whitespace-pre-line text-[34px] font-semibold leading-[1.08] tracking-[-0.025em] text-[#090F1D]">
             {content.title}
           </h2>
-          <p className="mt-5 text-[30px] leading-[1.26] text-[#5D6575] whitespace-pre-line sm:mt-7 sm:text-[38px]">{content.subtitle}</p>
-          {content.tertiary && <p className="mt-4 text-[24px] text-[#5D6575] sm:mt-5 sm:text-[28px]">🦷 {content.tertiary}</p>}
+          <p className="mt-3 text-[18px] leading-[1.3] text-[#5D6575] whitespace-pre-line">{content.subtitle}</p>
+          {content.tertiary && <p className="mt-2.5 text-[17px] text-[#5D6575]">🦷 {content.tertiary}</p>}
 
           <button
             onClick={content.onPrimaryClick}
-            className={`mt-10 flex h-[64px] w-full items-center justify-center gap-2 rounded-full px-4 text-[26px] font-semibold transition active:scale-[0.99] sm:mt-14 sm:h-[76px] sm:text-[34px] ${content.primaryClass}`}
+            className={`mt-7 flex h-[56px] w-full items-center justify-center gap-2 rounded-full px-4 text-[19px] font-semibold transition active:scale-[0.99] ${content.primaryClass}`}
           >
             {content.primaryIcon}
             {content.primaryLabel}
@@ -195,22 +198,22 @@ export function PatientPortalHome({
 
           {nextAppointment && moment !== 'post_operative' && moment !== 'emergency' && (
             <>
-              <div className="my-8 flex w-full items-center gap-4 text-[#6F7685]">
+              <div className="my-5 flex w-full items-center gap-3 text-[#6F7685]">
                 <div className="h-px flex-1 bg-[#D9DCE3]" />
-                <span className="text-[24px] sm:text-[28px]">ou</span>
+                <span className="text-[14px] uppercase tracking-[0.18em]">ou</span>
                 <div className="h-px flex-1 bg-[#D9DCE3]" />
               </div>
 
               <div className="grid w-full grid-cols-2 gap-3">
                 <button
                   onClick={() => onRescheduleAppointment(nextAppointment)}
-                  className="h-[60px] rounded-full bg-[#ECEDEF] text-[22px] font-medium text-[#1D2433] sm:h-[68px] sm:text-[26px]"
+                  className="h-[48px] rounded-full bg-[#ECEDEF] text-[17px] font-medium text-[#1D2433]"
                 >
                   Reagendar
                 </button>
                 <button
-                  onClick={() => window.open('https://maps.google.com', '_blank')}
-                  className="h-[60px] rounded-full bg-[#ECEDEF] text-[22px] font-medium text-[#1D2433] sm:h-[68px] sm:text-[26px]"
+                  onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(clinic?.clinic_name || clinic?.name || 'clínica odontológica')}`, '_blank')}
+                  className="h-[48px] rounded-full bg-[#ECEDEF] text-[17px] font-medium text-[#1D2433]"
                 >
                   Como chegar
                 </button>
@@ -218,28 +221,30 @@ export function PatientPortalHome({
             </>
           )}
 
-          {content.secondaryLabel && <p className="mt-6 text-[24px] text-[#5D6575] sm:text-[30px]">{content.secondaryLabel}</p>}
+          {content.secondaryLabel && <p className="mt-5 text-[17px] text-[#5D6575]">{content.secondaryLabel}</p>}
 
-          <button onClick={onOpenDepth} className="mt-8 text-[22px] text-[#6B7280] sm:text-[26px]">Ver histórico completo</button>
+          <button onClick={onOpenDepth} className="mt-6 text-[17px] font-medium text-[#6B7280]">Ver histórico completo</button>
 
-          <div className="mt-auto pb-8 pt-8 flex items-center gap-2 text-[20px] text-[#6B7280] sm:text-[24px]">
-            <Lock size={20} />
+          <div className="mt-auto pb-6 pt-6 flex items-center gap-2 text-[14px] text-[#6B7280]">
+            <Lock size={16} />
             Seus dados estão protegidos
           </div>
         </div>
+      </div>
 
-        <div className="mt-4 grid grid-cols-3 border-t border-[#E5E5EA] bg-[#F9F9FB] px-3 py-4 rounded-t-2xl">
-          <button className="flex flex-col items-center gap-2 text-[#08A055]">
-            <Home size={24} />
-            <span className="text-[18px] sm:text-[20px]">Início</span>
+      <div className="fixed inset-x-0 bottom-3 z-40 px-4">
+        <div className="mx-auto grid w-full max-w-xl grid-cols-3 rounded-[24px] border border-white/70 bg-white/90 px-2 py-2 shadow-[0_18px_45px_rgba(12,18,32,0.18)] backdrop-blur-2xl">
+          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'inicio' ? 'text-[#08A055]' : 'text-[#6B7280]'}`} onClick={() => onChangeTab('inicio')}>
+            <Home size={22} />
+            <span className="text-[13px] font-medium">Início</span>
           </button>
-          <button className="flex flex-col items-center gap-2 text-[#6B7280]" onClick={() => setShowGuidedConversation(true)}>
-            <MessageCircle size={24} />
-            <span className="text-[18px] sm:text-[20px]">Mensagens</span>
+          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'consultas' ? 'text-[#08A055]' : 'text-[#6B7280]'}`} onClick={() => { onChangeTab('consultas'); setShowGuidedConversation(true); }}>
+            <MessageCircle size={22} />
+            <span className="text-[13px] font-medium">Mensagens</span>
           </button>
-          <button className="flex flex-col items-center gap-2 text-[#6B7280]" onClick={onOpenDepth}>
-            <User size={24} />
-            <span className="text-[18px] sm:text-[20px]">Perfil</span>
+          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'evolucao' ? 'text-[#08A055]' : 'text-[#6B7280]'}`} onClick={() => { onChangeTab('evolucao'); onOpenDepth(); }}>
+            <User size={22} />
+            <span className="text-[13px] font-medium">Perfil</span>
           </button>
         </div>
       </div>
