@@ -168,29 +168,38 @@ export function PatientPortalHome({
 
   return (
     <>
-      <div className="flex min-h-[calc(100vh-132px)] w-full flex-col pb-[112px]">
-        <div className="px-1 pb-3 pt-1">
-          <h1 className="text-[42px] font-semibold leading-[1.02] tracking-[-0.03em] text-[#0A0F1A]">Olá, {firstName} 👋</h1>
-          <p className="mt-1.5 text-[18px] leading-[1.3] text-[#5D6575]">
+      <div className="flex min-h-[calc(100vh-132px)] w-full flex-col pb-[116px]">
+        <div className="px-1 pb-5 pt-2.5">
+          <h1 className="text-[40px] font-semibold leading-[1.03] tracking-[-0.03em] text-[#0A0F1A]">Olá, {firstName} 👋</h1>
+          <p className="mt-2 text-[18px] leading-[1.35] text-[#5D6575]">
             {moment === 'emergency' ? 'Conte com a gente.' : moment === 'post_operative' ? 'Sua recuperação é importante para nós.' : 'Estamos aqui para cuidar de você.'}
           </p>
         </div>
 
-        <div className="flex flex-1 flex-col items-center rounded-[28px] border border-white/70 bg-white/60 px-5 pt-6 text-center shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:px-6">
-          <div className={`flex h-[76px] w-[76px] items-center justify-center rounded-full ${content.iconWrap}`}>
+        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col rounded-[30px] border border-white/75 bg-white/65 px-5 pt-7 text-center shadow-[0_18px_44px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:px-7 sm:pt-8">
+          <p className="text-[12px] uppercase tracking-[0.2em] text-[#8A93A4]">Resumo da sua próxima etapa</p>
+
+          <div className={`mx-auto mt-5 flex h-[78px] w-[78px] items-center justify-center rounded-full ${content.iconWrap}`}>
             {content.icon}
           </div>
 
-          <p className={`mt-4 text-[19px] font-semibold tracking-[-0.01em] ${content.accent}`}>{content.kicker}</p>
-          <h2 className="mt-2 whitespace-pre-line text-[34px] font-semibold leading-[1.08] tracking-[-0.025em] text-[#090F1D]">
+          <p className={`mt-5 text-[18px] font-semibold tracking-[-0.01em] ${content.accent}`}>{content.kicker}</p>
+          <h2 className="mt-2 whitespace-pre-line text-[35px] font-semibold leading-[1.08] tracking-[-0.024em] text-[#090F1D]">
             {content.title}
           </h2>
-          <p className="mt-3 text-[18px] leading-[1.3] text-[#5D6575] whitespace-pre-line">{content.subtitle}</p>
-          {content.tertiary && <p className="mt-2.5 text-[17px] text-[#5D6575]">🦷 {content.tertiary}</p>}
+          <p className="mt-3.5 whitespace-pre-line text-[18px] leading-[1.35] text-[#5D6575]">{content.subtitle}</p>
+
+          {content.tertiary && (
+            <div className="mt-5 space-y-2">
+              <div className="mx-auto w-fit rounded-full bg-[#F3F5F8] px-4 py-2 text-[16px] text-[#4A5261]">
+                🦷 {content.tertiary}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={content.onPrimaryClick}
-            className={`mt-7 flex h-[56px] w-full items-center justify-center gap-2 rounded-full px-4 text-[19px] font-semibold transition active:scale-[0.99] ${content.primaryClass}`}
+            className={`mt-8 flex h-[56px] w-full items-center justify-center gap-2 rounded-full px-4 text-[19px] font-semibold transition active:scale-[0.99] ${content.primaryClass}`}
           >
             {content.primaryIcon}
             {content.primaryLabel}
@@ -198,7 +207,7 @@ export function PatientPortalHome({
 
           {nextAppointment && moment !== 'post_operative' && moment !== 'emergency' && (
             <>
-              <div className="my-5 flex w-full items-center gap-3 text-[#6F7685]">
+              <div className="my-6 flex w-full items-center gap-3 text-[#6F7685]">
                 <div className="h-px flex-1 bg-[#D9DCE3]" />
                 <span className="text-[14px] uppercase tracking-[0.18em]">ou</span>
                 <div className="h-px flex-1 bg-[#D9DCE3]" />
@@ -207,13 +216,13 @@ export function PatientPortalHome({
               <div className="grid w-full grid-cols-2 gap-3">
                 <button
                   onClick={() => onRescheduleAppointment(nextAppointment)}
-                  className="h-[48px] rounded-full bg-[#ECEDEF] text-[17px] font-medium text-[#1D2433]"
+                  className="h-[48px] rounded-full border border-[#DDE2EA] bg-[#F8FAFC] text-[16px] font-medium text-[#1D2433]"
                 >
                   Reagendar
                 </button>
                 <button
                   onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(clinic?.clinic_name || clinic?.name || 'clínica odontológica')}`, '_blank')}
-                  className="h-[48px] rounded-full bg-[#ECEDEF] text-[17px] font-medium text-[#1D2433]"
+                  className="h-[48px] rounded-full border border-[#DDE2EA] bg-[#F8FAFC] text-[16px] font-medium text-[#1D2433]"
                 >
                   Como chegar
                 </button>
@@ -223,9 +232,9 @@ export function PatientPortalHome({
 
           {content.secondaryLabel && <p className="mt-5 text-[17px] text-[#5D6575]">{content.secondaryLabel}</p>}
 
-          <button onClick={onOpenDepth} className="mt-6 text-[17px] font-medium text-[#6B7280]">Ver histórico completo</button>
+          <button onClick={onOpenDepth} className="mt-7 text-[16px] font-medium text-[#6B7280]">Ver histórico completo</button>
 
-          <div className="mt-auto pb-6 pt-6 flex items-center gap-2 text-[14px] text-[#6B7280]">
+          <div className="mt-auto flex items-center gap-2 pb-7 pt-8 text-[14px] text-[#6B7280]">
             <Lock size={16} />
             Seus dados estão protegidos
           </div>
