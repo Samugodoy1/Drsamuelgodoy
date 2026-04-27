@@ -35,6 +35,13 @@ interface PatientPortalHomeProps {
   confirmedAppointmentId: number | null;
   rescheduleRequestedAppointmentId: number | null;
   sessionToken: string | null;
+  appointmentRequests: Array<{
+    id: number;
+    status: string;
+    reason_category?: string;
+    desired_period?: string;
+    created_at: string;
+  }>;
   activeTab: 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro';
   onChangeTab: (tab: 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro') => void;
 }
@@ -49,6 +56,7 @@ export function PatientPortalHome({
   onRescheduleAppointment,
   appointmentSubmittingId,
   sessionToken,
+  appointmentRequests,
   activeTab,
   onChangeTab,
 }: PatientPortalHomeProps) {
@@ -63,7 +71,7 @@ export function PatientPortalHome({
   const [showPostOpCheckIn, setShowPostOpCheckIn] = useState(false);
   const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
 
-  const handleScheduleRequest = async (complaint: string, duration: string, isUrgent?: boolean) => {
+  const handleScheduleRequest = async (payload: { complaint: string; desiredPeriod: string; observation?: string; isUrgent?: boolean }) => {
     setIsSubmittingSchedule(true);
     try {
       const res = await fetch('/api/portal/request-appointment', {
@@ -73,10 +81,11 @@ export function PatientPortalHome({
           'Authorization': `Bearer ${sessionToken}`
         },
         body: JSON.stringify({
-          preferred_date: '',
-          preferred_time: '',
-          is_urgent: isUrgent ?? false,
-          notes: `${complaint} - há ${duration}${isUrgent ? ' [URGENTE]' : ''}`
+          preferred_date: new Date().toLocaleDateString('en-CA'),
+          desired_period: payload.desiredPeriod,
+          reason_category: payload.complaint,
+          is_urgent: payload.isUrgent ?? false,
+          notes: payload.observation || null
         })
       });
       if (!res.ok) throw new Error('Erro ao solicitar');
@@ -89,6 +98,7 @@ export function PatientPortalHome({
 
   const firstName = patient.name.split(' ')[0];
   const nextAppointment = futureAppointments[0];
+  const latestRequest = appointmentRequests?.[0];
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -174,6 +184,15 @@ export function PatientPortalHome({
           <p className="mt-2 text-[18px] leading-[1.35] text-[#5D6575]">
             {moment === 'emergency' ? 'Conte com a gente.' : moment === 'post_operative' ? 'Sua recuperação é importante para nós.' : 'Estamos aqui para cuidar de você.'}
           </p>
+          {latestRequest && (
+            <div className="mt-4 rounded-2xl border border-[#DDE2EA] bg-white px-4 py-3 text-left">
+              <p className="text-[12px] uppercase tracking-[0.14em] text-[#8A93A4]">Solicitação mais recente</p>
+              <p className="mt-1 text-[15px] font-semibold text-[#111827]">Status: {latestRequest.status}</p>
+              <p className="text-[13px] text-[#4B5563]">
+                {latestRequest.reason_category || 'Motivo não informado'} • {latestRequest.desired_period || 'Primeiro disponível'}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mx-auto flex w-full max-w-xl flex-1 flex-col rounded-[30px] border border-white/75 bg-white/65 px-5 pt-7 text-center shadow-[0_18px_44px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:px-7 sm:pt-8">

@@ -1326,6 +1326,27 @@ export default function App() {
     return response;
   };
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const refreshPortalPending = async () => {
+      try {
+        const res = await apiFetch('/api/portal/appointment-requests');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) {
+          setPortalPendingCount(data.filter((r: any) => r.status === 'PENDING').length);
+        }
+      } catch {}
+    };
+    refreshPortalPending();
+    const timer = setInterval(refreshPortalPending, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [user]);
+
   const openAppointmentModal = () => {
     const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
 

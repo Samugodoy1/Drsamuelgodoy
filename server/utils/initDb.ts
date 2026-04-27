@@ -334,11 +334,26 @@ export async function initDb() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS appointment_request_events (
+        id SERIAL PRIMARY KEY,
+        appointment_request_id INTEGER NOT NULL REFERENCES appointment_requests(id) ON DELETE CASCADE,
+        dentist_id INTEGER NOT NULL REFERENCES users(id),
+        event_type TEXT NOT NULL,
+        metadata JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Migração: adicionar coluna is_urgent se não existir
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appointment_requests' AND column_name='is_urgent') THEN
           ALTER TABLE appointment_requests ADD COLUMN is_urgent BOOLEAN DEFAULT FALSE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appointment_requests' AND column_name='reason_category') THEN
+          ALTER TABLE appointment_requests ADD COLUMN reason_category TEXT DEFAULT 'outro';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appointment_requests' AND column_name='desired_period') THEN
+          ALTER TABLE appointment_requests ADD COLUMN desired_period TEXT DEFAULT 'primeiro_disponivel';
         END IF;
       END $$;
 
