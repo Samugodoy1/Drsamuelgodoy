@@ -1,30 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Calendar,
-  FileText,
-  DollarSign,
-  Clock,
-  CheckCircle2,
   AlertCircle,
-  ChevronRight,
-  Stethoscope,
-  Activity,
-  CalendarPlus,
-  User,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  FileText,
   Heart,
-  Shield,
-  Download,
-  X,
   Home,
-  ClipboardList,
-  Phone
+  MessageCircle,
+  Phone,
+  Shield,
+  Sparkles,
+  UserCircle,
 } from '../icons';
-import { getStatusConfig, APPOINTMENT_STATUS_CONFIG, getCountdownLabel, getCountdownColor } from '../constants/statusConfig';
-import { COLORS, getStatusColors } from '../constants/colors';
-import { PatientPortalHome } from './PatientPortalHome';
-import { PatientPortalDepth } from './PatientPortalDepth';
+
+type PortalTab = 'home' | 'cuidados' | 'consultas' | 'perfil';
+type HomeState = 'consulta_proxima' | 'solicitacao_pendente' | 'tratamento_ativo' | 'revisao_atrasada' | 'sem_pendencias';
 
 interface PortalData {
   patient: {
@@ -32,23 +25,11 @@ interface PortalData {
     name: string;
     email: string;
     phone: string;
-    cpf: string;
     birth_date: string;
-    photo_url: string;
     address: string;
-    consent_accepted: boolean;
-    emergency_contact_name?: string;
-    emergency_contact_phone?: string;
     health_insurance?: string;
-    health_insurance_number?: string;
     treatment_plan?: Array<{ id: string; procedure?: string; value?: number; status?: string }>;
   };
-  anamnesis: {
-    medical_history: string;
-    allergies: string;
-    medications: string;
-    chief_complaint: string;
-  } | null;
   appointments: Array<{
     id: number;
     start_time: string;
@@ -64,53 +45,6 @@ interface PortalData {
     description: string;
     created_at: string;
   }>;
-  evolution: Array<{
-    id: number;
-    date: string;
-    procedure_performed: string;
-    notes: string;
-    dentist_name: string;
-  }>;
-  payment_plans: Array<{
-    id: number;
-    procedure: string;
-    total_amount: number;
-    installments_count: number;
-    status: string;
-    installments: Array<{
-      number: number;
-      amount: number;
-      due_date: string;
-      status: string;
-      payment_date: string | null;
-    }>;
-  }>;
-  transactions: Array<{
-    id: number;
-    type: string;
-    description: string;
-    category: string;
-    amount: number;
-    payment_method: string;
-    date: string;
-    status: string;
-    procedure: string | null;
-    notes: string | null;
-  }>;
-  installments: Array<{
-    id: number;
-    payment_plan_id: number;
-    number: number;
-    amount: number;
-    due_date: string;
-    status: string;
-    payment_date: string | null;
-    procedure: string;
-  }>;
-  consents: Array<{
-    consent_type: string;
-    signed_at: string;
-  }>;
   appointment_requests: Array<{
     id: number;
     status: string;
@@ -120,1849 +54,442 @@ interface PortalData {
     created_at: string;
   }>;
   clinic: {
-    name: string;
-    clinic_name: string;
-    clinic_address: string;
-    phone: string;
-    photo_url: string;
-    specialty: string;
+    name?: string;
+    clinic_name?: string;
+    phone?: string;
   } | null;
 }
 
+const statusLabel: Record<string, string> = {
+  PENDING: 'Pendente',
+  APPROVED: 'Aprovada',
+  REJECTED: 'Recusada',
+  CONFIRMED: 'Confirmada',
+  SCHEDULED: 'Agendada',
+  FINISHED: 'Concluída',
+};
+
 export function PatientPortal() {
   const { token } = useParams<{ token: string }>();
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showDepth, setShowDepth] = useState(false);
-
-  // DEBUG: Log token on mount
-  useEffect(() => {
-    console.log('🔧 PatientPortal mounted with token:', token);
-  }, []);
-
-  // Appointment state — needed for home component
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<PortalTab>('home');
   const [appointmentSubmittingId, setAppointmentSubmittingId] = useState<number | null>(null);
-  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<number | null>(null);
-  const [rescheduleRequestedAppointmentId, setRescheduleRequestedAppointmentId] = useState<number | null>(null);
-
-  // Schedule modal state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({
-    preferred_date: '',
-    preferred_time: '',
-    notes: '',
-    is_urgent: false
-  });
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
-  const [scheduleSuccess, setScheduleSuccess] = useState(false);
-  const [scheduleMode, setScheduleMode] = useState<'new' | 'reschedule'>('new');
-  const [scheduleTargetAppointment, setScheduleTargetAppointment] = useState<PortalData['appointments'][number] | null>(null);
-
-  // Payment state
-  const [actionSubmitting, setActionSubmitting] = useState(false);
-  const [showPixModal, setShowPixModal] = useState<{ amount: number; installment_id?: number; label: string } | null>(null);
-  const [pixInfo, setPixInfo] = useState<{ has_pix: boolean; pix_key?: string; pix_key_type?: string; beneficiary_name?: string } | null>(null);
-  const [pixCopied, setPixCopied] = useState(false);
-  const [paymentInformed, setPaymentInformed] = useState(false);
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro'>('inicio');
-
-  const scheduleModalRef = useRef<HTMLDivElement | null>(null);
-  const pixModalRef = useRef<HTMLDivElement | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
 
   useEffect(() => {
+    const authenticateAndLoad = async () => {
+      try {
+        const authRes = await fetch(`/api/portal/auth/${token}`);
+        const authData = await authRes.json();
+        if (!authRes.ok) throw new Error(authData.error || 'Link inválido ou expirado');
+
+        setSessionToken(authData.session_token);
+
+        const dataRes = await fetch('/api/portal/data', {
+          headers: { Authorization: `Bearer ${authData.session_token}` },
+        });
+        const portalData = await dataRes.json();
+        if (!dataRes.ok) throw new Error(portalData.error || 'Erro ao carregar dados');
+        setData(portalData);
+      } catch (err: any) {
+        setError(err.message || 'Erro ao carregar o portal');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     authenticateAndLoad();
   }, [token]);
 
-  const authenticateAndLoad = async () => {
-    try {
-      console.log('🔐 PatientPortal: Starting auth with token:', token); // DEBUG
-      
-      const authRes = await fetch(`/api/portal/auth/${token}`);
-      const authData = await authRes.json();
-      
-      console.log('🔐 Auth response:', { status: authRes.status, ok: authRes.ok, data: authData }); // DEBUG
-      
-      if (!authRes.ok) {
-        setError(authData.error || 'Link inválido ou expirado');
-        setLoading(false);
-        return;
-      }
-      setSessionToken(authData.session_token);
-
-      // Load portal data
-      console.log('📊 PatientPortal: Fetching /api/portal/data'); // DEBUG
-      const dataRes = await fetch('/api/portal/data', {
-        headers: { 'Authorization': `Bearer ${authData.session_token}` }
-      });
-      const portalData = await dataRes.json();
-      
-      console.log('📊 Data response:', { status: dataRes.status, ok: dataRes.ok, keys: portalData ? Object.keys(portalData) : 'null' }); // DEBUG
-      
-      if (!dataRes.ok) throw new Error(portalData.error || 'Erro ao carregar dados (status ' + dataRes.status + ')');
-      setData(portalData);
-      console.log('✅ Portal data loaded successfully'); // DEBUG
-    } catch (err: any) {
-      console.error('❌ PatientPortal error:', err); // DEBUG
-      setError(err.message || 'Erro ao carregar dados: ' + String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestAppointment = async () => {
-    if (!scheduleForm.preferred_date) return;
-    setScheduleSubmitting(true);
-    try {
-      const isReschedule = scheduleMode === 'reschedule' && scheduleTargetAppointment;
-      const res = await fetch(isReschedule ? '/api/portal/reschedule-appointment' : '/api/portal/request-appointment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify(
-          isReschedule
-            ? {
-                appointment_id: scheduleTargetAppointment.id,
-                preferred_date: scheduleForm.preferred_date,
-                preferred_time: scheduleForm.preferred_time,
-                reason: scheduleForm.notes
-              }
-            : scheduleForm
-        )
-      });
-      if (!res.ok) throw new Error('Erro ao solicitar');
-      setScheduleSuccess(true);
-      if (isReschedule) {
-        setRescheduleRequestedAppointmentId(scheduleTargetAppointment.id);
-      }
-      setTimeout(() => {
-        setShowScheduleModal(false);
-        setScheduleSuccess(false);
-        setScheduleMode('new');
-        setScheduleTargetAppointment(null);
-        setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
-      }, 2000);
-    } catch {
-      setError(scheduleMode === 'reschedule' ? 'Erro ao solicitar reagendamento' : 'Erro ao solicitar agendamento');
-    } finally {
-      setScheduleSubmitting(false);
-    }
-  };
-
   const handleConfirmAppointment = async (appointmentId: number) => {
-    // Optimistic update — muda status imediatamente na UI
-    setData((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        appointments: current.appointments.map((a) =>
-          a.id === appointmentId ? { ...a, status: 'CONFIRMED' } : a
-        )
-      };
-    });
-    setConfirmedAppointmentId(appointmentId);
+    if (!sessionToken) return;
     setAppointmentSubmittingId(appointmentId);
+
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            appointments: current.appointments.map((a) => (a.id === appointmentId ? { ...a, status: 'CONFIRMED' } : a)),
+          }
+        : current,
+    );
 
     try {
       const res = await fetch('/api/portal/confirm-appointment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
+          Authorization: `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ appointment_id: appointmentId })
+        body: JSON.stringify({ appointment_id: appointmentId }),
       });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        // Reverte update otimista em caso de erro
-        setData((current) => {
-          if (!current) return current;
-          return {
-            ...current,
-            appointments: current.appointments.map((a) =>
-              a.id === appointmentId ? { ...a, status: 'SCHEDULED' } : a
-            )
-          };
-        });
-        setConfirmedAppointmentId(null);
-        throw new Error(payload?.error || 'Erro ao confirmar consulta');
-      }
+
+      if (!res.ok) throw new Error('Erro ao confirmar consulta');
     } catch (err: any) {
       setError(err.message || 'Erro ao confirmar consulta');
-      setTimeout(() => setError(null), 4000);
     } finally {
       setAppointmentSubmittingId(null);
     }
   };
 
-  const loadPixInfo = async () => {
-    if (!sessionToken || pixInfo) return;
-    try {
-      const res = await fetch('/api/portal/pix-info', { headers: { 'Authorization': `Bearer ${sessionToken}` } });
-      if (res.ok) setPixInfo(await res.json());
-    } catch {}
-  };
+  const handleRequestAppointment = async () => {
+    if (!sessionToken || !scheduleForm.preferred_date) return;
+    setScheduleSubmitting(true);
 
-  const handleInformPayment = async (amount: number, installment_id?: number) => {
-    setActionSubmitting(true);
     try {
-      const res = await fetch('/api/portal/inform-payment', {
+      const res = await fetch('/api/portal/request-appointment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ amount, installment_id })
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify(scheduleForm),
       });
-      if (!res.ok) throw new Error();
-      setPaymentInformed(true);
-      setTimeout(() => { setShowPixModal(null); setPaymentInformed(false); }, 2500);
-    } catch { setError('Erro ao informar pagamento'); }
-    finally { setActionSubmitting(false); }
-  };
 
-  const copyToClipboard = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); setPixCopied(true); setTimeout(() => setPixCopied(false), 2000); } catch {}
-  };
-
-  // Manage focus + keyboard for modals (basic trap + Escape)
-  useEffect(() => {
-    if (!showScheduleModal) return;
-    const el = scheduleModalRef.current;
-    const first = el?.querySelector<HTMLElement>('input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
-    first?.focus();
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeScheduleModal();
-      }
-      if (e.key === 'Tab') {
-        const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
-        if (!focusable || focusable.length === 0) return;
-        const nodes = Array.from(focusable);
-        const idx = nodes.indexOf(document.activeElement as HTMLElement);
-        if (e.shiftKey) {
-          if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
-        } else {
-          if (idx === nodes.length - 1) { nodes[0].focus(); e.preventDefault(); }
-        }
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [showScheduleModal]);
-
-  useEffect(() => {
-    if (!showPixModal) return;
-    const el = pixModalRef.current;
-    const first = el?.querySelector<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    first?.focus();
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (!actionSubmitting) setShowPixModal(null);
-      }
-      if (e.key === 'Tab') {
-        const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
-        if (!focusable || focusable.length === 0) return;
-        const nodes = Array.from(focusable);
-        const idx = nodes.indexOf(document.activeElement as HTMLElement);
-        if (e.shiftKey) {
-          if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
-        } else {
-          if (idx === nodes.length - 1) { nodes[0].focus(); e.preventDefault(); }
-        }
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [showPixModal, actionSubmitting]);
-
-  const openNewScheduleModal = () => {
-    setScheduleMode('new');
-    setScheduleTargetAppointment(null);
-    setScheduleSuccess(false);
-    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
-    setShowScheduleModal(true);
-  };
-
-  const openRescheduleModal = (appointment: PortalData['appointments'][number]) => {
-    setScheduleMode('reschedule');
-    setScheduleTargetAppointment(appointment);
-    setScheduleSuccess(false);
-    setScheduleForm({
-      preferred_date: new Date(appointment.start_time).toLocaleDateString('en-CA'),
-      preferred_time: '',
-      notes: '',
-      is_urgent: false
-    });
-    setShowScheduleModal(true);
-  };
-
-  const closeScheduleModal = () => {
-    if (scheduleSubmitting) return;
-    setShowScheduleModal(false);
-    setScheduleSuccess(false);
-    setScheduleMode('new');
-    setScheduleTargetAppointment(null);
-    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
-  };
-
-  if (loading) return (
-    <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-5">
-        <div className="w-10 h-10 border-[3px] border-[#C6C6C8] border-t-[#0C9B72] rounded-full animate-spin" />
-        <p role="status" aria-live="polite" className="text-[#8E8E93] text-[15px] font-medium tracking-tight">Carregando...</p>
-      </div>
-    </div>
-  );
-
-  if (error) return (
-    <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center px-6">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
-          <AlertCircle size={28} className="text-[#FF3B30]" />
-        </div>
-        <h2 className="text-[20px] font-semibold text-[#1C1C1E] mb-2 tracking-tight">Acesso Indisponível</h2>
-        <p className="text-[#8E8E93] text-[15px] leading-relaxed">{error}</p>
-      </div>
-    </div>
-  );
-
-  if (!data) return (
-    <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center px-6">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
-          <AlertCircle size={28} className="text-[#FF3B30]" />
-        </div>
-        <h2 className="text-[20px] font-semibold text-[#1C1C1E] mb-2 tracking-tight">Dados não disponíveis</h2>
-        <p className="text-[#8E8E93] text-[15px] leading-relaxed">Não foi possível carregar seus dados. Tente recarregar a página.</p>
-      </div>
-    </div>
-  );
-
-  const { patient, clinic, appointments, evolution, files, payment_plans, transactions = [], installments = [] } = data;
-
-  const futureAppointments = appointments
-    .filter(a => new Date(a.start_time) > new Date() && a.status !== 'CANCELLED')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  const pastAppointments = appointments
-    .filter(a => new Date(a.start_time) <= new Date() || a.status === 'CANCELLED')
-    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-
-  const tabs: { id: Tab; icon: React.ElementType; label: string }[] = [
-    { id: 'inicio', icon: Home, label: 'Início' },
-    { id: 'consultas', icon: Calendar, label: 'Consultas' },
-    { id: 'evolucao', icon: Activity, label: 'Evolução' },
-    { id: 'documentos', icon: FileText, label: 'Documentos' },
-    { id: 'financeiro', icon: DollarSign, label: 'Financeiro' },
-  ];
-
-  const formatDateBR = (d: string) => {
-    try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
-  };
-
-  const formatTimeBR = (d: string) => {
-    try { return new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
-  };
-
-  const getConfirmationQuestion = (appointmentDate: string) => {
-    const date = new Date(appointmentDate);
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
-
-    const isSameDay = (left: Date, right: Date) => (
-      left.getFullYear() === right.getFullYear()
-      && left.getMonth() === right.getMonth()
-      && left.getDate() === right.getDate()
-    );
-
-    const dayLabel = isSameDay(date, today)
-      ? 'hoje'
-      : isSameDay(date, tomorrow)
-      ? 'amanhã'
-      : `dia ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-
-    return `Você vem ${dayLabel} às ${formatTimeBR(appointmentDate)}?`;
-  };
-
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bom dia';
-    if (h < 18) return 'Boa tarde';
-    return 'Boa noite';
-  };
-
-  // ─── Detect recent procedures for post-care guide ───
-  type ProcedureCategory = 'implante' | 'enxerto' | 'extracao' | 'cirurgia' | 'canal' | 'restauracao' | 'clareamento' | 'protese' | 'ortodontia' | 'raspagem' | 'limpeza';
-
-  const PROCEDURE_PATTERNS: Array<{ category: ProcedureCategory; pattern: RegExp; days: number }> = [
-    { category: 'implante',    pattern: /implante/i, days: 3 },
-    { category: 'enxerto',     pattern: /enxerto/i, days: 3 },
-    { category: 'extracao',    pattern: /extração|extraç|exodontia|exo\b|siso|terceiro.?molar/i, days: 3 },
-    { category: 'cirurgia',    pattern: /cirurgia|frenectomia|apicectomia|gengivectomia|biópsia|biopsia|alveoloplastia/i, days: 3 },
-    { category: 'canal',       pattern: /canal|endo(?:dont|do)|pulpectomia/i, days: 2 },
-    { category: 'restauracao', pattern: /restaura[çc]|resina|amálgama|amalgama|obtura[çc]/i, days: 1 },
-    { category: 'clareamento', pattern: /clareamento|branqueamento|whitening/i, days: 2 },
-    { category: 'protese',     pattern: /prótese|protese|coroa|faceta|lente|onlay|inlay|overlay/i, days: 2 },
-    { category: 'ortodontia',  pattern: /ortod|aparelho|bracket|alinhador|invisalign|manuten[çc]ão ortod/i, days: 1 },
-    { category: 'raspagem',    pattern: /raspagem|curetagem|periodon/i, days: 2 },
-    { category: 'limpeza',     pattern: /limpeza|profilaxia|tartaro|tártaro/i, days: 1 },
-  ];
-
-  const detectCategory = (text: string): { category: ProcedureCategory; days: number } | null => {
-    for (const p of PROCEDURE_PATTERNS) {
-      if (p.pattern.test(text)) return { category: p.category, days: p.days };
+      if (!res.ok) throw new Error('Erro ao solicitar consulta');
+      setShowScheduleModal(false);
+      setScheduleForm({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
+    } catch (err: any) {
+      setError(err.message || 'Erro ao solicitar consulta');
+    } finally {
+      setScheduleSubmitting(false);
     }
-    return null;
   };
 
-  const getRecentProcedures = () => {
-    const results: Array<{ date: string; procedure: string; category: ProcedureCategory }> = [];
-    const seen = new Set<string>();
+  const computed = useMemo(() => {
+    if (!data) return null;
 
-    // Dates of cancelled appointments — skip any procedures tied to these
-    const cancelledDates = new Set(
-      appointments.filter(a => a.status === 'CANCELLED').map(a => new Date(a.start_time).toDateString())
+    const now = new Date();
+    const appointments = [...data.appointments];
+    const upcoming = appointments
+      .filter((a) => new Date(a.start_time) > now && a.status !== 'CANCELLED')
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+    const history = appointments
+      .filter((a) => new Date(a.start_time) <= now || a.status === 'CANCELLED')
+      .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+
+    const requests = [...(data.appointment_requests || [])].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
 
-    // Words that indicate the procedure is just STARTING, not completed
-    const START_KEYWORDS = /início|inicio|preparo|moldagem|planejamento|provisór|escaneamento|cimentação provisória|teste|prova|avaliação|consulta inicial|primeira etapa|1[ªa] etapa|abertura/i;
+    const latestPendingRequest = requests.find((r) => ['PENDING', 'ANALYZING', 'EM_ANALISE'].includes(r.status?.toUpperCase()));
 
-    // Check evolution records (skip if matching a cancelled appointment date or indicates start of treatment)
-    evolution.forEach(e => {
-      const text = `${e.procedure_performed || ''} ${e.notes || ''}`;
-      const match = detectCategory(text);
-      if (!match) return;
-      if (START_KEYWORDS.test(e.notes || '') || START_KEYWORDS.test(e.procedure_performed || '')) return;
-      const date = new Date(e.date);
-      if (isNaN(date.getTime())) return;
-      if (cancelledDates.has(date.toDateString())) return;
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - match.days);
-      cutoff.setHours(0, 0, 0, 0);
-      if (date < cutoff) return;
-      const key = `${date.toDateString()}-${match.category}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      results.push({ date: e.date, procedure: e.procedure_performed || e.notes || 'Procedimento', category: match.category });
-    });
+    const treatmentPlan = data.patient.treatment_plan || [];
+    const activeTreatmentItems = treatmentPlan.filter((item) => !['DONE', 'COMPLETED', 'FINISHED', 'CANCELLED'].includes((item.status || '').toUpperCase()));
 
-    // Also check FINISHED appointments with notes (covers case where no evolution was created)
-    appointments.filter(a => a.status === 'FINISHED' && a.notes).forEach(a => {
-      const match = detectCategory(a.notes);
-      if (!match) return;
-      if (START_KEYWORDS.test(a.notes)) return;
-      const date = new Date(a.start_time);
-      if (cancelledDates.has(date.toDateString())) return;
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - match.days);
-      if (date < cutoff) return;
-      const key = `${date.toDateString()}-${match.category}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      results.push({ date: a.start_time, procedure: a.notes, category: match.category });
-    });
+    const lastFinished = history.find((a) => a.status === 'FINISHED');
+    const monthsWithoutVisit = lastFinished
+      ? Math.floor((now.getTime() - new Date(lastFinished.start_time).getTime()) / (1000 * 60 * 60 * 24 * 30))
+      : null;
 
-    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  };
+    let homeState: HomeState = 'sem_pendencias';
+    if (upcoming[0]) homeState = 'consulta_proxima';
+    else if (latestPendingRequest) homeState = 'solicitacao_pendente';
+    else if (activeTreatmentItems.length > 0) homeState = 'tratamento_ativo';
+    else if ((monthsWithoutVisit || 0) >= 6) homeState = 'revisao_atrasada';
 
-  const recentProcedures = getRecentProcedures();
+    return {
+      upcoming,
+      history,
+      requests,
+      latestPendingRequest,
+      activeTreatmentItems,
+      monthsWithoutVisit,
+      homeState,
+      lastFinished,
+    };
+  }, [data]);
 
-  const PROCEDURE_GUIDES: Record<ProcedureCategory, { title: string; color: string; borderColor: string; iconBg: string; items: Array<{ icon: string; text: string }> }> = {
-    implante: {
-      title: 'Cuidados Pós-Implante',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 48h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nas primeiras 72h' },
-        { icon: '🚫', text: 'Não faça bochechos nas primeiras 24h' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🦷', text: 'Evite mastigar do lado operado por 7 dias' },
-        { icon: '🚭', text: 'Não fume por pelo menos 7 dias — o cigarro compromete a cicatrização' },
-        { icon: '🛌', text: 'Durma com a cabeça elevada nas primeiras 2 noites' },
-        { icon: '⚠️', text: 'Sangramento leve nas primeiras 24h é normal. Se persistir, entre em contato' },
-      ]
-    },
-    enxerto: {
-      title: 'Cuidados Pós-Enxerto',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 48h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nas primeiras 72h' },
-        { icon: '🚫', text: 'Não toque a região operada com a língua ou os dedos' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🦷', text: 'Evite mastigar do lado operado por até 14 dias' },
-        { icon: '🚭', text: 'Não fume — o cigarro pode comprometer o enxerto' },
-        { icon: '🛌', text: 'Durma com a cabeça elevada nas primeiras 2 noites' },
-        { icon: '🏃', text: 'Evite atividades físicas intensas por 5 dias' },
-      ]
-    },
-    extracao: {
-      title: 'Cuidados Pós-Extração',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 24h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nas primeiras 48h' },
-        { icon: '🚫', text: 'Não faça bochechos nas primeiras 24h' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🩸', text: 'Morda a gaze por 30 minutos para ajudar na coagulação' },
-        { icon: '🚭', text: 'Não fume por pelo menos 3 dias' },
-        { icon: '🏃', text: 'Evite atividades físicas intensas por 48h' },
-        { icon: '⚠️', text: 'Sangramento leve é normal. Se for intenso, entre em contato' },
-      ]
-    },
-    cirurgia: {
-      title: 'Cuidados Pós-Cirúrgicos',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 24–48h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nos primeiros dias' },
-        { icon: '🚫', text: 'Não faça bochechos vigorosos nas primeiras 24h' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🚭', text: 'Evite fumar durante o período de recuperação' },
-        { icon: '🏃', text: 'Evite atividades físicas intensas por 48h' },
-        { icon: '🛌', text: 'Durma com a cabeça elevada nas primeiras noites' },
-        { icon: '⚠️', text: 'Em caso de dor intensa, sangramento ou inchaço anormal, entre em contato' },
-      ]
-    },
-    canal: {
-      title: 'Cuidados Pós-Canal',
-      color: 'text-[#AF52DE]', borderColor: 'border-[#AF52DE]/15', iconBg: 'from-[#AF52DE]/5 to-[#8B3FC7]/5',
-      items: [
-        { icon: '🦷', text: 'Evite mastigar com o dente tratado até a restauração definitiva' },
-        { icon: '💊', text: 'Tome a medicação prescrita para dor e inflamação' },
-        { icon: '🍽️', text: 'Prefira alimentos macios do lado oposto nas primeiras 24h' },
-        { icon: '🚫', text: 'Não morda objetos duros (canetas, gelo, unhas)' },
-        { icon: '🪥', text: 'Escove normalmente, mas com cuidado na região tratada' },
-        { icon: '⚠️', text: 'Sensibilidade leve nos primeiros dias é normal — se a dor aumentar, entre em contato' },
-      ]
-    },
-    restauracao: {
-      title: 'Orientações Pós-Restauração',
-      color: 'text-[#007AFF]', borderColor: 'border-[#007AFF]/15', iconBg: 'from-[#007AFF]/5 to-[#005EC4]/5',
-      items: [
-        { icon: '🍽️', text: 'Evite alimentos muito duros ou pegajosos nas primeiras 24h' },
-        { icon: '🥤', text: 'Evite bebidas e alimentos muito quentes ou muito frios nas primeiras horas' },
-        { icon: '🦷', text: 'A mordida pode parecer diferente — se incomodar após 2 dias, entre em contato para ajuste' },
-        { icon: '🪥', text: 'Escove e use fio dental normalmente' },
-        { icon: '⚠️', text: 'Sensibilidade leve é normal e tende a diminuir em alguns dias' },
-      ]
-    },
-    clareamento: {
-      title: 'Cuidados Pós-Clareamento',
-      color: 'text-[#5AC8FA]', borderColor: 'border-[#5AC8FA]/15', iconBg: 'from-[#5AC8FA]/5 to-[#34AADC]/5',
-      items: [
-        { icon: '🚫', text: 'Evite alimentos e bebidas com corantes por 48h (café, vinho, açaí, beterraba, molho de tomate)' },
-        { icon: '🚭', text: 'Não fume por pelo menos 48h — o tabaco mancha os dentes' },
-        { icon: '🍽️', text: 'Prefira a "dieta branca": arroz, frango, leite, banana, água' },
-        { icon: '🥤', text: 'Se tomar bebidas escuras, use canudo' },
-        { icon: '🪥', text: 'Use creme dental para sensibilidade se houver desconforto' },
-        { icon: '⚠️', text: 'Sensibilidade temporária é normal e costuma cessar em 24–48h' },
-      ]
-    },
-    protese: {
-      title: 'Orientações para Prótese/Coroa',
-      color: 'text-[#34C759]', borderColor: 'border-[#34C759]/15', iconBg: 'from-[#34C759]/5 to-[#28A745]/5',
-      items: [
-        { icon: '🍽️', text: 'Evite alimentos muito duros ou pegajosos nas primeiras 24h' },
-        { icon: '🦷', text: 'A mordida pode parecer diferente no início — isso é normal e se ajusta em alguns dias' },
-        { icon: '🪥', text: 'Escove e use fio dental normalmente, passando o fio com cuidado ao redor da peça' },
-        { icon: '🚫', text: 'Evite morder objetos duros diretamente sobre a prótese' },
-        { icon: '🗓️', text: 'Compareça ao retorno agendado para checagem e ajuste final' },
-        { icon: '⚠️', text: 'Se a prótese soltar ou machucar, entre em contato imediatamente' },
-      ]
-    },
-    ortodontia: {
-      title: 'Orientações Pós-Ajuste Ortodôntico',
-      color: 'text-[#FF2D55]', borderColor: 'border-[#FF2D55]/15', iconBg: 'from-[#FF2D55]/5 to-[#D4234A]/5',
-      items: [
-        { icon: '💊', text: 'Desconforto e sensibilidade nos dentes é normal por 2–3 dias após o ajuste' },
-        { icon: '🍽️', text: 'Prefira alimentos macios nos primeiros dias' },
-        { icon: '🚫', text: 'Evite alimentos duros, pegajosos e pipoca que podem soltar bráquetes' },
-        { icon: '🪥', text: 'Escove após cada refeição usando escova ortodôntica e fio dental com passa-fio' },
-        { icon: '🧴', text: 'Use cera ortodôntica se algum fio ou bráquete estiver machucando' },
-        { icon: '⚠️', text: 'Se um bráquete soltar ou o fio machucar, entre em contato antes do próximo ajuste' },
-      ]
-    },
-    raspagem: {
-      title: 'Cuidados Pós-Raspagem',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🩸', text: 'Sangramento leve na gengiva é normal nas primeiras 24h' },
-        { icon: '🪥', text: 'Escove suavemente e use fio dental — não deixe de escovar mesmo se doer um pouco' },
-        { icon: '🧴', text: 'Use enxaguante bucal ou o bochecho prescrito para auxiliar na recuperação gengival' },
-        { icon: '🍽️', text: 'Evite alimentos muito condimentados ou ácidos nas primeiras 24h' },
-        { icon: '🚭', text: 'Evite fumar — o cigarro prejudica a cicatrização da gengiva' },
-        { icon: '⚠️', text: 'Se o sangramento persistir após 48h ou houver febre, entre em contato' },
-      ]
-    },
-    limpeza: {
-      title: 'Após sua Limpeza',
-      color: 'text-[#34C759]', borderColor: 'border-[#34C759]/15', iconBg: 'from-[#34C759]/5 to-[#28A745]/5',
-      items: [
-        { icon: '🪥', text: 'Mantenha a escovação 3x ao dia e use fio dental diariamente' },
-        { icon: '🧴', text: 'Enxaguante bucal após as refeições ajuda a manter a saúde gengival' },
-        { icon: '🍬', text: 'Reduza o consumo de açúcar para prevenir cáries' },
-        { icon: '💧', text: 'Beba bastante água — ela ajuda a manter a boca limpa' },
-        { icon: '🗓️', text: 'Agende seu retorno para daqui a 6 meses para manter os dentes saudáveis' },
-      ]
-    },
-  };
-
-  return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#F5F5F7] pb-24 text-[#1D1D1F]">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#BEE3D3]/40 blur-3xl" />
-        <div className="absolute top-48 -left-20 h-64 w-64 rounded-full bg-[#D7E8FF]/55 blur-3xl" />
-        <div className="absolute bottom-8 right-[-60px] h-72 w-72 rounded-full bg-[#EFE8FF]/60 blur-3xl" />
-      </div>
-
-      {/* Accessible announcer for screen readers */}
-      <div id="a11y-announcer" aria-live="polite" className="sr-only">
-        {error || (scheduleSuccess ? (scheduleMode === 'reschedule' ? 'Pedido de reagendamento enviado' : 'Solicitação de agendamento enviada') : '') || (paymentInformed ? 'Pagamento informado' : '') || (pixCopied ? 'Chave PIX copiada' : '')}
-      </div>
-      {/* ─── Header: frosted, minimal ─── */}
-      <div className="sticky top-0 z-50 border-b border-white/70 bg-white/70 shadow-[0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl">
-        <div className="max-w-xl mx-auto px-5 py-4 flex items-center gap-3.5">
-          {clinic?.photo_url ? (
-            <img src={clinic.photo_url} alt={clinic?.clinic_name || clinic?.name || 'Minha Clínica'} className="w-9 h-9 rounded-full object-cover ring-1 ring-[#C6C6C8]/40" />
-          ) : (
-            <div className="w-9 h-9 bg-[#E5E5EA] rounded-full flex items-center justify-center">
-              <Stethoscope size={18} className="text-[#8E8E93]" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-[#1C1C1E] text-[15px] font-semibold tracking-tight truncate">
-              {clinic?.clinic_name || clinic?.name || 'Minha Clínica'}
-            </p>
-          </div>
-          {patient.photo_url ? (
-            <img src={patient.photo_url} alt={patient.name} className="w-8 h-8 rounded-full object-cover ring-1 ring-[#C6C6C8]/40" />
-          ) : (
-            <div className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center text-[13px] font-semibold text-[#8E8E93]">
-              {patient.name.charAt(0)}
-            </div>
-          )}
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f7] px-4 py-10">
+        <div className="mx-auto max-w-md space-y-4 animate-pulse">
+          <div className="h-7 w-44 rounded-xl bg-[#e5e7eb]" />
+          <div className="h-28 rounded-3xl bg-white" />
+          <div className="h-16 rounded-2xl bg-white" />
+          <div className="h-16 rounded-2xl bg-white" />
         </div>
       </div>
+    );
+  }
 
-      {/* ─── Content: Apple-Style Home ─── */}
-      <div className="relative z-10 max-w-xl mx-auto px-4 pt-4 pb-24 sm:px-5 sm:pt-6">
-        <AnimatePresence mode="wait">
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-          >
-            {data && (
-              <PatientPortalHome
-                patient={data.patient}
-                clinic={data.clinic}
-                futureAppointments={futureAppointments}
-                recentProcedures={recentProcedures}
-                onOpenDepth={() => setShowDepth(true)}
-                onConfirmAppointment={handleConfirmAppointment}
-                onRescheduleAppointment={openRescheduleModal}
-                appointmentSubmittingId={appointmentSubmittingId}
-                confirmedAppointmentId={confirmedAppointmentId}
-                rescheduleRequestedAppointmentId={rescheduleRequestedAppointmentId}
-                sessionToken={sessionToken}
-                appointmentRequests={data.appointment_requests || []}
-                onChangeTab={setActiveTab}
-                activeTab={activeTab}
-              />
-            )}
-            {activeTab === 'inicio' && false && (
-              <div className="space-y-6">
-                {/* ── Simple greeting: Step back, let appointment shine ── */}
-                {(() => {
-                  const firstName = patient.name.split(' ')[0];
-                  return (
-                    <div>
-                      <p className="text-[#8E8E93] text-[13px] font-medium tracking-wide uppercase">{getGreeting()}</p>
-                      <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight mt-1">
-                        {firstName}
-                      </h1>
-                    </div>
-                  );
-                })()}
+  if (error || !data || !computed) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6">
+        <div className="max-w-sm rounded-3xl border border-[#f1d4d3] bg-white p-6 text-center shadow-sm">
+          <AlertCircle size={28} className="mx-auto text-[#bf3f3f]" />
+          <p className="mt-3 text-sm text-[#6b7280]">{error || 'Não foi possível carregar seus dados.'}</p>
+        </div>
+      </div>
+    );
+  }
 
-                {/* HERO: Next Appointment — Main Focus */}
-                {futureAppointments.length > 0 && (() => {
-                  const next = futureAppointments[0];
-                  const nextDate = new Date(next.start_time);
-                  const now = new Date();
-                  const diffMs = nextDate.getTime() - now.getTime();
-                  const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                  const hoursUntil = Math.ceil(diffMs / (1000 * 60 * 60));
+  const firstName = data.patient.name.split(' ')[0];
+  const greeting = new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite';
 
-                  const countdownLabel = daysUntil <= 0
-                    ? 'Hoje!'
-                    : daysUntil === 1
-                    ? hoursUntil <= 24 ? `Em ${hoursUntil}h` : 'Amanhã'
-                    : `Em ${daysUntil} dias`;
+  const homeContent: Record<HomeState, { title: string; description: string; cta: string; action: () => void }> = {
+    consulta_proxima: {
+      title: `Seu retorno é ${new Date(computed.upcoming[0].start_time).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })} às ${new Date(computed.upcoming[0].start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+      description: `Com Dr(a). ${computed.upcoming[0].dentist_name}`,
+      cta: 'Ver detalhes',
+      action: () => setActiveTab('consultas'),
+    },
+    solicitacao_pendente: {
+      title: 'Recebemos seu pedido e estamos analisando',
+      description: 'Você será notificado assim que houver atualização.',
+      cta: 'Falar com clínica',
+      action: () => window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`,
+    },
+    tratamento_ativo: {
+      title: 'Próxima etapa do tratamento disponível',
+      description: `${computed.activeTreatmentItems.length} etapa(s) em andamento.`,
+      cta: 'Ver progresso',
+      action: () => setActiveTab('cuidados'),
+    },
+    revisao_atrasada: {
+      title: `Já faz ${computed.monthsWithoutVisit} meses desde sua última visita`,
+      description: 'Manter a revisão em dia previne urgências e reduz custos.',
+      cta: 'Agendar revisão',
+      action: () => setShowScheduleModal(true),
+    },
+    sem_pendencias: {
+      title: 'Seu sorriso está em dia',
+      description: 'Tudo certo por enquanto. Que tal programar seu próximo check-up?',
+      cta: 'Agendar check-up',
+      action: () => setShowScheduleModal(true),
+    },
+  };
 
-                  // Friendly reminders based on context
-                  const reminders: string[] = [];
+  const homePrimary = homeContent[computed.homeState];
+  const progressPct = data.patient.treatment_plan?.length
+    ? Math.round((((data.patient.treatment_plan.length - computed.activeTreatmentItems.length) / data.patient.treatment_plan.length) * 100))
+    : 0;
 
-                  if (daysUntil <= 1) {
-                    reminders.push('Não esqueça de trazer um documento com foto 😊');
-                  }
+  return (
+    <div className="min-h-screen bg-[#f5f5f7] text-[#111827]">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-28 pt-6">
+        <header>
+          <p className="text-sm text-[#6b7280]">{greeting}, {firstName}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Portal do Paciente</h1>
+          <p className="mt-1 text-xs text-[#9ca3af]">{data.clinic?.clinic_name || data.clinic?.name || 'OdontoHub'}</p>
+        </header>
 
-                  if (patient.health_insurance) {
-                    reminders.push('Lembre-se de trazer a carteirinha do convênio');
-                  }
-
-                  if (!data.anamnesis || (!data.anamnesis.allergies && !data.anamnesis.medications && !data.anamnesis.medical_history)) {
-                    reminders.push('Se possível, anote os medicamentos que você toma — isso ajuda no seu atendimento');
-                  }
-
-                  const pendingInstallments = installments.filter(i => i.status === 'PENDING' || i.status === 'OVERDUE');
-                  if (pendingInstallments.length > 0) {
-                    const overdue = pendingInstallments.some(i => i.status === 'OVERDUE' || new Date(i.due_date) < now);
-                    if (overdue) {
-                      reminders.push('Você tem uma parcela pendente — que tal resolver antes da consulta?');
-                    }
-                  }
-
-                  if (daysUntil <= 3 && next.status !== 'CONFIRMED') {
-                    reminders.push('Confirme sua presença para garantir seu horário');
-                  }
-
-                  if (reminders.length < 2) {
-                    reminders.push('Escove bem os dentes antes de sair de casa — seu dentista agradece 🪥');
-                  }
-
-                  // Pick just one reminder, rotating based on the current day
-                  const todayIndex = new Date().getDate() % reminders.length;
-                  const singleReminder = reminders[todayIndex];
-
-                  return (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-                      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-[#F9FAFB] backdrop-blur-xl border border-white/80 group transition-all duration-300"
-                    >
-                      {/* Animated gradient accent: more prominent */}
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-[#0C9B72]/[0.08] rounded-full blur-3xl group-hover:opacity-100 opacity-60 transition-opacity duration-500" />
-                      {/* Left accent */}
-                      <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#0C9B72]/[0.04] rounded-full blur-3xl" />
-                      
-                      <div className="relative z-10 p-8 sm:p-10">
-                        {/* Header with countdown */}
-                        <div className="flex items-start justify-between gap-4 mb-7">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[#0C9B72] text-[12px] font-bold uppercase tracking-wider">Próxima Consulta</p>
-                            <p className="text-[#1C1C1E] text-[40px] font-bold tracking-tight mt-2 leading-tight">
-                              {nextDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-                            </p>
-                            <div className="mt-4 space-y-1">
-                              <p className="text-[#0C9B72] text-[16px] font-semibold">{formatTimeBR(next.start_time)}</p>
-                              <p className="text-[#8E8E93] text-[14px] font-medium">
-                                Dr(a). {next.dentist_name}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {/* Status badges — larger, prominent */}
-                          <div className="flex flex-col gap-2.5 shrink-0">
-                            <motion.span 
-                              whileHover={{ scale: 1.05 }}
-                              className={`px-5 py-3 rounded-full text-[13px] font-bold ${getCountdownColor(daysUntil)}`}
-                            >
-                              {countdownLabel}
-                            </motion.span>
-                            <span className={`px-5 py-2.5 rounded-full text-[12px] font-semibold ${getStatusConfig(next.status).color}`}>
-                              {getStatusConfig(next.status).label}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Notes section */}
-                        {next.notes && (
-                          <div className="pb-7 border-b border-[#E5E5EA]">
-                            <p className="text-[#3A3A3C] text-[15px] leading-relaxed font-medium">{next.notes}</p>
-                          </div>
-                        )}
-
-                        {/* Smart reminder with gradient background */}
-                        {singleReminder && (
-                          <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.2 }}
-                            className="mt-7 p-5 bg-gradient-to-br from-[#FFA500]/[0.08] to-[#FF6347]/[0.04] rounded-2xl border border-[#FFA500]/20 group/reminder hover:border-[#FFA500]/40 transition-all duration-300"
-                          >
-                            <p className="text-[#FF9500] text-[14px] leading-relaxed font-medium">
-                              💡 {singleReminder}
-                            </p>
-                          </motion.div>
-                        )}
-
-                        {/* Confirmation section */}
-                        {next.status === 'SCHEDULED' && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                            className="mt-7 pt-7 border-t border-[#E5E5EA]"
-                          >
-                            <p className="text-[#1C1C1E] text-[16px] font-semibold mb-4">
-                              {getConfirmationQuestion(next.start_time)}
-                            </p>
-                            <div className="flex gap-3">
-                              <motion.button
-                                whileHover={{ y: -2 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleConfirmAppointment(next.id)}
-                                disabled={appointmentSubmittingId === next.id}
-                                className="flex-1 h-12 px-5 rounded-full bg-gradient-to-r from-[#0C9B72] to-[#0A7D5C] text-white text-[15px] font-semibold tracking-tight active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center"
-                              >
-                                {appointmentSubmittingId === next.id ? (
-                                  <div className="w-5 h-5 border-2 border-white/25 border-t-white rounded-full animate-spin" />
-                                ) : 'Confirmar'}
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ y: -2 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => openRescheduleModal(next)}
-                                disabled={appointmentSubmittingId === next.id}
-                                className="flex-1 h-12 px-5 rounded-full border-2 border-[#0C9B72]/30 text-[#1C1C1E] text-[15px] font-semibold tracking-tight active:scale-95 transition-all hover:border-[#0C9B72]/60 hover:bg-[#0C9B72]/5"
-                              >
-                                Reagendar
-                              </motion.button>
-                            </div>
-                            {confirmedAppointmentId === next.id && (
-                              <motion.p 
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="text-[#34C759] text-[14px] font-semibold mt-4 flex items-center gap-2"
-                              >
-                                <CheckCircle2 size={18} /> Horário confirmado
-                              </motion.p>
-                            )}
-                            {rescheduleRequestedAppointmentId === next.id && (
-                              <motion.p 
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="text-[#007AFF] text-[14px] font-semibold mt-4"
-                              >
-                                Pedido de reagendamento enviado à clínica
-                              </motion.p>
-                            )}
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-
-                {/* Divider: Secondary content below */}
-                <div className="h-px bg-gradient-to-r from-transparent via-[#E5E5EA] to-transparent" />
-
-                {/* Secondary Info: Dentist message + Treatment progress (reduced visual weight) */}
-                <div className="space-y-4">
-                  {(() => {
-                    const firstName = patient.name.split(' ')[0];
-                    const dentistFirstName = clinic?.name?.split(' ').slice(0, 2).join(' ') || 'seu dentista';
-                    const treatmentPlan = patient.treatment_plan || [];
-                    const completed = treatmentPlan.filter((t: any) => String(t.status || '').toUpperCase() === 'REALIZADO').length;
-                    const total = treatmentPlan.length;
-                    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-                    const nextStep = treatmentPlan.find((t: any) => String(t.status || '').toUpperCase() !== 'REALIZADO');
-                    const lastEvolution = evolution.length > 0 ? evolution[0] : null;
-                    const nextAppt = futureAppointments.length > 0 ? futureAppointments[0] : null;
-
-                    let personalMessage = '';
-                    if (pct === 100 && total > 0) {
-                      personalMessage = `${firstName}, seu tratamento foi concluído com sucesso! Cuide bem do seu sorriso e lembre-se dos retornos periódicos.`;
-                    } else if (nextStep && pct >= 50) {
-                      personalMessage = `${firstName}, estamos na reta final! A próxima etapa é ${nextStep.procedure || 'importante'} — cada passo conta para o resultado.`;
-                    } else if (nextStep && lastEvolution) {
-                      personalMessage = `${firstName}, na última sessão fizemos ${lastEvolution.procedure_performed || 'um bom avanço'}. Agora o próximo passo é ${nextStep.procedure || 'continuar o tratamento'}.`;
-                    } else if (nextAppt) {
-                      personalMessage = `${firstName}, te espero na próxima consulta! Qualquer dúvida, é só chamar.`;
-                    } else {
-                      personalMessage = `${firstName}, que bom ter você aqui! Estou acompanhando sua saúde bucal de perto.`;
-                    }
-
-                    const uniqueProcedures = [...new Set(treatmentPlan.map((t: any) => t.procedure).filter(Boolean))];
-                    const caseName = uniqueProcedures.length === 1
-                      ? uniqueProcedures[0]
-                      : uniqueProcedures.length <= 3
-                      ? uniqueProcedures.join(', ')
-                      : `${uniqueProcedures.slice(0, 2).join(', ')} e mais ${uniqueProcedures.length - 2}`;
-
-                    return (
-                      <>
-                        {/* Dentist message — secondary */}
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.4 }}
-                          className="relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-xl border border-white/50 p-5"
-                        >
-                          <div className="flex items-start gap-3">
-                            {clinic?.photo_url ? (
-                              <img src={clinic.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover ring-1 ring-[#0C9B72]/10 shrink-0" />
-                            ) : (
-                              <div className="w-10 h-10 bg-[#0C9B72]/10 rounded-xl flex items-center justify-center shrink-0">
-                                <Stethoscope size={16} className="text-[#0C9B72]" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[#0C9B72] text-[11px] font-bold uppercase tracking-wide">Mensagem do seu dentista</p>
-                              <p className="text-[#1C1C1E] text-[13px] leading-relaxed mt-1.5">{personalMessage}</p>
-                            </div>
-                          </div>
-                        </motion.div>
-
-                        {/* Treatment progress — secondary */}
-                        {total > 0 && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5 }}
-                            className="relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-xl border border-white/50 p-5"
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[#0C9B72] text-[11px] font-bold uppercase tracking-wide">Progresso do Tratamento</p>
-                                {caseName && (
-                                  <p className="text-[#1C1C1E] text-[14px] font-semibold mt-1">{caseName}</p>
-                                )}
-                                <p className="text-[#8E8E93] text-[12px] mt-1">{completed} de {total} etapas</p>
-                              </div>
-                              
-                              <div className="w-14 h-14 shrink-0 relative">
-                                <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
-                                  <circle cx="24" cy="24" r="20" fill="none" stroke="#F2F2F7" strokeWidth="2" />
-                                  <motion.circle
-                                    cx="24" cy="24" r="20" fill="none"
-                                    stroke="#0C9B72"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    initial={{ strokeDashoffset: `${2 * Math.PI * 20}` }}
-                                    animate={{ strokeDashoffset: `${2 * Math.PI * 20 * (1 - pct / 100)}` }}
-                                    strokeDasharray={`${2 * Math.PI * 20}`}
-                                    transition={{ duration: 0.8, ease: "easeInOut" }}
-                                  />
-                                </svg>
-                                <span className="absolute inset-0 flex items-center justify-center text-[#1C1C1E] text-[11px] font-bold">{pct}%</span>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </>
-                    );
-                  })()}
+        <main className="mt-5 flex-1">
+          <AnimatePresence mode="wait">
+            {activeTab === 'home' && (
+              <motion.section key="home" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
+                <div className="rounded-3xl border border-white/70 bg-white p-5 shadow-[0_8px_30px_rgba(17,24,39,0.06)]">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[#9ca3af]">Prioridade de hoje</p>
+                  <h2 className="mt-2 text-xl font-semibold leading-tight">{homePrimary.title}</h2>
+                  <p className="mt-2 text-sm text-[#6b7280]">{homePrimary.description}</p>
+                  <button onClick={homePrimary.action} className="mt-4 w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-medium text-white active:scale-[0.99]">
+                    {homePrimary.cta}
+                  </button>
                 </div>
 
-                {/* Dynamic contextual actions: Apple-style, no color pollution */}
-                {(() => {
-                  // Dynamically choose actions based on patient context
-                  const actions: Array<{
-                    id: string;
-                    title: string;
-                    subtitle?: string;
-                    icon: React.ElementType;
-                    action: () => void;
-                    highlight?: boolean;
-                  }> = [];
-
-                  // 1. If next appointment exists and not confirmed
-                  if (futureAppointments.length > 0 && futureAppointments[0].status !== 'CONFIRMED') {
-                    actions.push({
-                      id: 'confirm',
-                      title: 'Confirmar minha consulta',
-                      subtitle: `${new Date(futureAppointments[0].start_time).toLocaleDateString('pt-BR')}`,
-                      icon: CheckCircle2,
-                      action: () => handleConfirmAppointment(futureAppointments[0].id),
-                      highlight: true,
-                    });
-                  }
-
-                  // 2. If no next appointment
-                  if (futureAppointments.length === 0) {
-                    actions.push({
-                      id: 'schedule',
-                      title: 'Gostaria de agendar uma consulta',
-                      subtitle: 'Reserve seu horário',
-                      icon: CalendarPlus,
-                      action: openNewScheduleModal,
-                      highlight: true,
-                    });
-                  }
-
-                  // 3. If has pending payments
-                  if (installments.some(i => i.status === 'PENDING' || i.status === 'OVERDUE')) {
-                    actions.push({
-                      id: 'payments',
-                      title: 'Ver meus pagamentos',
-                      subtitle: 'Pendências',
-                      icon: DollarSign,
-                      action: () => setActiveTab('financeiro'),
-                    });
-                  }
-
-                  // 4. If has documents
-                  if (files.length > 0) {
-                    actions.push({
-                      id: 'docs',
-                      title: 'Baixar meus documentos',
-                      subtitle: `${files.length} arquivo${files.length !== 1 ? 's' : ''}`,
-                      icon: Download,
-                      action: () => setActiveTab('documentos'),
-                    });
-                  }
-
-                  return (
-                    <div className="space-y-2">
-                      {actions.map((action, idx) => (
-                        <motion.button
-                          key={action.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05 }}
-                          onClick={action.action}
-                          className={`w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl transition-all duration-300 group ${
-                            action.highlight
-                              ? 'bg-[#0C9B72]/8 border border-[#0C9B72]/30 hover:bg-[#0C9B72]/12 hover:border-[#0C9B72]/50'
-                              : 'bg-white/40 backdrop-blur-xl border border-white/60 hover:bg-white/50 hover:border-[#0C9B72]/20'
-                          }`}
-                        >
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                            action.highlight
-                              ? 'bg-[#0C9B72]/15 group-hover:bg-[#0C9B72]/25'
-                              : 'bg-[#E5E5EA] group-hover:bg-[#0C9B72]/10'
-                          }`}>
-                            <action.icon size={18} className={action.highlight ? 'text-[#0C9B72]' : 'text-[#8E8E93]'} />
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <p className="text-[#1C1C1E] text-[14px] font-semibold leading-tight">{action.title}</p>
-                            {action.subtitle && (
-                              <p className="text-[#8E8E93] text-[12px] mt-0.5">{action.subtitle}</p>
-                            )}
-                          </div>
-                          <ChevronRight size={16} className="text-[#C6C6C8] group-hover:text-[#0C9B72] transition-colors shrink-0" />
-                        </motion.button>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                {/* Post-procedure care guides */}
-                {recentProcedures.map((proc, idx) => {
-                  const guide = PROCEDURE_GUIDES[proc.category];
-                  if (!guide) return null;
-                  const surgeryDate = new Date(proc.date);
-                  const daysAgo = Math.floor((Date.now() - surgeryDate.getTime()) / (1000 * 60 * 60 * 24));
-                  const daysLabel = daysAgo === 0 ? 'Hoje' : daysAgo === 1 ? 'Ontem' : `Há ${daysAgo} dias`;
-
-                  return (
-                    <div key={`${proc.category}-${idx}`} className={`bg-gradient-to-br ${guide.iconBg} rounded-2xl border ${guide.borderColor} overflow-hidden`}>
-                      <div className="px-5 pt-5 pb-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Shield size={16} className={guide.color} />
-                          <p className={`${guide.color} text-[11px] font-bold uppercase tracking-widest`}>{guide.title}</p>
-                        </div>
-                        <p className="text-[#3A3A3C] text-[14px] font-semibold mt-1">{proc.procedure}</p>
-                        <p className="text-[#8E8E93] text-[12px] mt-0.5">{daysLabel} · {formatDateBR(proc.date)}</p>
-                      </div>
-                      <div className="px-5 pb-5 space-y-2.5">
-                        {guide.items.map((item, i) => (
-                          <div key={i} className="flex items-start gap-3">
-                            <span className="text-[16px] mt-0.5 shrink-0">{item.icon}</span>
-                            <p className="text-[#3A3A3C] text-[13px] leading-relaxed">{item.text}</p>
-                          </div>
-                        ))}
-                      </div>
-                      {clinic?.phone && (
-                        <div className="px-5 pb-5">
-                          <a
-                            href={`tel:${clinic.phone}`}
-                            className={`flex items-center justify-center gap-2 w-full h-11 rounded-xl text-[14px] font-semibold active:scale-[0.98] transition-transform ${
-                              guide.color.replace('text-', 'text-') + ' ' + guide.iconBg.replace('from-', 'bg-').split(' ')[0]
-                            }`}
-                            style={{ backgroundColor: `color-mix(in srgb, currentColor 10%, transparent)` }}
-                          >
-                            <Phone size={15} />
-                            Ligar para a clínica
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Upcoming appointments scroll: elegant card carousel */}
-                {futureAppointments.length > 1 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4 px-0">
-                      <div>
-                        <h2 className="text-[#1C1C1E] text-[22px] font-bold tracking-tight">Próximas Consultas</h2>
-                        <p className="text-[#8E8E93] text-[13px] mt-1.5 font-medium">Seus horários próximos</p>
-                      </div>
-                      <button onClick={() => setActiveTab('consultas')} className="text-[#0C9B72] text-[14px] font-semibold hover:text-[#0C9B72]/80 transition-colors duration-200">
-                        Ver tudo →
-                      </button>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-5 px-5 pb-2 snap-x">
-                      {futureAppointments.slice(1, 6).map((a, idx) => (
-                        <motion.div 
-                          key={a.id} 
-                          initial={{ opacity: 0, x: 20 }}
-                          whileInView={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.3, delay: idx * 0.05 }}
-                          viewport={{ once: true }}
-                          className="min-w-[240px] group snap-start"
-                        >
-                          <div className="relative overflow-hidden rounded-3xl bg-white/40 backdrop-blur-xl border border-white/60 p-5 shrink-0 transition-shadow duration-300 h-full">
-                            {/* Accent line */}
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0C9B72]/40 via-[#0C9B72]/20 to-transparent" />
-                            
-                            {/* Animated background glow on hover */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#0C9B72]/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                            
-                            {/* Date with refined styling */}
-                            <p className="text-[#1C1C1E] text-[32px] font-bold tracking-tight leading-none">
-                              {new Date(a.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-                            </p>
-                            
-                            {/* Time and doctor with subtle color */}
-                            <div className="space-y-2 mt-4">
-                              <p className="text-[#0C9B72] text-[14px] font-semibold">{formatTimeBR(a.start_time)}</p>
-                              <p className="text-[#8E8E93] text-[13px] font-medium leading-relaxed">Dr(a). {a.dentist_name}</p>
-                            </div>
-                            
-                            {/* Status badge with refined design */}
-                            <div className="mt-4 pt-4 border-t border-white/40">
-                              <span className={`inline-block text-[11px] font-semibold px-3 py-1.5 rounded-full ${getStatusConfig(a.status).color}`}>
-                                {getStatusConfig(a.status).label}
-                              </span>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Health summary: refined elegant section */}
-                {data.anamnesis && (data.anamnesis.allergies || data.anamnesis.medications) && (
-                  <div>
-                    <h2 className="text-[#1C1C1E] text-[22px] font-bold tracking-tight mb-4">Saúde e Alergias</h2>
-                    <div className="space-y-3">
-                      {data.anamnesis.allergies && (
-                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#FF3B30]/[0.06] to-[#FF3B30]/[0.02] border border-[#FF3B30]/20 p-5 group hover:border-[#FF3B30]/40 transition-all duration-300">
-                          <div className="flex items-start gap-3.5">
-                            <div className="w-10 h-10 bg-[#FF3B30]/15 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-[#FF3B30]/20 transition-colors duration-300">
-                              <AlertCircle size={18} className="text-[#FF3B30]" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[#FF3B30] text-[12px] font-bold uppercase tracking-wider">Alergias</p>
-                              <p className="text-[#1C1C1E] text-[14px] leading-relaxed mt-2">{data.anamnesis.allergies}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {data.anamnesis.medications && (
-                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#AF52DE]/[0.06] to-[#AF52DE]/[0.02] border border-[#AF52DE]/20 p-5 group hover:border-[#AF52DE]/40 transition-all duration-300">
-                          <div className="flex items-start gap-3.5">
-                            <div className="w-10 h-10 bg-[#AF52DE]/15 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-[#AF52DE]/20 transition-colors duration-300">
-                              <Heart size={18} className="text-[#AF52DE]" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[#AF52DE] text-[12px] font-bold uppercase tracking-wider">Medicamentos</p>
-                              <p className="text-[#1C1C1E] text-[14px] leading-relaxed mt-2">{data.anamnesis.medications}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Clinic contact: elegant and prominent */}
-                {clinic && (
-                  <div className="relative overflow-hidden rounded-3xl bg-white/40 backdrop-blur-xl border border-white/60 p-6 group transition-all duration-300">
-                    {/* Accent gradient */}
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-[#0C9B72]/[0.04] rounded-full blur-3xl group-hover:opacity-100 opacity-0 transition-opacity duration-500" />
-                    
-                    <div className="relative z-10 flex items-start gap-4">
-                      {clinic.photo_url ? (
-                        <img src={clinic.photo_url} alt="" className="w-16 h-16 rounded-2xl object-cover ring-2 ring-[#0C9B72]/10" />
-                      ) : (
-                        <div className="w-16 h-16 bg-[#0C9B72]/10 rounded-2xl flex items-center justify-center ring-2 ring-[#0C9B72]/10">
-                          <Stethoscope size={24} className="text-[#0C9B72]" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[#1C1C1E] text-[18px] font-bold truncate">{clinic.clinic_name || clinic.name}</p>
-                        {clinic.clinic_address && (
-                          <p className="text-[#8E8E93] text-[13px] leading-relaxed mt-1">{clinic.clinic_address}</p>
-                        )}
-                        {clinic.phone && (
-                          <a
-                            href={`tel:${clinic.phone}`}
-                            className="inline-block mt-3 text-[#0C9B72] font-semibold text-[14px] hover:text-[#0C9B72]/80 transition-colors duration-200"
-                          >
-                            {clinic.phone} · Ligar
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                <MiniList
+                  title="Próximas movimentações"
+                  items={[
+                    computed.upcoming[0] ? `Consulta em ${new Date(computed.upcoming[0].start_time).toLocaleDateString('pt-BR')}` : 'Sem consultas agendadas',
+                    computed.latestPendingRequest ? 'Solicitação aguardando análise' : 'Nenhuma solicitação pendente',
+                  ]}
+                />
+                <MiniList
+                  title="Mensagens recentes"
+                  items={[
+                    computed.requests[0] ? `Solicitação #${computed.requests[0].id} • ${statusLabel[computed.requests[0].status] || computed.requests[0].status}` : 'Sem mensagens recentes',
+                    'Use “Falar com clínica” para atendimento rápido',
+                  ]}
+                />
+                <MiniList
+                  title="Lembretes importantes"
+                  items={[
+                    computed.monthsWithoutVisit && computed.monthsWithoutVisit >= 6 ? 'Revisão preventiva recomendada agora' : 'Higiene e fio dental diariamente',
+                    'Chegue 10 minutos antes em consultas presenciais',
+                  ]}
+                />
+              </motion.section>
             )}
 
-            {/* ═══ APPOINTMENTS TAB ═══ */}
+            {activeTab === 'cuidados' && (
+              <motion.section key="care" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
+                {computed.activeTreatmentItems.length > 0 ? (
+                  <>
+                    <div className="rounded-3xl bg-white p-5 shadow-sm border border-white/70">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[#9ca3af]">Tratamento ativo</p>
+                      <h2 className="mt-2 text-lg font-semibold">Etapa atual em andamento</h2>
+                      <p className="mt-2 text-sm text-[#6b7280]">Progresso geral do plano: {progressPct}%</p>
+                      <div className="mt-3 h-2 rounded-full bg-[#e5e7eb]">
+                        <div className="h-2 rounded-full bg-[#111827]" style={{ width: `${progressPct}%` }} />
+                      </div>
+                    </div>
+                    <MiniList title="Próximas fases" items={computed.activeTreatmentItems.slice(0, 4).map((item) => item.procedure || 'Procedimento planejado')} />
+                    <MiniList title="Orientações" items={['Siga os horários de medicação orientados.', 'Evite esforços nas primeiras 24h pós-procedimento.', 'Em caso de dor forte, fale com a clínica.']} />
+                    <MiniList title="Documentos e imagens" items={[data.files[0] ? `${data.files.length} arquivo(s) disponível(is)` : 'Ainda não há arquivos para este tratamento']} />
+                  </>
+                ) : (
+                  <>
+                    <MiniList title="Prevenção personalizada" items={['Faça revisão semestral para manter estabilidade clínica.', 'Atualize sua anamnese anualmente para maior segurança.']} />
+                    <MiniList title="Higiene bucal premium" items={['Escovação suave 3x ao dia', 'Uso de fio dental noturno', 'Enxaguante sem álcool quando indicado']} />
+                    <MiniList title="Lembretes" items={['Agende seu próximo check-up preventivo', 'Mantenha hidratação e evite açúcar frequente']} />
+                  </>
+                )}
+              </motion.section>
+            )}
+
             {activeTab === 'consultas' && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">Consultas</h1>
-                  <button
-                    onClick={openNewScheduleModal}
-                    className="h-9 px-4 bg-[#0C9B72] text-white rounded-full text-[13px] font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"
-                  >
-                    <CalendarPlus size={14} /> Solicitar
-                  </button>
-                </div>
+              <motion.section key="appointments" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
+                <button onClick={() => setShowScheduleModal(true)} className="w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-medium text-white">
+                  Agendar consulta
+                </button>
 
-                {futureAppointments.length > 0 && (
-                  <div>
-                    <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Próximas</p>
-                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
-                      {futureAppointments.map(a => (
-                        <PortalAppointmentRow
-                          key={a.id}
-                          appointment={a}
-                          formatDate={formatDateBR}
-                          formatTime={formatTimeBR}
-                          actionContent={a.status === 'SCHEDULED' ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleConfirmAppointment(a.id)}
-                                disabled={appointmentSubmittingId === a.id}
-                                className="h-8 px-4 rounded-full bg-[#1C1C1E] text-white text-[12px] font-semibold active:scale-[0.97] transition-transform disabled:opacity-40 flex items-center justify-center"
-                              >
-                                {appointmentSubmittingId === a.id ? (
-                                  <div className="w-3.5 h-3.5 border-[1.5px] border-white/25 border-t-white rounded-full animate-spin" />
-                                ) : 'Confirmar'}
-                              </button>
-                              <button
-                                onClick={() => openRescheduleModal(a)}
-                                className="h-8 px-4 rounded-full border border-[#D1D1D6] text-[#3A3A3C] text-[12px] font-semibold active:scale-[0.97] transition-transform"
-                              >
-                                Reagendar
-                              </button>
-                            </div>
-                          ) : null}
-                          actionNotice={confirmedAppointmentId === a.id
-                            ? 'Confirmado ✓'
-                            : rescheduleRequestedAppointmentId === a.id
-                            ? 'Pedido enviado.'
-                            : null}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {pastAppointments.length > 0 && (
-                  <div>
-                    <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Histórico</p>
-                    <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
-                      {pastAppointments.slice(0, 20).map(a => (
-                        <PortalAppointmentRow key={a.id} appointment={a} formatDate={formatDateBR} formatTime={formatTimeBR} past />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {appointments.length === 0 && (
-                  <PortalEmptyState icon={Calendar} text="Nenhuma consulta registrada" />
-                )}
-              </div>
-            )}
-
-            {/* ═══ EVOLUTION TAB ═══ */}
-            {activeTab === 'evolucao' && (
-              <div className="space-y-5">
-                <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">Evolução</h1>
-                {evolution.length > 0 ? (
-                  <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
-                    {evolution.map(e => (
-                      <div key={e.id} className="px-4 py-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[#8E8E93] text-[12px] font-medium">{formatDateBR(e.date)}</span>
-                          <span className="text-[#AEAEB2] text-[12px]">Dr(a). {e.dentist_name}</span>
-                        </div>
-                        {e.procedure_performed && (
-                          <p className="text-[#1C1C1E] text-[15px] font-semibold tracking-tight">{e.procedure_performed}</p>
-                        )}
-                        {e.notes && (
-                          <p className="text-[#8E8E93] text-[14px] mt-1 leading-relaxed">{e.notes}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <PortalEmptyState icon={Activity} text="Nenhuma evolução clínica registrada" />
-                )}
-              </div>
-            )}
-
-            {/* ═══ DOCUMENTS TAB ═══ */}
-            {activeTab === 'documentos' && (
-              <div className="space-y-5">
-                <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">Documentos</h1>
-                {files.length > 0 ? (
-                  <div className="bg-white rounded-2xl divide-y divide-[#E5E5EA]">
-                    {files.map(f => (
-                      <a
-                        key={f.id}
-                        href={f.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3.5 px-4 py-3.5 active:bg-[#F2F2F7] transition-colors"
-                      >
-                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#F2F2F7] flex items-center justify-center shrink-0">
-                          {f.file_type?.includes('image') ? (
-                            <img src={f.file_url} alt="" className="w-10 h-10 object-cover" />
-                          ) : (
-                            <FileText size={18} className="text-[#007AFF]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[#1C1C1E] text-[15px] font-medium truncate">{f.description || 'Documento'}</p>
-                          <p className="text-[#AEAEB2] text-[13px] mt-0.5">{formatDateBR(f.created_at)}</p>
-                        </div>
-                        <Download size={16} className="text-[#C7C7CC] shrink-0" />
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <PortalEmptyState icon={FileText} text="Nenhum documento disponível" />
-                )}
-              </div>
-            )}
-
-            {/* ═══ FINANCIAL TAB ═══ */}
-            {activeTab === 'financeiro' && (
-              <div className="space-y-5">
-                <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">Financeiro</h1>
-
-                {/* Summary — identical to prontuário */}
-                {(() => {
-                  const treatmentPlan = patient.treatment_plan || [];
-                  const financialTotal = treatmentPlan.reduce((acc: number, item: any) => acc + (Number(item.value) || 0), 0);
-                  const completedTotal = treatmentPlan
-                    .filter((item: any) => String(item.status || '').toUpperCase() === 'REALIZADO')
-                    .reduce((acc: number, item: any) => acc + (Number(item.value) || 0), 0);
-                  const received = transactions
-                    .filter(t => t.type === 'INCOME')
-                    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-                  const pct = financialTotal > 0 ? Math.min(100, Math.round((received / financialTotal) * 100)) : 0;
-                  const remaining = Math.max(0, financialTotal - received);
-
-                  if (financialTotal === 0 && received === 0 && payment_plans.length === 0 && transactions.length === 0) return null;
-
-                  return (
-                    <div className="bg-white rounded-2xl p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-1">Orçamento total</p>
-                          <p className="text-[#1C1C1E] text-[18px] font-bold tracking-tight">
-                            {financialTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[#34C759] text-[11px] font-semibold uppercase tracking-widest mb-1">Concluído</p>
-                          <p className="text-[#34C759] text-[18px] font-bold tracking-tight">
-                            {completedTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="pt-2 border-t border-[#F2F2F7]">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest">Recebido</p>
-                          <span className="text-[#8E8E93] text-[12px] font-semibold">{pct}%</span>
-                        </div>
-                        <div className="flex items-baseline gap-2 mb-2">
-                          <p className="text-[#34C759] text-[16px] font-bold tracking-tight">
-                            {received.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                          {remaining > 0 && (
-                            <p className="text-[#AEAEB2] text-[12px]">
-                              falta {remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </p>
-                          )}
-                        </div>
-                        <div className="h-[6px] bg-[#E5E5EA] rounded-full overflow-hidden">
-                          <div className="h-full bg-[#34C759] rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-                        </div>
+                <ListCard title="Próximas consultas">
+                  {computed.upcoming.length === 0 ? <EmptyRow text="Nenhuma consulta futura." /> : computed.upcoming.map((appointment) => (
+                    <div key={appointment.id} className="rounded-2xl border border-[#eceff3] p-3">
+                      <p className="text-sm font-medium">{new Date(appointment.start_time).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-xs text-[#6b7280]">Dr(a). {appointment.dentist_name} • {statusLabel[appointment.status] || appointment.status}</p>
+                      <div className="mt-2 flex gap-2">
+                        <button onClick={() => handleConfirmAppointment(appointment.id)} className="rounded-xl bg-[#ecfdf3] px-3 py-1.5 text-xs font-medium text-[#0f766e]">
+                          {appointmentSubmittingId === appointment.id ? 'Confirmando...' : 'Confirmar'}
+                        </button>
+                        <button onClick={() => setShowScheduleModal(true)} className="rounded-xl bg-[#f3f4f6] px-3 py-1.5 text-xs font-medium text-[#374151]">Reagendar</button>
                       </div>
                     </div>
-                  );
-                })()}
+                  ))}
+                </ListCard>
 
-                {/* Pending installments — same as prontuário */}
-                {(() => {
-                  const pending = installments.filter(i => i.status === 'PENDING' || i.status === 'OVERDUE');
-                  if (pending.length === 0) return null;
-                  return (
-                    <div>
-                      <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Parcelas Pendentes</p>
-                      <div className="space-y-2">
-                        {pending.map((inst) => {
-                          const isOverdue = inst.status === 'OVERDUE' || new Date(inst.due_date) < new Date();
-                          return (
-                            <div key={inst.id} className={`flex items-center gap-3 p-3.5 rounded-2xl border ${
-                              isOverdue ? 'bg-[#FF3B30]/[0.04] border-[#FF3B30]/15' : 'bg-[#FF9500]/[0.04] border-[#FF9500]/15'
-                            }`}>
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                                isOverdue ? 'bg-[#FF3B30]/10' : 'bg-[#FF9500]/10'
-                              }`}>
-                                <DollarSign size={15} className={isOverdue ? 'text-[#FF3B30]' : 'text-[#FF9500]'} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[#1C1C1E] text-[14px] font-semibold truncate">
-                                  {inst.procedure || `Parcela ${inst.number}`}
-                                </p>
-                                <p className={`text-[12px] font-medium ${isOverdue ? 'text-[#FF3B30]' : 'text-[#FF9500]'}`}>
-                                  {isOverdue ? 'Vencida em' : 'Vence em'} {formatDateBR(inst.due_date)}
-                                </p>
-                              </div>
-                              <span className={`text-[14px] font-bold shrink-0 ${isOverdue ? 'text-[#FF3B30]' : 'text-[#1C1C1E]'}`}>
-                                R$ {Number(inst.amount).toFixed(2)}
-                              </span>
-                              <button
-                                onClick={() => { loadPixInfo(); setShowPixModal({ amount: Number(inst.amount), installment_id: inst.id, label: inst.procedure || `Parcela ${inst.number}` }); }}
-                                className="h-8 px-3 rounded-full bg-[#34C759]/10 text-[#34C759] text-[12px] font-semibold active:scale-95 transition-transform shrink-0"
-                              >
-                                Pagar
-                              </button>
-                            </div>
-                          );
-                        })}
+                <ListCard title="Solicitações enviadas">
+                  {computed.requests.length === 0 ? <EmptyRow text="Nenhuma solicitação enviada." /> : computed.requests.map((request) => (
+                    <div key={request.id} className="flex items-start justify-between rounded-2xl border border-[#eceff3] p-3">
+                      <div>
+                        <p className="text-sm font-medium">#{request.id} • {request.reason_category || 'Consulta geral'}</p>
+                        <p className="text-xs text-[#6b7280]">{new Date(request.created_at).toLocaleDateString('pt-BR')}</p>
                       </div>
+                      <span className="rounded-full bg-[#f3f4f6] px-2 py-1 text-xs text-[#4b5563]">{statusLabel[request.status] || request.status}</span>
                     </div>
-                  );
-                })()}
+                  ))}
+                </ListCard>
 
-                {/* Payment plans */}
-                {payment_plans.length > 0 && (
-                  <div>
-                    <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Planos de Pagamento</p>
-                    {payment_plans.map(plan => {
-                      const planInstallments = installments.filter(i => i.payment_plan_id === plan.id);
-                      const paidCount = planInstallments.filter(i => i.status === 'PAID').length;
-                      const total = plan.installments_count || 1;
-                      const progress = Math.round((paidCount / total) * 100);
-
-                      return (
-                        <div key={plan.id} className="bg-white rounded-2xl overflow-hidden mb-3">
-                          <div className="p-4">
-                            <div className="flex items-start justify-between mb-3">
-                              <div>
-                                <p className="text-[#1C1C1E] text-[16px] font-semibold tracking-tight">{plan.procedure}</p>
-                                <p className="text-[#8E8E93] text-[13px] mt-0.5">
-                                  {plan.installments_count}x de R$ {(plan.total_amount / plan.installments_count).toFixed(2)}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-[#1C1C1E] text-[18px] font-bold tracking-tight">
-                                  R$ {Number(plan.total_amount).toFixed(2)}
-                                </p>
-                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                  plan.status === 'COMPLETED' ? 'bg-[#34C759]/10 text-[#34C759]' :
-                                  plan.status === 'ACTIVE' ? 'bg-[#007AFF]/10 text-[#007AFF]' :
-                                  'bg-[#8E8E93]/10 text-[#8E8E93]'
-                                }`}>
-                                  {plan.status === 'ACTIVE' ? 'Ativo' : plan.status === 'COMPLETED' ? 'Concluído' : 'Cancelado'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 h-1.5 bg-[#E5E5EA] rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-[#34C759] rounded-full transition-all duration-500"
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                              <span className="text-[#8E8E93] text-[12px] font-medium shrink-0">{paidCount}/{total}</span>
-                            </div>
-                          </div>
-
-                          {/* Installments detail */}
-                          {planInstallments.length > 0 && (
-                            <div className="border-t border-[#E5E5EA]">
-                              {planInstallments.map((inst) => (
-                                <div
-                                  key={inst.id}
-                                  className="flex items-center px-4 py-3 border-b border-[#F2F2F7] last:border-0"
-                                >
-                                  <span className="text-[#8E8E93] text-[13px] w-20 shrink-0">Parcela {inst.number}</span>
-                                  <span className="text-[#AEAEB2] text-[13px] flex-1">{formatDateBR(inst.due_date)}</span>
-                                  <span className="text-[#3A3A3C] text-[13px] font-medium mr-3">R$ {Number(inst.amount).toFixed(2)}</span>
-                                  <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${
-                                    inst.status === 'PAID' ? 'bg-[#34C759]/10 text-[#34C759]' :
-                                    inst.status === 'OVERDUE' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' :
-                                    'bg-[#FF9500]/10 text-[#FF9500]'
-                                  }`}>
-                                    {inst.status === 'PAID' ? 'Pago' : inst.status === 'OVERDUE' ? 'Vencido' : 'Pendente'}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Transactions — same as prontuário */}
-                {transactions.length > 0 && (
-                  <div>
-                    <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">Movimentações</p>
-                    <div className="bg-white rounded-2xl divide-y divide-[#F2F2F7]">
-                      {transactions.map(t => {
-                        const isIncome = t.type === 'INCOME';
-                        return (
-                          <div key={t.id} className="flex items-center gap-3.5 px-4 py-3.5">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                              isIncome ? 'bg-[#34C759]/10' : 'bg-[#FF3B30]/10'
-                            }`}>
-                              <DollarSign size={16} className={isIncome ? 'text-[#34C759]' : 'text-[#FF3B30]'} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[#1C1C1E] text-[15px] font-medium truncate">
-                                {t.procedure || t.description}
-                              </p>
-                              <p className="text-[#AEAEB2] text-[12px] mt-0.5">
-                                {formatDateBR(t.date)}
-                              </p>
-                            </div>
-                            <p className={`text-[15px] font-semibold tracking-tight shrink-0 ${
-                              isIncome ? 'text-[#34C759]' : 'text-[#FF3B30]'
-                            }`}>
-                              {isIncome ? '+' : '-'}R$ {Number(t.amount).toFixed(2)}
-                            </p>
-                          </div>
-                        );
-                      })}
+                <ListCard title="Histórico anterior">
+                  {computed.history.length === 0 ? <EmptyRow text="Sem histórico ainda." /> : computed.history.slice(0, 5).map((appointment) => (
+                    <div key={appointment.id} className="flex items-center justify-between rounded-2xl border border-[#eceff3] p-3">
+                      <div>
+                        <p className="text-sm font-medium">{new Date(appointment.start_time).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-xs text-[#6b7280]">Dr(a). {appointment.dentist_name}</p>
+                      </div>
+                      <span className="text-xs text-[#6b7280]">{statusLabel[appointment.status] || appointment.status}</span>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </ListCard>
 
-                {transactions.length === 0 && payment_plans.length === 0 && (
-                  <PortalEmptyState icon={DollarSign} text="Nenhuma movimentação financeira" />
-                )}
-              </div>
+                <button onClick={() => (window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`)} className="w-full rounded-2xl border border-[#d1d5db] bg-white px-4 py-3 text-sm font-medium text-[#111827]">
+                  Falar com clínica
+                </button>
+              </motion.section>
             )}
-          </motion.div>
-        </AnimatePresence>
+
+            {activeTab === 'perfil' && (
+              <motion.section key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
+                <ListButton icon={<UserCircle size={18} />} label="Editar dados pessoais" value={data.patient.email} />
+                <ListButton icon={<FileText size={18} />} label="Renovar anamnese" value="Atualize suas informações clínicas" />
+                <ListButton icon={<Shield size={18} />} label="Convênio" value={data.patient.health_insurance || 'Não informado'} />
+                <ListButton icon={<FileText size={18} />} label="Documentos" value={`${data.files.length} arquivo(s)`} />
+                <ListButton icon={<Sparkles size={18} />} label="Preferências" value="Notificações e idioma" />
+                <ListButton icon={<MessageCircle size={18} />} label="Suporte" value="Atendimento da clínica" />
+                <ListButton icon={<Phone size={18} />} label="Sair" value="Encerrar sessão do portal" />
+              </motion.section>
+            )}
+          </AnimatePresence>
+        </main>
       </div>
 
-      {/* ─── Depth Drawer (Historical Data Access) ─── */}
-      {data && (
-        <PatientPortalDepth
-          isOpen={showDepth}
-          onClose={() => setShowDepth(false)}
-          data={{
-            appointments: data.appointments,
-            evolution: data.evolution,
-            files: data.files,
-            payment_plans: data.payment_plans,
-            transactions: data.transactions
-          }}
-        />
-      )}
+      <nav className="fixed inset-x-0 bottom-3 z-40 px-4">
+        <div className="mx-auto grid max-w-md grid-cols-4 rounded-[24px] border border-white/80 bg-white/90 p-2 shadow-[0_8px_30px_rgba(17,24,39,0.16)] backdrop-blur-xl">
+          <TabButton label="Home" icon={<Home size={20} />} isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+          <TabButton label="Cuidados" icon={<Heart size={20} />} isActive={activeTab === 'cuidados'} onClick={() => setActiveTab('cuidados')} />
+          <TabButton label="Consultas" icon={<Calendar size={20} />} isActive={activeTab === 'consultas'} onClick={() => setActiveTab('consultas')} />
+          <TabButton label="Perfil" icon={<UserCircle size={20} />} isActive={activeTab === 'perfil'} onClick={() => setActiveTab('perfil')} />
+        </div>
+      </nav>
 
-      {/* ─── Schedule Modal (iOS sheet) ─── */}
       <AnimatePresence>
-          {showScheduleModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center"
-            onClick={closeScheduleModal}
-          >
-            <motion.div
-              ref={scheduleModalRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="schedule-modal-title"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl"
-            >
-              {/* Drag indicator */}
-              <div className="flex justify-center pt-3 pb-1 sm:hidden">
-                <div className="w-9 h-1 bg-[#C6C6C8] rounded-full" />
+        {showScheduleModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end bg-black/35 p-4">
+            <motion.div initial={{ y: 30 }} animate={{ y: 0 }} exit={{ y: 30 }} className="mx-auto w-full max-w-md rounded-3xl bg-white p-5">
+              <h3 className="text-lg font-semibold">Agendar consulta</h3>
+              <p className="mt-1 text-sm text-[#6b7280]">Escolha data e horário preferenciais.</p>
+              <div className="mt-4 space-y-3">
+                <input type="date" className="w-full rounded-xl border border-[#d1d5db] px-3 py-2 text-sm" value={scheduleForm.preferred_date} onChange={(e) => setScheduleForm((s) => ({ ...s, preferred_date: e.target.value }))} />
+                <input type="time" className="w-full rounded-xl border border-[#d1d5db] px-3 py-2 text-sm" value={scheduleForm.preferred_time} onChange={(e) => setScheduleForm((s) => ({ ...s, preferred_time: e.target.value }))} />
+                <textarea placeholder="Observações (opcional)" className="h-24 w-full rounded-xl border border-[#d1d5db] px-3 py-2 text-sm" value={scheduleForm.notes} onChange={(e) => setScheduleForm((s) => ({ ...s, notes: e.target.value }))} />
               </div>
-
-              {scheduleSuccess ? (
-                <div className="text-center py-12 px-6">
-                  <div className="w-14 h-14 bg-[#34C759]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 size={28} className="text-[#34C759]" />
-                  </div>
-                  <h3 id="schedule-modal-title" className="text-[18px] font-semibold text-[#1C1C1E] mb-1.5 tracking-tight">
-                    {scheduleMode === 'reschedule' ? 'Pedido Enviado' : 'Solicitação Enviada'}
-                  </h3>
-                  <p className="text-[#8E8E93] text-[14px]">
-                    {scheduleMode === 'reschedule'
-                      ? 'A clínica vai revisar o novo horário e retornar para você.'
-                      : 'A clínica entrará em contato para confirmar.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="px-5 pb-6 pt-3">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 id="schedule-modal-title" className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">
-                        {scheduleMode === 'reschedule' ? 'Reagendar Consulta' : 'Solicitar Consulta'}
-                      </h3>
-                      {scheduleTargetAppointment && (
-                        <p className="text-[#8E8E93] text-[12px] mt-1">
-                          Atual: {formatDateBR(scheduleTargetAppointment.start_time)} às {formatTimeBR(scheduleTargetAppointment.start_time)}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeScheduleModal}
-                      aria-label="Fechar"
-                      className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-90 transition-transform"
-                    >
-                      <X size={16} className="text-[#8E8E93]" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">
-                        {scheduleMode === 'reschedule' ? 'Nova Data Preferencial' : 'Data Preferencial'}
-                      </label>
-                      <input
-                        type="date"
-                        value={scheduleForm.preferred_date}
-                        min={new Date().toLocaleDateString('en-CA')}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, preferred_date: e.target.value })}
-                        className="w-full h-12 px-4 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#0C9B72]/40 transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Horário Preferencial</label>
-                      <select
-                        value={scheduleForm.preferred_time}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, preferred_time: e.target.value })}
-                        className="w-full h-12 px-4 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#0C9B72]/40 transition-colors appearance-none"
-                      >
-                        <option value="">Qualquer horário</option>
-                        <option value="manha">Manhã (08h–12h)</option>
-                        <option value="tarde">Tarde (13h–18h)</option>
-                        <option value="noite">Noite (18h–21h)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">
-                        {scheduleMode === 'reschedule' ? 'Preferências' : 'Observações'}
-                      </label>
-                      <textarea
-                        placeholder={scheduleMode === 'reschedule' ? 'Conte qual horário funciona melhor para você...' : 'Motivo da consulta...'}
-                        value={scheduleForm.notes}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, notes: e.target.value })}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#0C9B72]/40 transition-colors resize-none placeholder:text-[#C7C7CC]"
-                      />
-                    </div>
-                    <button
-                      onClick={handleRequestAppointment}
-                      disabled={!scheduleForm.preferred_date || scheduleSubmitting}
-                      className="w-full h-12 bg-[#0C9B72] text-white rounded-xl font-semibold text-[15px] active:scale-[0.98] transition-all disabled:opacity-30 disabled:scale-100 flex items-center justify-center gap-2"
-                    >
-                      {scheduleSubmitting ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        scheduleMode === 'reschedule' ? 'Enviar Pedido de Reagendamento' : 'Enviar Solicitação'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="mt-4 flex gap-2">
+                <button onClick={() => setShowScheduleModal(false)} className="flex-1 rounded-xl border border-[#d1d5db] px-3 py-2 text-sm">Cancelar</button>
+                <button onClick={handleRequestAppointment} disabled={scheduleSubmitting} className="flex-1 rounded-xl bg-[#111827] px-3 py-2 text-sm text-white">{scheduleSubmitting ? 'Enviando...' : 'Enviar'}</button>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ─── PIX Payment Modal ─── */}
-      <AnimatePresence>
-        {showPixModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center"
-            onClick={() => !actionSubmitting && setShowPixModal(null)}>
-            <motion.div
-              ref={pixModalRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="pix-modal-title"
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl">
-              <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-9 h-1 bg-[#C6C6C8] rounded-full" /></div>
-              {paymentInformed ? (
-                <div className="text-center py-12 px-6">
-                  <div className="w-14 h-14 bg-[#34C759]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 size={28} className="text-[#34C759]" />
-                  </div>
-                  <h3 id="pix-modal-title" className="text-[18px] font-semibold text-[#1C1C1E] mb-1">Pagamento Informado</h3>
-                  <p className="text-[#8E8E93] text-[14px]">A clínica confirmará o recebimento.</p>
-                </div>
-              ) : (
-                <div className="px-5 pb-6 pt-3">
-                  <div className="flex items-center justify-between mb-5">
-                    <h3 id="pix-modal-title" className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Pagar</h3>
-                    <button type="button" onClick={() => setShowPixModal(null)} aria-label="Fechar" className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center"><X size={16} className="text-[#8E8E93]" /></button>
-                  </div>
-
-                  <div className="bg-[#F2F2F7] rounded-xl p-4 mb-4 text-center">
-                    <p className="text-[#8E8E93] text-[12px] mb-1">{showPixModal.label}</p>
-                    <p className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">
-                      R$ {showPixModal.amount.toFixed(2)}
-                    </p>
-                  </div>
-
-                  {pixInfo?.has_pix ? (
-                    <div className="space-y-3 mb-5">
-                      <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest">Chave PIX</p>
-                      <button onClick={() => copyToClipboard(pixInfo.pix_key!)}
-                        className="w-full flex items-center gap-3 p-3.5 bg-[#F2F2F7] rounded-xl active:bg-[#E5E5EA] transition-colors">
-                        <div className="w-10 h-10 bg-[#0C9B72]/10 rounded-xl flex items-center justify-center shrink-0">
-                          <DollarSign size={18} className="text-[#0C9B72]" />
-                        </div>
-                        <div className="flex-1 text-left min-w-0">
-                          <p className="text-[#1C1C1E] text-[15px] font-medium truncate">{pixInfo.pix_key}</p>
-                          <p className="text-[#8E8E93] text-[12px]">{pixInfo.pix_key_type} · {pixInfo.beneficiary_name}</p>
-                        </div>
-                        <span className="text-[#0C9B72] text-[12px] font-semibold shrink-0">
-                          {pixCopied ? 'Copiado!' : 'Copiar'}
-                        </span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="bg-[#FF9500]/[0.06] rounded-xl p-4 mb-5">
-                      <p className="text-[#FF9500] text-[13px]">
-                        A clínica ainda não configurou o PIX. Entre em contato para combinar o pagamento.
-                      </p>
-                    </div>
-                  )}
-
-                  <button onClick={() => handleInformPayment(showPixModal.amount, showPixModal.installment_id)}
-                    disabled={actionSubmitting}
-                    className="w-full h-12 bg-[#34C759] text-white rounded-xl font-semibold text-[15px] active:scale-[0.98] transition-all disabled:opacity-30 flex items-center justify-center">
-                    {actionSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Já Paguei — Informar Clínica'}
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }
 
-// ─── Helper Components ───
-
-function PortalStatCard({ value, label }: { value: number; label: string }) {
+function TabButton({ label, icon, isActive, onClick }: { label: string; icon: React.ReactNode; isActive: boolean; onClick: () => void }) {
   return (
-    <motion.div 
-      whileHover={{ y: -1 }}
-      className="relative overflow-hidden group"
-    >
-      {/* Glassmorphic background with subtle gradient */}
-      <div className="absolute inset-0 bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 -z-10" />
-      
-      {/* Animated accent on hover */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-[#0C9B72]/[0.04] rounded-full blur-3xl group-hover:opacity-100 opacity-0 transition-opacity duration-500" />
-      
-      <div className="p-5 flex flex-col items-start">
-        {/* Number with refined styling */}
-        <motion.p 
-          initial={{ opacity: 0.6 }}
-          whileInView={{ opacity: 1 }}
-          className="text-[#1C1C1E] text-[40px] font-bold tracking-tighter leading-none"
-        >
-          {value}
-        </motion.p>
-        
-        {/* Label subtle and refined */}
-        <p className="text-[#8E8E93] text-[12px] font-medium uppercase tracking-widest mt-3">{label}</p>
-      </div>
-      
-      {/* Subtle border accent */}
-      <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-[#0C9B72] to-transparent group-hover:w-full transition-all duration-500" />
-    </motion.div>
+    <button onClick={onClick} className={`flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] transition ${isActive ? 'bg-[#f3f4f6] text-[#111827]' : 'text-[#6b7280]'}`}>
+      {icon}
+      <span className="font-medium">{label}</span>
+    </button>
   );
 }
 
-function PortalAppointmentRow({ appointment, formatDate, formatTime, past, actionContent, actionNotice }: any) {
-  const config = getStatusConfig(appointment.status);
+function MiniList({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className={`px-4 py-3.5 ${past ? 'opacity-40' : ''}`}>
-      <div className="flex items-center gap-3.5">
-        <div className="w-10 h-10 bg-[#F2F2F7] rounded-xl flex items-center justify-center shrink-0">
-          <Calendar size={16} className="text-[#8E8E93]" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[#1C1C1E] text-[15px] font-medium">{formatDate(appointment.start_time)}</p>
-          <p className="text-[#8E8E93] text-[13px] mt-0.5">
-            {formatTime(appointment.start_time)} · Dr(a). {appointment.dentist_name}
-          </p>
-        </div>
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${config.color}`}>
-          {config.label}
-        </span>
-      </div>
-      {appointment.notes && (
-        <p className="text-[#C7C7CC] text-[13px] mt-2 ml-[54px]">{appointment.notes}</p>
-      )}
-      {actionContent && !past && (
-        <div className="mt-3 ml-[54px]">
-          {actionContent}
-        </div>
-      )}
-      {actionNotice && !past && (
-        <p className="text-[#34C759] text-[12px] font-medium mt-1.5 ml-[54px]">{actionNotice}</p>
-      )}
-    </div>
+    <section className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">{title}</h3>
+      <ul className="mt-2 space-y-2">
+        {items.map((item, idx) => (
+          <li key={`${title}-${idx}`} className="flex items-start gap-2 text-sm text-[#374151]">
+            <Clock size={14} className="mt-0.5 text-[#9ca3af]" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
-function PortalEmptyState({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
+function ListCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="py-16 text-center">
-      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
-        <Icon size={24} className="text-[#C7C7CC]" />
+    <section className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">{title}</h3>
+      <div className="mt-3 space-y-2">{children}</div>
+    </section>
+  );
+}
+
+function EmptyRow({ text }: { text: string }) {
+  return <p className="rounded-xl bg-[#f9fafb] px-3 py-2 text-sm text-[#6b7280]">{text}</p>;
+}
+
+function ListButton({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <button className="flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white px-4 py-3 text-left shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="text-[#6b7280]">{icon}</div>
+        <div>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-[#6b7280]">{value}</p>
+        </div>
       </div>
-      <p className="text-[#AEAEB2] text-[15px]">{text}</p>
-    </div>
+      <CheckCircle2 size={16} className="text-[#d1d5db]" />
+    </button>
   );
 }
