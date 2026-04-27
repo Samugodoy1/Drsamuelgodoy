@@ -111,6 +111,14 @@ interface PortalData {
     consent_type: string;
     signed_at: string;
   }>;
+  appointment_requests: Array<{
+    id: number;
+    status: string;
+    reason_category?: string;
+    desired_period?: string;
+    notes?: string;
+    created_at: string;
+  }>;
   clinic: {
     name: string;
     clinic_name: string;
@@ -763,6 +771,7 @@ export function PatientPortal() {
                 confirmedAppointmentId={confirmedAppointmentId}
                 rescheduleRequestedAppointmentId={rescheduleRequestedAppointmentId}
                 sessionToken={sessionToken}
+                appointmentRequests={data.appointment_requests || []}
                 onChangeTab={setActiveTab}
                 activeTab={activeTab}
               />
