@@ -6,11 +6,11 @@ import {
   Calendar,
   ChevronRight,
   CheckCircle2,
-  Clock,
   ClipboardList,
   FileText,
   Heart,
   Home,
+  LogOut,
   MapPin,
   MessageCircle,
   Phone,
@@ -66,13 +66,43 @@ interface PortalData {
 }
 
 const statusLabel: Record<string, string> = {
-  PENDING: 'Pendente',
-  APPROVED: 'Aprovada',
-  REJECTED: 'Recusada',
+  PENDING: 'Em análise',
+  ANALYZING: 'Em análise',
+  EM_ANALISE: 'Em análise',
+  APPROVED: 'Confirmada',
   CONFIRMED: 'Confirmada',
-  SCHEDULED: 'Agendada',
+  SCHEDULED: 'Confirmada',
+  REJECTED: 'Horário indisponível',
+  DECLINED: 'Horário indisponível',
+  DENIED: 'Horário indisponível',
+  REFUSED: 'Horário indisponível',
+  RECUSADA: 'Horário indisponível',
+  CANCELLED: 'Cancelada',
+  CANCELED: 'Cancelada',
+  CANCELED_BY_PATIENT: 'Cancelada',
+  CANCELED_BY_CLINIC: 'Cancelada',
+  COMPLETED: 'Concluída',
   FINISHED: 'Concluída',
 };
+
+function getStatusLabel(status?: string) {
+  if (!status) return 'Em análise';
+  return statusLabel[status.toUpperCase()] || 'Em análise';
+}
+
+function getStatusChipClasses(status?: string) {
+  const normalized = (status || '').toUpperCase();
+  if (['APPROVED', 'CONFIRMED', 'SCHEDULED', 'FINISHED', 'COMPLETED'].includes(normalized)) {
+    return 'bg-[#EAF4EE] text-[#166534]';
+  }
+  if (['PENDING', 'ANALYZING', 'EM_ANALISE'].includes(normalized)) {
+    return 'bg-[#FFFBEB] text-[#B45309]';
+  }
+  if (['REJECTED', 'DECLINED', 'DENIED', 'REFUSED', 'RECUSADA', 'CANCELLED', 'CANCELED', 'CANCELED_BY_PATIENT', 'CANCELED_BY_CLINIC'].includes(normalized)) {
+    return 'bg-[#FEF2F2] text-[#B42318]';
+  }
+  return 'bg-[#F2F4F7] text-[#667085]';
+}
 
 export function PatientPortal() {
   const { token } = useParams<{ token: string }>();
@@ -172,11 +202,11 @@ export function PatientPortal() {
     const now = new Date();
     const appointments = [...data.appointments];
     const upcoming = appointments
-      .filter((a) => new Date(a.start_time) > now && a.status !== 'CANCELLED')
+      .filter((a) => new Date(a.start_time) > now && !['CANCELLED', 'CANCELED'].includes(a.status?.toUpperCase()))
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     const history = appointments
-      .filter((a) => new Date(a.start_time) <= now || a.status === 'CANCELLED')
+      .filter((a) => new Date(a.start_time) <= now || ['CANCELLED', 'CANCELED'].includes(a.status?.toUpperCase()))
       .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
 
     const requests = [...(data.appointment_requests || [])].sort(
@@ -268,10 +298,10 @@ export function PatientPortal() {
       ? {
           id: `request-${computed.requests[0].id}`,
           text: ['REJECTED', 'DENIED', 'RECUSADA', 'REFUSED'].includes(computed.requests[0].status?.toUpperCase())
-            ? `Horário indisponível para o pedido #${computed.requests[0].id}`
+            ? `Horário indisponível para a solicitação #${computed.requests[0].id}`
             : ['PENDING', 'ANALYZING', 'EM_ANALISE'].includes(computed.requests[0].status?.toUpperCase())
-              ? `Pedido #${computed.requests[0].id} recebido e em análise`
-              : `Pedido #${computed.requests[0].id} atualizado`,
+              ? `Solicitação #${computed.requests[0].id} recebida e em análise`
+              : `Solicitação #${computed.requests[0].id} atualizada`,
           tone: ['REJECTED', 'DENIED', 'RECUSADA', 'REFUSED'].includes(computed.requests[0].status?.toUpperCase())
             ? ('danger' as UpdateTone)
             : ['PENDING', 'ANALYZING', 'EM_ANALISE'].includes(computed.requests[0].status?.toUpperCase())
@@ -294,7 +324,7 @@ export function PatientPortal() {
 
   return (
     <div className="min-h-screen bg-[#F6F8F7] text-[#0F172A]">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-[calc(128px+env(safe-area-inset-bottom))] pt-6">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-x-hidden px-5 pb-[calc(140px+env(safe-area-inset-bottom))] pt-6">
         <header>
           <PatientPortalHeader
             greeting={greeting}
@@ -345,90 +375,144 @@ export function PatientPortal() {
 
             {activeTab === 'cuidados' && (
               <motion.section key="care" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-                {computed.activeTreatmentItems.length > 0 ? (
+                {computed.activeTreatmentItems.length > 0 && progressPct > 0 ? (
                   <>
                     <div className="rounded-3xl bg-white p-5 shadow-sm border border-white/70">
-                      <p className="text-xs uppercase tracking-[0.16em] text-[#9ca3af]">Tratamento ativo</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-[#9ca3af]">Plano de cuidado</p>
                       <h2 className="mt-2 text-lg font-semibold">Etapa atual em andamento</h2>
                       <p className="mt-2 text-sm text-[#6b7280]">Progresso geral do plano: {progressPct}%</p>
                       <div className="mt-3 h-2 rounded-full bg-[#e5e7eb]">
                         <div className="h-2 rounded-full bg-[#111827]" style={{ width: `${progressPct}%` }} />
                       </div>
                     </div>
-                    <MiniList title="Próximas fases" items={computed.activeTreatmentItems.slice(0, 4).map((item) => item.procedure || 'Procedimento planejado')} />
-                    <MiniList title="Orientações" items={['Siga os horários de medicação orientados.', 'Evite esforços nas primeiras 24h pós-procedimento.', 'Em caso de dor forte, fale com a clínica.']} />
-                    <MiniList title="Documentos e imagens" items={[data.files[0] ? `${data.files.length} arquivo(s) disponível(is)` : 'Ainda não há arquivos para este tratamento']} />
+                    <MiniList
+                      title="Etapas do tratamento"
+                      iconType="phase"
+                      items={computed.activeTreatmentItems.slice(0, 4).map((item) => {
+                        const label = item.procedure || 'Procedimento planejado';
+                        return label.replace('Restauracao', 'Restauração').replace('Extracao', 'Extração');
+                      })}
+                    />
+                    <MiniList
+                      title="Orientações"
+                      iconType="guidance"
+                      items={['Siga os horários de medicação orientados.', 'Evite esforços nas primeiras 24h após o procedimento.', 'Se houver dor forte, fale com a clínica.']}
+                    />
+                    <MiniList
+                      title="Alertas e documentos"
+                      iconType="alert"
+                      items={[data.files[0] ? `${data.files.length} arquivo(s) disponível(is)` : 'Ainda não há arquivos para este tratamento']}
+                    />
                   </>
                 ) : (
                   <>
-                    <MiniList title="Prevenção personalizada" items={['Faça revisão semestral para manter estabilidade clínica.', 'Atualize sua anamnese anualmente para maior segurança.']} />
-                    <MiniList title="Higiene bucal premium" items={['Escovação suave 3x ao dia', 'Uso de fio dental noturno', 'Enxaguante sem álcool quando indicado']} />
-                    <MiniList title="Lembretes" items={['Agende seu próximo check-up preventivo', 'Mantenha hidratação e evite açúcar frequente']} />
+                    <section className="rounded-3xl border border-[#E4E7EC] bg-white px-5 py-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[#98A2B3]">Cuidados e orientações</p>
+                      <p className="mt-2 text-sm text-[#667085]">Veja recomendações importantes para seu tratamento e consultas.</p>
+                      <div className="mt-4 grid grid-cols-1 gap-2.5">
+                        <button onClick={() => setActiveTab('cuidados')} className="rounded-xl bg-[#F7F8F6] px-3 py-2.5 text-left text-sm font-medium text-[#0F172A]">Ver orientações</button>
+                        <button onClick={() => setActiveTab('perfil')} className="rounded-xl bg-[#F7F8F6] px-3 py-2.5 text-left text-sm font-medium text-[#0F172A]">Atualizar anamnese</button>
+                        <button onClick={() => (window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`)} className="rounded-xl bg-[#F7F8F6] px-3 py-2.5 text-left text-sm font-medium text-[#0F172A]">Falar com a clínica</button>
+                      </div>
+                    </section>
+                    <MiniList title="Plano de cuidado" iconType="phase" items={['Revisão preventiva semestral', 'Acompanhamento da saúde gengival']} />
+                    <MiniList title="Orientações diárias" iconType="guidance" items={['Escovação suave 3x ao dia', 'Uso de fio dental noturno', 'Enxaguante sem álcool quando indicado']} />
                   </>
                 )}
               </motion.section>
             )}
 
             {activeTab === 'consultas' && (
-              <motion.section key="appointments" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-                <button onClick={() => setShowScheduleModal(true)} className="w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-medium text-white">
-                  Agendar consulta
-                </button>
+              <motion.section key="appointments" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4 pb-6">
+                {computed.upcoming.length === 0 ? (
+                  <section className="rounded-2xl border border-[#E4E7EC] bg-white px-4 py-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                    <h3 className="text-base font-semibold text-[#0F172A]">Nenhuma consulta marcada</h3>
+                    <p className="mt-1.5 text-sm text-[#667085]">Quando você solicitar um horário, a clínica acompanha tudo por aqui.</p>
+                    <button onClick={() => setShowScheduleModal(true)} className="mt-4 rounded-xl bg-[#174F35] px-4 py-2.5 text-sm font-medium text-white">Solicitar consulta</button>
+                  </section>
+                ) : (
+                  <section className="rounded-2xl border border-[#E4E7EC] bg-white p-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98A2B3]">Próxima consulta</p>
+                    <p className="mt-2 text-base font-semibold text-[#0F172A]">
+                      {new Date(computed.upcoming[0].start_time).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                    </p>
+                    <p className="text-sm text-[#667085]">
+                      {new Date(computed.upcoming[0].start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • Dr(a). {computed.upcoming[0].dentist_name}
+                    </p>
+                    <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusChipClasses(computed.upcoming[0].status)}`}>
+                      {getStatusLabel(computed.upcoming[0].status)}
+                    </span>
+                    <button onClick={() => setActiveTab('home')} className="mt-3 block rounded-xl border border-[#D0D5DD] px-3 py-2 text-sm font-medium text-[#174F35]">Ver detalhes</button>
+                  </section>
+                )}
 
-                <ListCard title="Próximas consultas">
-                  {computed.upcoming.length === 0 ? <EmptyRow text="Nenhuma consulta futura." /> : computed.upcoming.map((appointment) => (
-                    <div key={appointment.id} className="rounded-2xl border border-[#eceff3] p-3">
-                      <p className="text-sm font-medium">{new Date(appointment.start_time).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
-                      <p className="text-xs text-[#6b7280]">Dr(a). {appointment.dentist_name} • {statusLabel[appointment.status] || appointment.status}</p>
-                      <div className="mt-2 flex gap-2">
-                        <button onClick={() => handleConfirmAppointment(appointment.id)} className="rounded-xl bg-[#ecfdf3] px-3 py-1.5 text-xs font-medium text-[#0f766e]">
-                          {appointmentSubmittingId === appointment.id ? 'Confirmando...' : 'Confirmar'}
-                        </button>
-                        <button onClick={() => setShowScheduleModal(true)} className="rounded-xl bg-[#f3f4f6] px-3 py-1.5 text-xs font-medium text-[#374151]">Reagendar</button>
+                {computed.requests.length > 0 && (
+                  <ListCard title="Solicitações">
+                    {computed.requests.slice(0, 5).map((request) => (
+                      <div key={request.id} className="flex items-start justify-between rounded-xl border border-[#ECEFF3] px-3 py-2.5">
+                        <div>
+                          <p className="text-sm font-medium text-[#0F172A]">{request.reason_category || 'Consulta geral'}</p>
+                          <p className="text-xs text-[#667085]">{new Date(request.created_at).toLocaleDateString('pt-BR')}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${getStatusChipClasses(request.status)}`}>{getStatusLabel(request.status)}</span>
                       </div>
-                    </div>
-                  ))}
-                </ListCard>
+                    ))}
+                  </ListCard>
+                )}
 
-                <ListCard title="Solicitações enviadas">
-                  {computed.requests.length === 0 ? <EmptyRow text="Nenhuma solicitação enviada." /> : computed.requests.map((request) => (
-                    <div key={request.id} className="flex items-start justify-between rounded-2xl border border-[#eceff3] p-3">
-                      <div>
-                        <p className="text-sm font-medium">#{request.id} • {request.reason_category || 'Consulta geral'}</p>
-                        <p className="text-xs text-[#6b7280]">{new Date(request.created_at).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                      <span className="rounded-full bg-[#f3f4f6] px-2 py-1 text-xs text-[#4b5563]">{statusLabel[request.status] || request.status}</span>
-                    </div>
-                  ))}
-                </ListCard>
-
-                <ListCard title="Histórico anterior">
-                  {computed.history.length === 0 ? <EmptyRow text="Sem histórico ainda." /> : computed.history.slice(0, 5).map((appointment) => (
-                    <div key={appointment.id} className="flex items-center justify-between rounded-2xl border border-[#eceff3] p-3">
-                      <div>
-                        <p className="text-sm font-medium">{new Date(appointment.start_time).toLocaleDateString('pt-BR')}</p>
-                        <p className="text-xs text-[#6b7280]">Dr(a). {appointment.dentist_name}</p>
-                      </div>
-                      <span className="text-xs text-[#6b7280]">{statusLabel[appointment.status] || appointment.status}</span>
-                    </div>
-                  ))}
-                </ListCard>
-
-                <button onClick={() => (window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`)} className="w-full rounded-2xl border border-[#d1d5db] bg-white px-4 py-3 text-sm font-medium text-[#111827]">
-                  Falar com clínica
-                </button>
+                <section className="rounded-2xl border border-[#E4E7EC] bg-white p-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98A2B3]">Histórico</h3>
+                  {computed.history.length === 0 ? (
+                    <p className="mt-3 text-sm text-[#667085]">Sem histórico ainda.</p>
+                  ) : (
+                    <ul className="mt-3 space-y-3">
+                      {computed.history.slice(0, 5).map((appointment) => (
+                        <li key={appointment.id} className="flex items-center justify-between gap-3 border-b border-[#F2F4F7] pb-3 last:border-b-0 last:pb-0">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-[#0F172A]">{new Date(appointment.start_time).toLocaleDateString('pt-BR')}</p>
+                            <p className="truncate text-xs text-[#667085]">Dr(a). {appointment.dentist_name}</p>
+                          </div>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#667085]">
+                            <span className={`h-2 w-2 rounded-full ${getStatusChipClasses(appointment.status).includes('FEF2F2') ? 'bg-[#DC2626]' : getStatusChipClasses(appointment.status).includes('FFFBEB') ? 'bg-[#F59E0B]' : 'bg-[#16A34A]'}`} />
+                            {getStatusLabel(appointment.status)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
               </motion.section>
             )}
 
             {activeTab === 'perfil' && (
               <motion.section key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
+                <section className="rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3.5 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF4EE] text-sm font-semibold text-[#174F35]">
+                      {firstName[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[#0F172A]">{data.patient.name}</p>
+                      <p className="text-xs text-[#667085]">Paciente de Dr. Samuel Godoy</p>
+                    </div>
+                  </div>
+                </section>
                 <ListButton icon={<UserCircle size={18} />} label="Editar dados pessoais" value={data.patient.email} />
-                <ListButton icon={<FileText size={18} />} label="Renovar anamnese" value="Atualize suas informações clínicas" />
-                <ListButton icon={<Shield size={18} />} label="Convênio" value={data.patient.health_insurance || 'Não informado'} />
-                <ListButton icon={<FileText size={18} />} label="Documentos" value={`${data.files.length} arquivo(s)`} />
+                <ListButton icon={<FileText size={18} />} label="Anamnese" value="Atualizar" badgeTone="warning" />
+                <ListButton icon={<Shield size={18} />} label="Convênio" value={data.patient.health_insurance || 'Não informado'} badgeTone={!data.patient.health_insurance ? 'warning' : 'neutral'} />
+                <ListButton icon={<FileText size={18} />} label="Documentos" value={`${data.files.length} arquivos`} badgeTone={data.files.length === 0 ? 'warning' : 'neutral'} />
                 <ListButton icon={<Sparkles size={18} />} label="Preferências" value="Notificações e idioma" />
                 <ListButton icon={<MessageCircle size={18} />} label="Suporte" value="Atendimento da clínica" />
-                <ListButton icon={<Phone size={18} />} label="Sair" value="Encerrar sessão do portal" />
+                <button className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[#FEE4E2] bg-[#FFF7F7] px-4 py-3 text-left">
+                  <div className="flex items-center gap-3">
+                    <LogOut size={18} className="text-[#B42318]" />
+                    <div>
+                      <p className="text-sm font-medium text-[#B42318]">Sair</p>
+                      <p className="text-xs text-[#B42318]/80">Encerrar sessão do portal</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-[#FDA29B]" />
+                </button>
               </motion.section>
             )}
           </AnimatePresence>
@@ -554,12 +638,12 @@ function PatientMainStatusCard({
   }
 
   return (
-    <section className="rounded-[32px] bg-[#174F35] p-5 text-white shadow-[0_20px_40px_rgba(15,42,29,0.22)]">
-      <h2 className="text-2xl font-semibold">Vamos marcar sua próxima consulta?</h2>
-      <p className="mt-2 text-sm text-white/85">Escolha um horário e a clínica retorna para confirmar.</p>
-      <div className="mt-5 grid grid-cols-2 gap-2.5">
-        <button onClick={onOpenSchedule} className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#174F35]">Solicitar consulta</button>
-        <button onClick={onCallClinic} className="rounded-2xl bg-[rgba(24,90,61,0.3)] px-4 py-3 text-sm font-medium text-white">Falar com clínica</button>
+    <section className="rounded-[28px] bg-[#185A3D] p-4 text-white shadow-[0_12px_24px_rgba(15,42,29,0.16)]">
+      <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Pronto para marcar sua próxima consulta?</h2>
+      <p className="mt-2 text-sm text-white/85">Escolha um horário e a clínica confirma com você.</p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button onClick={onOpenSchedule} className="rounded-xl bg-white px-3.5 py-2.5 text-sm font-semibold text-[#174F35]">Solicitar consulta</button>
+        <button onClick={onCallClinic} className="rounded-xl border border-white/35 bg-[rgba(255,255,255,0.12)] px-3.5 py-2.5 text-sm font-medium text-white">Falar com clínica</button>
       </div>
     </section>
   );
@@ -587,8 +671,8 @@ function PatientQuickActions({
       <h3 className="px-1 text-sm font-semibold text-[#0F172A]">Ações rápidas</h3>
       <div className="mt-3 grid grid-cols-2 gap-3">
         {items.map((item) => (
-          <button key={item.label} onClick={item.onClick} className="rounded-[22px] border border-[#EAECF0] bg-white px-4 py-3.5 text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
-            <div className="mb-2.5 inline-flex rounded-xl bg-[rgba(24,90,61,0.1)] p-2 text-[#174F35]">{item.icon}</div>
+          <button key={item.label} onClick={item.onClick} className="rounded-[18px] border border-[#EAECF0] bg-white px-3.5 py-3 text-left shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+            <div className="mb-2 inline-flex rounded-lg bg-[rgba(24,90,61,0.1)] p-1.5 text-[#174F35]">{item.icon}</div>
             <p className="text-[13px] font-medium leading-snug text-[#0F172A]">{item.label}</p>
           </button>
         ))}
@@ -675,7 +759,7 @@ function PatientRecentUpdates({ updates }: { updates: Array<{ id: string; text: 
 function PatientBottomNav({ activeTab, onChangeTab }: { activeTab: PortalTab; onChangeTab: (tab: PortalTab) => void }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
-      <div className="mx-auto grid max-w-md grid-cols-4 rounded-[28px] border border-[#EAECF0] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.1)]">
+      <div className="mx-auto grid max-w-md grid-cols-4 rounded-[26px] border border-[#EAECF0] bg-white/95 p-2 shadow-[0_4px_16px_rgba(15,23,42,0.08)] backdrop-blur">
         <BottomNavItem label="Início" icon={<Home size={20} />} isActive={activeTab === 'home'} onClick={() => onChangeTab('home')} />
         <BottomNavItem label="Consultas" icon={<Calendar size={20} />} isActive={activeTab === 'consultas'} onClick={() => onChangeTab('consultas')} />
         <BottomNavItem label="Cuidados" icon={<Heart size={20} />} isActive={activeTab === 'cuidados'} onClick={() => onChangeTab('cuidados')} />
@@ -694,14 +778,19 @@ function BottomNavItem({ label, icon, isActive, onClick }: { label: string; icon
   );
 }
 
-function MiniList({ title, items }: { title: string; items: string[] }) {
+function MiniList({ title, items, iconType = 'guidance' }: { title: string; items: string[]; iconType?: 'phase' | 'guidance' | 'alert' }) {
+  const iconByType = {
+    phase: <Calendar size={14} className="mt-0.5 text-[#98A2B3]" />,
+    guidance: <Heart size={14} className="mt-0.5 text-[#98A2B3]" />,
+    alert: <AlertCircle size={14} className="mt-0.5 text-[#98A2B3]" />,
+  };
   return (
-    <section className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
+    <section className="rounded-2xl border border-[#EAECF0] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
       <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">{title}</h3>
-      <ul className="mt-2 space-y-2">
+      <ul className="mt-2.5 space-y-2.5">
         {items.map((item, idx) => (
           <li key={`${title}-${idx}`} className="flex items-start gap-2 text-sm text-[#374151]">
-            <Clock size={14} className="mt-0.5 text-[#9ca3af]" />
+            {iconByType[iconType]}
             <span>{item}</span>
           </li>
         ))}
@@ -712,28 +801,25 @@ function MiniList({ title, items }: { title: string; items: string[] }) {
 
 function ListCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
+    <section className="rounded-2xl border border-[#E4E7EC] bg-white p-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
       <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">{title}</h3>
       <div className="mt-3 space-y-2">{children}</div>
     </section>
   );
 }
 
-function EmptyRow({ text }: { text: string }) {
-  return <p className="rounded-xl bg-[#f9fafb] px-3 py-2 text-sm text-[#6b7280]">{text}</p>;
-}
-
-function ListButton({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ListButton({ icon, label, value, badgeTone = 'neutral' }: { icon: React.ReactNode; label: string; value: string; badgeTone?: 'neutral' | 'warning' }) {
+  const badgeClass = badgeTone === 'warning' ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#F2F4F7] text-[#667085]';
   return (
-    <button className="flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white px-4 py-3 text-left shadow-sm">
+    <button className="flex w-full items-center justify-between rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3 text-left shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
       <div className="flex items-center gap-3">
-        <div className="text-[#6b7280]">{icon}</div>
+        <div className="text-[#667085]">{icon}</div>
         <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-xs text-[#6b7280]">{value}</p>
+          <p className="text-sm font-medium text-[#0F172A]">{label}</p>
+          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>{value}</span>
         </div>
       </div>
-      <CheckCircle2 size={16} className="text-[#d1d5db]" />
+      <ChevronRight size={16} className="text-[#98A2B3]" />
     </button>
   );
 }
