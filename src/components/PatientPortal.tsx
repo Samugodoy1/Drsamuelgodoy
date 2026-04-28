@@ -29,6 +29,8 @@ type HomeAssistantState =
   | 'solicitacao_recusada'
   | 'sem_pendencias';
 type UpdateTone = 'success' | 'warning' | 'danger' | 'neutral';
+type ProfileActionKey = 'edit_profile' | 'renew_anamnesis' | 'insurance' | 'documents' | 'preferences' | 'support';
+type FeedbackTone = 'success' | 'error' | 'info';
 
 interface PortalData {
   patient: {
@@ -39,6 +41,7 @@ interface PortalData {
     birth_date: string;
     address: string;
     health_insurance?: string;
+    health_insurance_number?: string;
     treatment_plan?: Array<{ id: string; procedure?: string; value?: number; status?: string }>;
   };
   appointments: Array<{
@@ -120,6 +123,16 @@ export function PatientPortal() {
   const [appointmentSubmittingId, setAppointmentSubmittingId] = useState<number | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [activeProfileAction, setActiveProfileAction] = useState<ProfileActionKey | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string } | null>(null);
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [insuranceForm, setInsuranceForm] = useState({
+    health_insurance: '',
+    health_insurance_number: '',
+  });
   const [scheduleForm, setScheduleForm] = useState({ preferred_date: '', preferred_time: '', notes: '', is_urgent: false });
 
   useEffect(() => {
@@ -137,6 +150,10 @@ export function PatientPortal() {
         const portalData = await dataRes.json();
         if (!dataRes.ok) throw new Error(portalData.error || 'Erro ao carregar dados');
         setData(portalData);
+        setInsuranceForm({
+          health_insurance: portalData.patient.health_insurance || '',
+          health_insurance_number: portalData.patient.health_insurance_number || '',
+        });
       } catch (err: any) {
         setError(err.message || 'Erro ao carregar o portal');
       } finally {
@@ -146,6 +163,28 @@ export function PatientPortal() {
 
     authenticateAndLoad();
   }, [token]);
+
+  const portalFetch = async (url: string, options: RequestInit = {}) => {
+    if (!sessionToken) throw new Error('Sessão expirada. Entre novamente pelo link da clínica.');
+    return fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        ...(options.headers || {}),
+      },
+    });
+  };
+
+  const refreshPortalData = async () => {
+    const response = await portalFetch('/api/portal/data');
+    const portalData = await response.json();
+    if (!response.ok) throw new Error(portalData.error || 'Não foi possível atualizar os dados');
+    setData(portalData);
+    setInsuranceForm({
+      health_insurance: portalData.patient.health_insurance || '',
+      health_insurance_number: portalData.patient.health_insurance_number || '',
+    });
+  };
 
   const handleConfirmAppointment = async (appointmentId: number) => {
     if (!sessionToken) return;
@@ -264,6 +303,112 @@ export function PatientPortal() {
       lastFinished,
     };
   }, [data]);
+
+  const openSupportWhatsApp = () => {
+    const digits = (data?.clinic?.phone || '').replace(/\D/g, '');
+    if (!digits) return false;
+    const text = encodeURIComponent('Olá, preciso de ajuda pelo portal do paciente.');
+    window.open(`https://wa.me/${digits}?text=${text}`, '_blank', 'noopener,noreferrer');
+    return true;
+  };
+
+  const openSupportPhone = () => {
+    const rawPhone = data?.clinic?.phone || '';
+    if (!rawPhone) return false;
+    window.location.href = `tel:${rawPhone}`;
+    return true;
+  };
+
+  const handleSupport = () => {
+    if (openSupportWhatsApp()) return;
+    if (openSupportPhone()) return;
+    setActiveProfileAction('support');
+  };
+
+  const handleRenewAnamnesis = () => {
+    if (token) {
+      window.location.href = `/pre-atendimento/${token}`;
+      return;
+    }
+    setActiveProfileAction('renew_anamnesis');
+  };
+
+  const handleSaveInsurance = async () => {
+    try {
+      setPortalLoading(true);
+      setFeedback(null);
+      const response = await portalFetch('/api/portal/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          health_insurance: insuranceForm.health_insurance.trim() || null,
+          health_insurance_number: insuranceForm.health_insurance_number.trim() || null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Erro ao salvar convênio');
+      await refreshPortalData();
+      setFeedback({ tone: 'success', message: 'Convênio atualizado com sucesso.' });
+    } catch (err: any) {
+      setFeedback({ tone: 'error', message: err.message || 'Não foi possível salvar o convênio.' });
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  const handleUploadDocument = async (file?: File) => {
+    if (!file || !sessionToken) return;
+    try {
+      setUploadingDocument(true);
+      setFeedback(null);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `Documento: ${file.name}`);
+      formData.append('file_type', file.type.includes('image') ? 'image' : 'document');
+      const response = await fetch('/api/portal/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessionToken}` },
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Falha ao enviar documento');
+      await refreshPortalData();
+      setFeedback({ tone: 'success', message: 'Documento enviado com sucesso.' });
+    } catch (err: any) {
+      setFeedback({ tone: 'error', message: err.message || 'Não foi possível enviar o documento.' });
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  const handleSendSupportMessage = async () => {
+    if (!supportMessage.trim()) return;
+    try {
+      setSupportSending(true);
+      setFeedback(null);
+      const response = await portalFetch('/api/portal/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: supportMessage.trim() }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível enviar sua mensagem');
+      setSupportMessage('');
+      setFeedback({ tone: 'success', message: 'Mensagem enviada para a clínica.' });
+    } catch (err: any) {
+      setFeedback({ tone: 'error', message: err.message || 'Erro ao enviar mensagem.' });
+    } finally {
+      setSupportSending(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setSessionToken(null);
+    setData(null);
+    sessionStorage.clear();
+    localStorage.removeItem('portal_session_token');
+    window.location.replace('/');
+  };
 
   if (loading) {
     return (
@@ -515,13 +660,36 @@ export function PatientPortal() {
                     </div>
                   </div>
                 </section>
-                <ListButton icon={<UserCircle size={18} />} label="Editar dados pessoais" value={data.patient.email} />
-                <ListButton icon={<FileText size={18} />} label="Anamnese" value="Atualizar" badgeTone="warning" />
-                <ListButton icon={<Shield size={18} />} label="Convênio" value={data.patient.health_insurance || 'Não informado'} badgeTone={!data.patient.health_insurance ? 'warning' : 'neutral'} />
-                <ListButton icon={<FileText size={18} />} label="Documentos" value={`${data.files.length} arquivos`} badgeTone={data.files.length === 0 ? 'warning' : 'neutral'} />
-                <ListButton icon={<Sparkles size={18} />} label="Preferências" value="Notificações e idioma" />
-                <ListButton icon={<MessageCircle size={18} />} label="Suporte" value="Atendimento da clínica" />
-                <button className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[#FEE4E2] bg-[#FFF7F7] px-4 py-3 text-left">
+                <ListButton
+                  icon={<UserCircle size={18} />}
+                  label="Editar dados pessoais"
+                  value={data.patient.email}
+                  onClick={() => setActiveProfileAction('edit_profile')}
+                />
+                <ListButton icon={<FileText size={18} />} label="Renovar anamnese" value="Revisar minhas respostas" badgeTone="warning" onClick={handleRenewAnamnesis} />
+                <ListButton
+                  icon={<Shield size={18} />}
+                  label="Convênio"
+                  value={data.patient.health_insurance || 'Convênio não informado'}
+                  badgeTone={!data.patient.health_insurance ? 'warning' : 'neutral'}
+                  onClick={() => setActiveProfileAction('insurance')}
+                />
+                <ListButton
+                  icon={<FileText size={18} />}
+                  label="Documentos"
+                  value={`${data.files.length} arquivo(s)`}
+                  badgeTone={data.files.length === 0 ? 'warning' : 'neutral'}
+                  onClick={() => setActiveProfileAction('documents')}
+                />
+                <ListButton
+                  icon={<Sparkles size={18} />}
+                  label="Preferências"
+                  value="Ainda não disponível"
+                  badgeTone="warning"
+                  onClick={() => setActiveProfileAction('preferences')}
+                />
+                <ListButton icon={<MessageCircle size={18} />} label="Suporte" value="WhatsApp, telefone ou mensagem" onClick={handleSupport} />
+                <button onClick={handleLogout} className="mt-2 flex w-full items-center justify-between rounded-2xl border border-[#FEE4E2] bg-[#FFF7F7] px-4 py-3 text-left">
                   <div className="flex items-center gap-3">
                     <LogOut size={18} className="text-[#B42318]" />
                     <div>
@@ -554,6 +722,118 @@ export function PatientPortal() {
                 <button onClick={() => setShowScheduleModal(false)} className="flex-1 rounded-xl border border-[#d1d5db] px-3 py-2 text-sm">Cancelar</button>
                 <button onClick={handleRequestAppointment} disabled={scheduleSubmitting} className="flex-1 rounded-xl bg-[#111827] px-3 py-2 text-sm text-white">{scheduleSubmitting ? 'Enviando...' : 'Enviar'}</button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {activeProfileAction && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end bg-black/40 p-4">
+            <motion.div initial={{ y: 20 }} animate={{ y: 0 }} exit={{ y: 20 }} className="mx-auto w-full max-w-md rounded-3xl bg-white p-5">
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <h3 className="text-lg font-semibold text-[#0F172A]">
+                  {activeProfileAction === 'edit_profile' && 'Editar dados pessoais'}
+                  {activeProfileAction === 'insurance' && 'Convênio'}
+                  {activeProfileAction === 'documents' && 'Documentos'}
+                  {activeProfileAction === 'preferences' && 'Preferências'}
+                  {activeProfileAction === 'support' && 'Suporte'}
+                  {activeProfileAction === 'renew_anamnesis' && 'Renovar anamnese'}
+                </h3>
+                <button className="text-sm text-[#667085]" onClick={() => setActiveProfileAction(null)}>Fechar</button>
+              </div>
+              {feedback && (
+                <p
+                  className={`mb-3 rounded-xl px-3 py-2 text-sm ${
+                    feedback.tone === 'success'
+                      ? 'bg-[#EAF4EE] text-[#166534]'
+                      : feedback.tone === 'error'
+                        ? 'bg-[#FEF2F2] text-[#B42318]'
+                        : 'bg-[#F2F4F7] text-[#475467]'
+                  }`}
+                >
+                  {feedback.message}
+                </p>
+              )}
+
+              {activeProfileAction === 'edit_profile' && (
+                <div className="space-y-3">
+                  <div className="space-y-2 rounded-xl border border-[#EAECF0] p-3">
+                    <p className="text-sm text-[#475467]"><span className="font-medium text-[#0F172A]">Nome:</span> {data.patient.name}</p>
+                    <p className="text-sm text-[#475467]"><span className="font-medium text-[#0F172A]">Telefone:</span> {data.patient.phone || 'Não informado'}</p>
+                    <p className="text-sm text-[#475467]"><span className="font-medium text-[#0F172A]">E-mail:</span> {data.patient.email || 'Não informado'}</p>
+                    <p className="text-sm text-[#475467]"><span className="font-medium text-[#0F172A]">Nascimento:</span> {data.patient.birth_date ? new Date(data.patient.birth_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+                    <p className="text-sm text-[#475467]"><span className="font-medium text-[#0F172A]">Endereço:</span> {data.patient.address || 'Não informado'}</p>
+                  </div>
+                  <p className="rounded-xl bg-[#F7F8F6] px-3 py-2 text-sm text-[#475467]">
+                    Para alterar seus dados, fale com a clínica.
+                  </p>
+                  <button onClick={handleSupport} className="w-full rounded-xl bg-[#174F35] px-3 py-2.5 text-sm font-semibold text-white">
+                    Falar com a clínica
+                  </button>
+                </div>
+              )}
+
+              {activeProfileAction === 'insurance' && (
+                <div className="space-y-3">
+                  <input value={insuranceForm.health_insurance} onChange={(e) => setInsuranceForm((s) => ({ ...s, health_insurance: e.target.value }))} placeholder="Nome do convênio" className="w-full rounded-xl border border-[#D0D5DD] px-3 py-2 text-sm" />
+                  <input value={insuranceForm.health_insurance_number} onChange={(e) => setInsuranceForm((s) => ({ ...s, health_insurance_number: e.target.value }))} placeholder="Número da carteirinha (opcional)" className="w-full rounded-xl border border-[#D0D5DD] px-3 py-2 text-sm" />
+                  <button onClick={handleSaveInsurance} disabled={portalLoading} className="w-full rounded-xl bg-[#174F35] px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                    {portalLoading ? 'Salvando...' : 'Salvar alterações'}
+                  </button>
+                </div>
+              )}
+
+              {activeProfileAction === 'documents' && (
+                <div className="space-y-3">
+                  <div className="max-h-44 space-y-2 overflow-auto rounded-xl border border-[#EAECF0] p-2.5">
+                    {data.files.length === 0 ? (
+                      <p className="text-sm text-[#667085]">Nenhum documento enviado ainda.</p>
+                    ) : (
+                      data.files.map((file) => (
+                        <a key={file.id} href={file.file_url} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#F7F8F6] px-3 py-2 text-sm text-[#0F172A]">
+                          {file.description || 'Documento'} • {new Date(file.created_at).toLocaleDateString('pt-BR')}
+                        </a>
+                      ))
+                    )}
+                  </div>
+                  <label className="block w-full cursor-pointer rounded-xl border border-dashed border-[#98A2B3] px-3 py-2.5 text-center text-sm text-[#475467]">
+                    {uploadingDocument ? 'Enviando documento...' : 'Enviar novo documento'}
+                    <input type="file" className="hidden" onChange={(e) => handleUploadDocument(e.target.files?.[0])} disabled={uploadingDocument} />
+                  </label>
+                </div>
+              )}
+
+              {activeProfileAction === 'preferences' && (
+                <div className="space-y-3">
+                  <p className="rounded-xl bg-[#F7F8F6] px-3 py-2 text-sm text-[#475467]">Preferências ainda não disponíveis.</p>
+                  <p className="text-sm text-[#667085]">A clínica usará os canais cadastrados para entrar em contato.</p>
+                </div>
+              )}
+
+              {activeProfileAction === 'support' && (
+                <div className="space-y-3">
+                  {data.clinic?.phone ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={openSupportWhatsApp} className="rounded-xl bg-[#174F35] px-3 py-2.5 text-sm font-semibold text-white">WhatsApp</button>
+                      <button onClick={openSupportPhone} className="rounded-xl border border-[#D0D5DD] px-3 py-2.5 text-sm font-medium text-[#174F35]">Ligar</button>
+                    </div>
+                  ) : (
+                    <p className="rounded-xl bg-[#F7F8F6] px-3 py-2 text-sm text-[#475467]">Nenhum canal de suporte foi configurado pela clínica.</p>
+                  )}
+                  <textarea value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Escreva sua mensagem para a clínica" className="h-24 w-full rounded-xl border border-[#D0D5DD] px-3 py-2 text-sm" />
+                  <button onClick={handleSendSupportMessage} disabled={supportSending || !supportMessage.trim()} className="w-full rounded-xl bg-[#111827] px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                    {supportSending ? 'Enviando...' : 'Enviar mensagem'}
+                  </button>
+                </div>
+              )}
+
+              {activeProfileAction === 'renew_anamnesis' && (
+                <div className="space-y-3">
+                  <p className="rounded-xl bg-[#F7F8F6] px-3 py-2 text-sm text-[#475467]">A renovação da anamnese ainda não está disponível por aqui.</p>
+                  <p className="text-sm text-[#667085]">Fale com a clínica para atualizar suas informações de saúde.</p>
+                  <button onClick={handleSupport} className="w-full rounded-xl bg-[#174F35] px-3 py-2.5 text-sm font-semibold text-white">Falar com a clínica</button>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -820,10 +1100,27 @@ function ListCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-function ListButton({ icon, label, value, badgeTone = 'neutral' }: { icon: React.ReactNode; label: string; value: string; badgeTone?: 'neutral' | 'warning' }) {
+function ListButton({
+  icon,
+  label,
+  value,
+  badgeTone = 'neutral',
+  onClick,
+  disabled = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  badgeTone?: 'neutral' | 'warning';
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
   const badgeClass = badgeTone === 'warning' ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#F2F4F7] text-[#667085]';
+  const baseClass = disabled
+    ? 'cursor-default border-[#EAECF0] bg-[#F8FAFC]'
+    : 'border-[#E4E7EC] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.04)]';
   return (
-    <button className="flex w-full items-center justify-between rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3 text-left shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+    <button onClick={onClick} disabled={disabled} className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left ${baseClass}`}>
       <div className="flex items-center gap-3">
         <div className="text-[#667085]">{icon}</div>
         <div>
@@ -831,7 +1128,7 @@ function ListButton({ icon, label, value, badgeTone = 'neutral' }: { icon: React
           <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>{value}</span>
         </div>
       </div>
-      <ChevronRight size={16} className="text-[#98A2B3]" />
+      {!disabled && <ChevronRight size={16} className="text-[#98A2B3]" />}
     </button>
   );
 }
