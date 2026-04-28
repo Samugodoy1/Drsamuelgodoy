@@ -20,8 +20,14 @@ import {
 } from '../icons';
 
 type PortalTab = 'home' | 'cuidados' | 'consultas' | 'perfil';
-type HomeState = 'consulta_proxima' | 'solicitacao_pendente' | 'solicitacao_recusada' | 'sem_pendencias';
-type MainCardState = 'upcoming' | 'pending_request' | 'rejected_request' | 'no_data';
+type HomeAssistantState =
+  | 'confirmar_presenca'
+  | 'consulta_hoje'
+  | 'consulta_amanha'
+  | 'consulta_futura'
+  | 'solicitacao_pendente'
+  | 'solicitacao_recusada'
+  | 'sem_pendencias';
 type UpdateTone = 'success' | 'warning' | 'danger' | 'neutral';
 
 interface PortalData {
@@ -221,8 +227,24 @@ export function PatientPortal() {
       ? Math.floor((now.getTime() - new Date(lastFinished.start_time).getTime()) / (1000 * 60 * 60 * 24 * 30))
       : null;
 
-    let homeState: HomeState = 'sem_pendencias';
-    if (upcoming[0]) homeState = 'consulta_proxima';
+    const nextAppointment = upcoming[0];
+    const nextAppointmentStatus = nextAppointment?.status?.toUpperCase() || '';
+    const needsConfirmation =
+      !!nextAppointment &&
+      ['SCHEDULED', 'CONFIRMATION_PENDING', 'PENDING_CONFIRMATION', 'AWAITING_CONFIRMATION'].includes(nextAppointmentStatus);
+
+    const appointmentDayDiff = nextAppointment
+      ? Math.floor(
+          (new Date(nextAppointment.start_time).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) /
+            (1000 * 60 * 60 * 24),
+        )
+      : null;
+
+    let homeState: HomeAssistantState = 'sem_pendencias';
+    if (needsConfirmation) homeState = 'confirmar_presenca';
+    else if (nextAppointment && appointmentDayDiff === 0) homeState = 'consulta_hoje';
+    else if (nextAppointment && appointmentDayDiff === 1) homeState = 'consulta_amanha';
+    else if (nextAppointment) homeState = 'consulta_futura';
     else if (latestPendingRequest) homeState = 'solicitacao_pendente';
     else if (latestRejectedRequest) homeState = 'solicitacao_recusada';
 
@@ -238,6 +260,7 @@ export function PatientPortal() {
       activeTreatmentItems,
       monthsWithoutVisit,
       homeState,
+      nextAppointment,
       lastFinished,
     };
   }, [data]);
@@ -268,15 +291,6 @@ export function PatientPortal() {
 
   const firstName = data.patient.name.split(' ')[0];
   const greeting = new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite';
-  const mainCardState: MainCardState =
-    computed.homeState === 'consulta_proxima'
-      ? 'upcoming'
-      : computed.homeState === 'solicitacao_pendente'
-        ? 'pending_request'
-        : computed.homeState === 'solicitacao_recusada'
-          ? 'rejected_request'
-          : 'no_data';
-
   const formatMainDate = (dateISO: string) =>
     new Date(dateISO)
       .toLocaleDateString('pt-BR', {
@@ -338,9 +352,10 @@ export function PatientPortal() {
             {activeTab === 'home' && (
               <motion.section key="home" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-5">
                 <PatientMainStatusCard
-                  state={mainCardState}
-                  upcoming={computed.upcoming[0]}
+                  state={computed.homeState}
+                  nextAppointment={computed.nextAppointment}
                   pendingRequest={computed.latestPendingRequest}
+                  rejectedRequest={computed.latestRejectedRequest}
                   onOpenAppointments={() => setActiveTab('consultas')}
                   onOpenSchedule={() => setShowScheduleModal(true)}
                   onCallClinic={() => (window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`)}
@@ -349,27 +364,16 @@ export function PatientPortal() {
                   onConfirmAppointment={handleConfirmAppointment}
                 />
 
-                <PatientQuickActions
-                  onSchedule={() => setShowScheduleModal(true)}
-                  onCallClinic={() => (window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`)}
-                  onUpdateAnamnesis={() => setActiveTab('perfil')}
-                  onViewGuidance={() => setActiveTab('cuidados')}
-                />
-
-                {computed.upcoming[0] && (
-                  <PatientBeforeAppointment
-                    appointment={computed.upcoming[0]}
-                    onUpdateAnamnesis={() => setActiveTab('perfil')}
-                    onViewGuidance={() => setActiveTab('cuidados')}
-                    onDirections={() =>
-                      window.open(`https://maps.google.com/?q=${encodeURIComponent(data.clinic?.clinic_name || data.clinic?.name || 'clínica odontológica')}`, '_blank')
-                    }
-                    onConfirmAppointment={handleConfirmAppointment}
-                    appointmentSubmittingId={appointmentSubmittingId}
-                  />
-                )}
-
-                <PatientRecentUpdates updates={recentUpdates} />
+                <section className="rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#98A2B3]">Precisa de ajuda?</p>
+                  <button
+                    onClick={() => (window.location.href = `tel:${data.clinic?.phone || data.patient.phone}`)}
+                    className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-[#174F35]"
+                  >
+                    <Phone size={16} />
+                    Falar com a clínica
+                  </button>
+                </section>
               </motion.section>
             )}
 
@@ -442,7 +446,6 @@ export function PatientPortal() {
                     <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusChipClasses(computed.upcoming[0].status)}`}>
                       {getStatusLabel(computed.upcoming[0].status)}
                     </span>
-                    <button onClick={() => setActiveTab('home')} className="mt-3 block rounded-xl border border-[#D0D5DD] px-3 py-2 text-sm font-medium text-[#174F35]">Ver detalhes</button>
                   </section>
                 )}
 
@@ -459,6 +462,21 @@ export function PatientPortal() {
                     ))}
                   </ListCard>
                 )}
+
+                {computed.upcoming[0] && (
+                  <PatientBeforeAppointment
+                    appointment={computed.upcoming[0]}
+                    onUpdateAnamnesis={() => setActiveTab('perfil')}
+                    onViewGuidance={() => setActiveTab('cuidados')}
+                    onDirections={() =>
+                      window.open(`https://maps.google.com/?q=${encodeURIComponent(data.clinic?.clinic_name || data.clinic?.name || 'clínica odontológica')}`, '_blank')
+                    }
+                    onConfirmAppointment={handleConfirmAppointment}
+                    appointmentSubmittingId={appointmentSubmittingId}
+                  />
+                )}
+
+                <PatientRecentUpdates updates={recentUpdates} />
 
                 <section className="rounded-2xl border border-[#E4E7EC] bg-white p-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98A2B3]">Histórico</h3>
@@ -556,8 +574,9 @@ function PatientPortalHeader({ greeting, firstName, clinicName }: { greeting: st
 
 function PatientMainStatusCard({
   state,
-  upcoming,
+  nextAppointment,
   pendingRequest,
+  rejectedRequest,
   onOpenAppointments,
   onOpenSchedule,
   onCallClinic,
@@ -565,9 +584,10 @@ function PatientMainStatusCard({
   appointmentSubmittingId,
   formatDate,
 }: {
-  state: MainCardState;
-  upcoming?: PortalData['appointments'][number];
+  state: HomeAssistantState;
+  nextAppointment?: PortalData['appointments'][number];
   pendingRequest?: PortalData['appointment_requests'][number];
+  rejectedRequest?: PortalData['appointment_requests'][number];
   onOpenAppointments: () => void;
   onOpenSchedule: () => void;
   onCallClinic: () => void;
@@ -575,108 +595,100 @@ function PatientMainStatusCard({
   appointmentSubmittingId: number | null;
   formatDate: (dateISO: string) => string;
 }) {
-  if (state === 'upcoming' && upcoming) {
-    const appointmentTime = new Date(upcoming.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const isConfirmable = !['CONFIRMED', 'FINISHED'].includes(upcoming.status.toUpperCase());
-    return (
-      <section className="rounded-[32px] bg-[#0F2A1D] p-5 text-white shadow-[0_20px_40px_rgba(15,42,29,0.22)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">Próxima consulta</p>
-        <h2 className="mt-2 text-[30px] font-semibold leading-tight">{formatDate(upcoming.start_time)}</h2>
-        <p className="mt-2 text-[40px] font-semibold leading-none">{appointmentTime}</p>
-        <p className="mt-2 text-sm text-white/80">Com Dr(a). {upcoming.dentist_name}</p>
-        <span className="mt-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-          {upcoming.status === 'CONFIRMED' ? 'Confirmada' : upcoming.status === 'SCHEDULED' ? 'Agendada' : 'Precisa confirmar'}
-        </span>
-        <div className="mt-5 space-y-2.5">
-          <button onClick={onOpenAppointments} className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#174F35]">
-            Ver detalhes
-          </button>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button onClick={onOpenSchedule} className="rounded-2xl bg-[rgba(24,90,61,0.3)] px-3 py-2.5 text-sm font-medium text-white">
-              Reagendar
+  if ((state === 'confirmar_presenca' || state === 'consulta_hoje' || state === 'consulta_amanha' || state === 'consulta_futura') && nextAppointment) {
+    const appointmentDate = formatDate(nextAppointment.start_time);
+    const appointmentTime = new Date(nextAppointment.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dentist = `Com Dr(a). ${nextAppointment.dentist_name}`;
+
+    if (state === 'confirmar_presenca') {
+      return (
+        <section className="rounded-[32px] border border-[#CDE8D8] bg-white p-5 shadow-[0_16px_30px_rgba(15,42,29,0.08)]">
+          <h2 className="text-[28px] font-semibold leading-tight text-[#0F172A]">Confirme sua presença</h2>
+          <p className="mt-2 text-sm text-[#667085]">Sua consulta é {appointmentDate.toLowerCase()} às {appointmentTime}.</p>
+          <p className="mt-1.5 text-sm font-medium text-[#0F172A]">{dentist}</p>
+          <div className="mt-5 space-y-2.5">
+            <button
+              onClick={() => onConfirmAppointment(nextAppointment.id)}
+              className="w-full rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white"
+            >
+              {appointmentSubmittingId === nextAppointment.id ? 'Confirmando...' : 'Confirmar presença'}
             </button>
-            <button onClick={onCallClinic} className="rounded-2xl bg-[rgba(24,90,61,0.3)] px-3 py-2.5 text-sm font-medium text-white">
-              Falar com clínica
+            <button onClick={onOpenAppointments} className="w-full rounded-2xl border border-[#D0D5DD] px-4 py-3 text-sm font-medium text-[#174F35]">
+              Preciso remarcar
             </button>
           </div>
-          {isConfirmable && (
-            <button onClick={() => onConfirmAppointment(upcoming.id)} className="w-full rounded-2xl border border-white/25 bg-transparent px-4 py-2.5 text-sm font-medium text-white">
-              {appointmentSubmittingId === upcoming.id ? 'Confirmando...' : 'Confirmar presença'}
-            </button>
-          )}
+        </section>
+      );
+    }
+
+    if (state === 'consulta_hoje' || state === 'consulta_amanha') {
+      return (
+        <section className="rounded-[32px] border border-[#CDE8D8] bg-white p-5 shadow-[0_16px_30px_rgba(15,42,29,0.08)]">
+          <h2 className="text-[28px] font-semibold leading-tight text-[#0F172A]">{state === 'consulta_hoje' ? 'Sua consulta é hoje' : 'Sua consulta é amanhã'}</h2>
+          <p className="mt-2 text-sm text-[#667085]">
+            {appointmentTime} • Dr(a). {nextAppointment.dentist_name}
+          </p>
+          <button onClick={onOpenAppointments} className="mt-5 w-full rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white">
+            Ver detalhes da consulta
+          </button>
+          <ul className="mt-5 space-y-2 text-sm text-[#475467]">
+            <li className="rounded-xl bg-[#F7F8F6] px-3 py-2">Chegue 10 minutos antes</li>
+            <li className="rounded-xl bg-[#F7F8F6] px-3 py-2">Traga um documento</li>
+            <li className="rounded-xl bg-[#F7F8F6] px-3 py-2">Fale com a clínica se precisar remarcar</li>
+          </ul>
+        </section>
+      );
+    }
+
+    return (
+      <section className="rounded-[32px] border border-[#CDE8D8] bg-white p-5 shadow-[0_16px_30px_rgba(15,42,29,0.08)]">
+        <h2 className="text-[28px] font-semibold leading-tight text-[#0F172A]">Sua consulta está marcada</h2>
+        <p className="mt-2 text-base font-semibold text-[#174F35]">{appointmentDate} às {appointmentTime}</p>
+        <p className="mt-1.5 text-sm text-[#667085]">{dentist}</p>
+        <div className="mt-5 space-y-2.5">
+          <button onClick={onOpenAppointments} className="w-full rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white">
+            Ver minha consulta
+          </button>
+          <button onClick={onOpenAppointments} className="w-full rounded-2xl border border-[#D0D5DD] px-4 py-3 text-sm font-medium text-[#174F35]">
+            Preciso remarcar
+          </button>
         </div>
+        <button onClick={onCallClinic} className="mt-4 text-sm font-medium text-[#174F35]">Falar com a clínica</button>
       </section>
     );
   }
 
-  if (state === 'pending_request') {
+  if (state === 'solicitacao_pendente') {
     return (
       <section className="rounded-[32px] border border-[#FDE68A] bg-[#FFFBEB] p-5 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
-        <span className="inline-flex rounded-full bg-[#F59E0B]/20 px-3 py-1 text-xs font-semibold text-[#B45309]">Em análise</span>
-        <h2 className="mt-3 text-2xl font-semibold text-[#0F172A]">Solicitação em análise</h2>
-        <p className="mt-2 text-sm text-[#667085]">A clínica recebeu seu pedido e vai responder em breve.</p>
+        <h2 className="text-2xl font-semibold text-[#0F172A]">Pedido recebido</h2>
+        <p className="mt-2 text-sm text-[#667085]">A clínica está analisando o horário solicitado.</p>
         {pendingRequest?.desired_period && <p className="mt-2 text-sm font-medium text-[#0F172A]">Período solicitado: {pendingRequest.desired_period}</p>}
-        <div className="mt-5 grid grid-cols-2 gap-2.5">
-          <button onClick={onOpenAppointments} className="rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white">Ver solicitação</button>
-          <button onClick={onCallClinic} className="rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3 text-sm font-medium text-[#174F35]">Falar com clínica</button>
-        </div>
+        <button onClick={onOpenAppointments} className="mt-5 w-full rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white">Ver pedido</button>
+        <p className="mt-3 text-xs text-[#667085]">Você receberá uma resposta por aqui.</p>
+        <button onClick={onCallClinic} className="mt-3 text-sm font-medium text-[#174F35]">Falar com a clínica</button>
       </section>
     );
   }
 
-  if (state === 'rejected_request') {
+  if (state === 'solicitacao_recusada') {
     return (
       <section className="rounded-[32px] border border-[#FEE4E2] bg-[#FFF7F7] p-5 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
         <h2 className="text-2xl font-semibold text-[#0F172A]">Esse horário não está disponível</h2>
-        <p className="mt-2 text-sm text-[#667085]">Você pode solicitar outro horário ou falar com a clínica.</p>
-        <div className="mt-5 grid grid-cols-2 gap-2.5">
-          <button onClick={onOpenSchedule} className="rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white">Solicitar novo horário</button>
-          <button onClick={onCallClinic} className="rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3 text-sm font-medium text-[#174F35]">Falar com clínica</button>
-        </div>
+        <p className="mt-2 text-sm text-[#667085]">Escolha outro horário para a clínica avaliar.</p>
+        {rejectedRequest?.desired_period && <p className="mt-2 text-sm text-[#667085]">Último período solicitado: {rejectedRequest.desired_period}</p>}
+        <button onClick={onOpenSchedule} className="mt-5 w-full rounded-2xl bg-[#174F35] px-4 py-3 text-sm font-semibold text-white">Escolher outro horário</button>
+        <button onClick={onCallClinic} className="mt-3 w-full rounded-2xl border border-[#E4E7EC] bg-white px-4 py-3 text-sm font-medium text-[#174F35]">Falar com a clínica</button>
       </section>
     );
   }
 
   return (
     <section className="rounded-[28px] bg-[#185A3D] p-4 text-white shadow-[0_12px_24px_rgba(15,42,29,0.16)]">
-      <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Pronto para marcar sua próxima consulta?</h2>
+      <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Vamos marcar sua consulta?</h2>
       <p className="mt-2 text-sm text-white/85">Escolha um horário e a clínica confirma com você.</p>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <button onClick={onOpenSchedule} className="rounded-xl bg-white px-3.5 py-2.5 text-sm font-semibold text-[#174F35]">Solicitar consulta</button>
-        <button onClick={onCallClinic} className="rounded-xl border border-white/35 bg-[rgba(255,255,255,0.12)] px-3.5 py-2.5 text-sm font-medium text-white">Falar com clínica</button>
-      </div>
-    </section>
-  );
-}
-
-function PatientQuickActions({
-  onSchedule,
-  onCallClinic,
-  onUpdateAnamnesis,
-  onViewGuidance,
-}: {
-  onSchedule: () => void;
-  onCallClinic: () => void;
-  onUpdateAnamnesis: () => void;
-  onViewGuidance: () => void;
-}) {
-  const items = [
-    { label: 'Solicitar consulta', icon: <Calendar size={20} />, onClick: onSchedule },
-    { label: 'Falar com clínica', icon: <Phone size={20} />, onClick: onCallClinic },
-    { label: 'Atualizar anamnese', icon: <ClipboardList size={20} />, onClick: onUpdateAnamnesis },
-    { label: 'Ver orientações', icon: <Heart size={20} />, onClick: onViewGuidance },
-  ];
-  return (
-    <section>
-      <h3 className="px-1 text-sm font-semibold text-[#0F172A]">Ações rápidas</h3>
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        {items.map((item) => (
-          <button key={item.label} onClick={item.onClick} className="rounded-[18px] border border-[#EAECF0] bg-white px-3.5 py-3 text-left shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
-            <div className="mb-2 inline-flex rounded-lg bg-[rgba(24,90,61,0.1)] p-1.5 text-[#174F35]">{item.icon}</div>
-            <p className="text-[13px] font-medium leading-snug text-[#0F172A]">{item.label}</p>
-          </button>
-        ))}
-      </div>
+      <button onClick={onOpenSchedule} className="mt-4 w-full rounded-xl bg-white px-3.5 py-2.5 text-sm font-semibold text-[#174F35]">Solicitar consulta</button>
+      <button onClick={onCallClinic} className="mt-2 w-full rounded-xl border border-white/35 bg-[rgba(255,255,255,0.12)] px-3.5 py-2.5 text-sm font-medium text-white">Falar com a clínica</button>
     </section>
   );
 }
