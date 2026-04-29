@@ -3,6 +3,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 
 import { login, register, requestPasswordReset, resetPassword, demoLogin } from '../server/controllers/authController.js';
+import { academyLogin, academyRegister } from '../server/controllers/academyAuthController.js';
 import { 
   getPatients, 
   getPatientById, 
@@ -153,6 +154,10 @@ app.post(['/auth/demo', '/api/auth/demo'], demoLogin);
 app.post(['/auth/register', '/api/auth/register'], register);
 app.post(['/auth/request-password-reset', '/api/auth/request-password-reset'], requestPasswordReset);
 app.post(['/auth/reset-password', '/api/auth/reset-password'], resetPassword);
+
+// Academy Auth (separate login for students)
+app.post(['/academy/auth/login', '/api/academy/auth/login'], academyLogin);
+app.post(['/academy/auth/register', '/api/academy/auth/register'], academyRegister);
 
 // Portal do Paciente (public routes — no dentist auth needed)
 app.get(['/portal/auth/:token', '/api/portal/auth/:token'], authenticatePortalToken);

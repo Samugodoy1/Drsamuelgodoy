@@ -35,6 +35,8 @@ import {
   DotsThree      as PhDotsThree,
   DownloadSimple as PhDownloadSimple,
   Envelope       as PhEnvelope,
+  Eye            as PhEye,
+  EyeSlash       as PhEyeSlash,
   FileText       as PhFileText,
   Flask          as PhFlask,
   GearSix        as PhGearSix,
@@ -165,6 +167,8 @@ export const Mail          = fill(PhEnvelope);
 export const Download      = fill(PhDownloadSimple);
 export const Image         = fill(PhImage);
 export const ImageIcon     = fill(PhImage);         // alias (App.tsx)
+export const Eye           = fill(PhEye);
+export const EyeOff        = fill(PhEyeSlash);
 export const Info          = fill(PhInfo);
 export const Circle        = fill(PhCircle);
 export const CreditCard    = fill(PhCreditCard);

@@ -59,7 +59,6 @@ import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
 import { MLInsights } from './components/MLInsights';
 import { ExploreDemo } from './components/ExploreDemo';
-import { AcademyExperience } from './components/AcademyExperience';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
 // Types
@@ -2321,7 +2320,6 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/portal/:token" element={<PatientPortal />} />
       <Route path="/pre-atendimento/:token" element={<PreAtendimento />} />
-      <Route path="/academy/*" element={user ? <AcademyExperience /> : <Navigate to="/" />} />
       <Route path="/prontuario/:id" element={
         user ? (
           <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
