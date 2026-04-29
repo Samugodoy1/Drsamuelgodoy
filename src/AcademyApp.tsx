@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, LogOut, Eye, EyeOff } from './icons';
 import { AcademyExperience } from './components/AcademyExperience';
@@ -13,7 +13,6 @@ interface AcademyUser {
 }
 
 export default function AcademyApp() {
-  const navigate = useNavigate();
   const [user, setUser] = useState<AcademyUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -370,9 +369,11 @@ export default function AcademyApp() {
       </div>
 
       {/* Academy Experience */}
-      <Routes>
-        <Route path="/*" element={<AcademyExperience />} />
-      </Routes>
+      <main className="min-h-screen bg-slate-50">
+        <Routes>
+          <Route path="/*" element={<AcademyExperience />} />
+        </Routes>
+      </main>
     </div>
   );
 }
