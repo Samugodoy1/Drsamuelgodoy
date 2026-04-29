@@ -35,27 +35,30 @@ const AcademyBottomNav = () => {
 };
 
 const PageShell = ({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-28">
-    <div className="max-w-[480px] mx-auto px-4 pt-6 space-y-4">{children}</div>
+  <div className="min-h-screen bg-[#F5F7FA] text-slate-900 pb-28">
+    <div className="max-w-[480px] mx-auto px-4 pt-7 space-y-5">{children}</div>
     <AcademyBottomNav />
   </div>
 );
 
 const AcademyHeroCard = ({ appointment, onPrepare }: { appointment: AcademyAppointment; onPrepare: () => void }) => (
-  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="rounded-[28px] bg-[#174F35] text-white p-5 shadow-[0_16px_40px_rgba(23,79,53,0.24)] space-y-4">
+  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="rounded-[32px] bg-[#174F35] text-white p-6 shadow-[0_24px_48px_rgba(23,79,53,0.30)] space-y-5">
     <div>
-      <p className="text-white/75 text-xs uppercase tracking-[0.12em]">Próximo atendimento</p>
-      <h2 className="text-[27px] leading-[1.1] font-bold mt-2">{appointment.patientName}</h2>
-      <p className="text-white/90 text-sm mt-1">{appointment.procedure}</p>
+      <p className="text-white/75 text-xs uppercase tracking-[0.14em]">Prepare o caso de hoje</p>
+      <h2 className="text-[29px] leading-[1.1] font-semibold mt-2">Laura Mendes</h2>
+      <p className="text-white/90 text-sm mt-1">Restauração Classe II</p>
     </div>
-    <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-sm text-white/90">
-      <p>{appointment.dateLabel}</p>
-      <p>{appointment.time}</p>
-      <p>{appointment.discipline}</p>
-      <p>{appointment.clinic}</p>
+    <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[14px] text-white/90">
+      <p>Disciplina: Dentística</p>
+      <p>Hoje, 14:00</p>
+      <p>Local:</p>
+      <p>Clínica Integrada I</p>
     </div>
-    <button onClick={onPrepare} className="w-full rounded-2xl bg-white text-[#174F35] font-semibold py-3.5 text-sm shadow-sm active:scale-[0.99] transition">
-      Preparar atendimento
+    <button onClick={onPrepare} className="w-full rounded-full bg-white text-[#174F35] font-semibold py-3.5 text-[16px] shadow-sm active:scale-[0.99] transition">
+      Revisar protocolo
+    </button>
+    <button className="w-full rounded-full border border-white/35 bg-white/10 text-white font-medium py-3 text-[15px] active:scale-[0.99] transition">
+      Ver materiais do caso
     </button>
   </motion.div>
 );
@@ -106,15 +109,37 @@ const AcademyHome = ({ nextAppointment }: { nextAppointment: AcademyAppointment 
   const navigate = useNavigate();
   return (
     <PageShell>
-      <div className="space-y-1">
-        <p className="text-slate-500 text-sm">Boa tarde, {students[0].greetingName}.</p>
-        <h1 className="text-[28px] leading-[1.15] font-bold tracking-tight">Tudo pronto para sua clínica.</h1>
+      <div className="space-y-1.5">
+        <p className="text-slate-500 text-[15px]">Boa tarde, {students[0].greetingName}.</p>
+        <h1 className="text-[37px] leading-[1.06] font-semibold tracking-[-0.025em]">Seu próximo passo na clínica.</h1>
+        <p className="text-[17px] text-slate-500">Estude, prepare e execute com clareza.</p>
       </div>
       <AcademyHeroCard appointment={nextAppointment} onPrepare={() => navigate(`/academy/checklist/${nextAppointment.id}`)} />
-      <div className="rounded-2xl bg-white p-4 border border-[#EAECF0] text-sm text-slate-600 flex items-center justify-between">
-        <span>Pendência principal</span>
-        <span className="font-semibold text-amber-700">Assinatura do plano</span>
-      </div>
+      <section className="rounded-[28px] border border-[#E4E7EC] bg-white p-5">
+        <h3 className="text-[18px] font-semibold text-slate-900">Continuar estudando</h3>
+        <p className="mt-1 text-sm text-slate-600">Dentística Restauradora</p>
+        <p className="mt-2 text-sm text-slate-500">Progresso: 68% · Próxima aula: Quinta, 9h</p>
+      </section>
+      <section className="rounded-[28px] border border-[#E4E7EC] bg-white p-5 space-y-2">
+        <h3 className="text-[18px] font-semibold text-slate-900">Casos em andamento</h3>
+        <p className="text-sm text-slate-700">Laura Mendes — Em preparo</p>
+        <p className="text-sm text-slate-700">João Pereira — Revisar radiografia</p>
+        <p className="text-sm text-slate-700">Ana Clara — Aguardando evolução</p>
+      </section>
+      <section className="rounded-[28px] border border-[#E4E7EC] bg-white p-5 space-y-2">
+        <h3 className="text-[18px] font-semibold text-slate-900">Agenda acadêmica</h3>
+        <p className="text-sm text-slate-700">• Clínica Integrada I</p>
+        <p className="text-sm text-slate-700">• Seminário</p>
+        <p className="text-sm text-slate-700">• Entrega de caso</p>
+      </section>
+      <section className="rounded-[28px] border border-[#E4E7EC] bg-white p-5 space-y-2.5">
+        <h3 className="text-[18px] font-semibold text-slate-900">Biblioteca rápida</h3>
+        {['Checklist Classe II', 'Isolamento absoluto', 'Biossegurança', 'Anatomia dental aplicada'].map((item) => (
+          <button key={item} className="w-full rounded-2xl bg-[#F7F8FA] px-4 py-3 text-left text-[15px] text-slate-700">
+            {item}
+          </button>
+        ))}
+      </section>
     </PageShell>
   );
 };

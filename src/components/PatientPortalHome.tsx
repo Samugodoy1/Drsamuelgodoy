@@ -144,32 +144,32 @@ export function PatientPortalHome({
 
     if (nextAppointment) {
       return {
-        accent: 'text-[#0B9B59]',
-        iconWrap: 'bg-[#E6F3EC]',
-        icon: <Calendar size={42} className="text-[#0B9B59]" />,
-        kicker: 'Sua consulta está próxima',
-        title: formatDate(nextAppointment.start_time),
-        subtitle: `com Dr. ${nextAppointment.dentist_name}`,
+        accent: 'text-white/90',
+        iconWrap: 'bg-white/15',
+        icon: <Calendar size={42} className="text-white" />,
+        kicker: 'Consulta confirmada',
+        title: 'Sua consulta está confirmada',
+        subtitle: `${formatDate(nextAppointment.start_time)}\ncom Dr. ${nextAppointment.dentist_name}`,
         tertiary: nextAppointment.notes || 'Restauração dente 22',
         primaryLabel: appointmentSubmittingId === nextAppointment.id ? 'Confirmando...' : 'Confirmar presença',
-        primaryClass: 'bg-[#08A055] text-white',
-        primaryIcon: <CheckCircle2 size={24} className="text-white" />,
-        secondaryLabel: '',
+        primaryClass: 'bg-white text-[#174F35]',
+        primaryIcon: <CheckCircle2 size={24} className="text-[#174F35]" />,
+        secondaryLabel: 'Ver detalhes da consulta',
         onPrimaryClick: () => onConfirmAppointment(nextAppointment.id),
       };
     }
 
     return {
-      accent: 'text-[#0B9B59]',
-      iconWrap: 'bg-[#E6F3EC]',
-      icon: <Calendar size={42} className="text-[#0B9B59]" />,
-      kicker: 'Cuidado contínuo',
-      title: 'Vamos agendar\nsua próxima visita?',
-      subtitle: 'Conte com a gente.',
-      primaryLabel: 'Agendar agora',
-      primaryClass: 'bg-[#08A055] text-white',
-      primaryIcon: <Calendar size={24} className="text-white" />,
-      secondaryLabel: '',
+      accent: 'text-white/90',
+      iconWrap: 'bg-white/15',
+      icon: <Calendar size={42} className="text-white" />,
+      kicker: latestRequest ? 'Solicitação enviada' : 'Vamos marcar sua consulta?',
+      title: latestRequest ? 'Sua solicitação foi enviada' : 'Vamos marcar sua consulta?',
+      subtitle: latestRequest ? 'A clínica vai retornar em breve.' : 'Estamos prontos para cuidar de você.',
+      primaryLabel: latestRequest ? 'Ver detalhes da consulta' : 'Solicitar consulta',
+      primaryClass: 'bg-white text-[#174F35]',
+      primaryIcon: <Calendar size={24} className="text-[#174F35]" />,
+      secondaryLabel: 'Falar com a clínica',
       onPrimaryClick: () => setShowGuidedConversation(true),
     };
   };
@@ -178,14 +178,13 @@ export function PatientPortalHome({
 
   return (
     <>
-      <div className="flex min-h-[calc(100vh-132px)] w-full flex-col pb-[116px]">
-        <div className="px-1 pb-5 pt-2.5">
-          <h1 className="text-[40px] font-semibold leading-[1.03] tracking-[-0.03em] text-[#0A0F1A]">Olá, {firstName} 👋</h1>
-          <p className="mt-2 text-[18px] leading-[1.35] text-[#5D6575]">
-            {moment === 'emergency' ? 'Conte com a gente.' : moment === 'post_operative' ? 'Sua recuperação é importante para nós.' : 'Estamos aqui para cuidar de você.'}
-          </p>
+      <div className="flex min-h-[calc(100vh-132px)] w-full flex-col pb-[120px]">
+        <div className="px-1 pb-6 pt-3">
+          <p className="text-[17px] leading-[1.3] text-[#5D6575]">Boa tarde, {firstName}</p>
+          <h1 className="mt-1 text-[42px] font-semibold leading-[1.04] tracking-[-0.032em] text-[#0A0F1A]">Tudo certo para sua consulta.</h1>
+          <p className="mt-2 text-[17px] leading-[1.35] text-[#6B7280]">{clinic?.clinic_name || clinic?.name || 'Sua clínica odontológica'} está acompanhando você.</p>
           {latestRequest && (
-            <div className="mt-4 rounded-2xl border border-[#DDE2EA] bg-white px-4 py-3 text-left">
+            <div className="mt-5 rounded-3xl border border-[#E4E7EC] bg-white px-5 py-4 text-left shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
               <p className="text-[12px] uppercase tracking-[0.14em] text-[#8A93A4]">Solicitação mais recente</p>
               <p className="mt-1 text-[15px] font-semibold text-[#111827]">Status: {latestRequest.status}</p>
               <p className="text-[13px] text-[#4B5563]">
@@ -195,22 +194,23 @@ export function PatientPortalHome({
           )}
         </div>
 
-        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col rounded-[30px] border border-white/75 bg-white/65 px-5 pt-7 text-center shadow-[0_18px_44px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:px-7 sm:pt-8">
-          <p className="text-[12px] uppercase tracking-[0.2em] text-[#8A93A4]">Resumo da sua próxima etapa</p>
+        <div className="mx-auto w-full max-w-xl flex-1 space-y-4">
+          <div className="rounded-[34px] bg-[#174F35] px-6 pb-6 pt-7 text-center text-white shadow-[0_26px_52px_rgba(16,64,44,0.30)] sm:px-7">
+          <p className="text-[12px] uppercase tracking-[0.2em] text-white/65">Estado atual</p>
 
           <div className={`mx-auto mt-5 flex h-[78px] w-[78px] items-center justify-center rounded-full ${content.iconWrap}`}>
             {content.icon}
           </div>
 
           <p className={`mt-5 text-[18px] font-semibold tracking-[-0.01em] ${content.accent}`}>{content.kicker}</p>
-          <h2 className="mt-2 whitespace-pre-line text-[35px] font-semibold leading-[1.08] tracking-[-0.024em] text-[#090F1D]">
+          <h2 className="mt-2 whitespace-pre-line text-[34px] font-semibold leading-[1.08] tracking-[-0.024em] text-white">
             {content.title}
           </h2>
-          <p className="mt-3.5 whitespace-pre-line text-[18px] leading-[1.35] text-[#5D6575]">{content.subtitle}</p>
+          <p className="mt-3.5 whitespace-pre-line text-[17px] leading-[1.35] text-white/84">{content.subtitle}</p>
 
           {content.tertiary && (
             <div className="mt-5 space-y-2">
-              <div className="mx-auto w-fit rounded-full bg-[#F3F5F8] px-4 py-2 text-[16px] text-[#4A5261]">
+              <div className="mx-auto w-fit rounded-full bg-white/14 px-4 py-2 text-[16px] text-white/90">
                 🦷 {content.tertiary}
               </div>
             </div>
@@ -218,7 +218,7 @@ export function PatientPortalHome({
 
           <button
             onClick={content.onPrimaryClick}
-            className={`mt-8 flex h-[56px] w-full items-center justify-center gap-2 rounded-full px-4 text-[19px] font-semibold transition active:scale-[0.99] ${content.primaryClass}`}
+            className={`mt-8 flex h-[58px] w-full items-center justify-center gap-2 rounded-full px-4 text-[19px] font-semibold transition active:scale-[0.99] ${content.primaryClass}`}
           >
             {content.primaryIcon}
             {content.primaryLabel}
@@ -226,22 +226,22 @@ export function PatientPortalHome({
 
           {nextAppointment && moment !== 'post_operative' && moment !== 'emergency' && (
             <>
-              <div className="my-6 flex w-full items-center gap-3 text-[#6F7685]">
-                <div className="h-px flex-1 bg-[#D9DCE3]" />
+              <div className="my-6 flex w-full items-center gap-3 text-white/60">
+                <div className="h-px flex-1 bg-white/20" />
                 <span className="text-[14px] uppercase tracking-[0.18em]">ou</span>
-                <div className="h-px flex-1 bg-[#D9DCE3]" />
+                <div className="h-px flex-1 bg-white/20" />
               </div>
 
               <div className="grid w-full grid-cols-2 gap-3">
                 <button
                   onClick={() => onRescheduleAppointment(nextAppointment)}
-                  className="h-[48px] rounded-full border border-[#DDE2EA] bg-[#F8FAFC] text-[16px] font-medium text-[#1D2433]"
+                  className="h-[48px] rounded-full border border-white/25 bg-white/10 text-[16px] font-medium text-white"
                 >
                   Reagendar
                 </button>
                 <button
                   onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(clinic?.clinic_name || clinic?.name || 'clínica odontológica')}`, '_blank')}
-                  className="h-[48px] rounded-full border border-[#DDE2EA] bg-[#F8FAFC] text-[16px] font-medium text-[#1D2433]"
+                  className="h-[48px] rounded-full border border-white/25 bg-white/10 text-[16px] font-medium text-white"
                 >
                   Como chegar
                 </button>
@@ -249,11 +249,18 @@ export function PatientPortalHome({
             </>
           )}
 
-          {content.secondaryLabel && <p className="mt-5 text-[17px] text-[#5D6575]">{content.secondaryLabel}</p>}
-
-          <button onClick={onOpenDepth} className="mt-7 text-[16px] font-medium text-[#6B7280]">Ver histórico completo</button>
-
-          <div className="mt-auto flex items-center gap-2 pb-7 pt-8 text-[14px] text-[#6B7280]">
+          {content.secondaryLabel && <button className="mt-4 h-[50px] w-full rounded-full border border-white/30 bg-white/10 text-[17px] font-medium text-white">{content.secondaryLabel}</button>}
+          </div>
+          <section className="rounded-[28px] border border-[#E5E7EB] bg-white px-5 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <p className="text-[12px] uppercase tracking-[0.16em] text-[#98A2B3]">Antes da consulta</p>
+            <ul className="mt-3 space-y-2.5 text-[15px] text-[#344054]">
+              <li>• Documento com foto</li>
+              <li>• Chegar com antecedência</li>
+              <li>• Atualizar dados se necessário</li>
+            </ul>
+            <button onClick={onOpenDepth} className="mt-4 text-[15px] font-semibold text-[#174F35]">Ver histórico completo</button>
+          </section>
+          <div className="flex items-center gap-2 pb-2 pt-1 text-[14px] text-[#6B7280]">
             <Lock size={16} />
             Seus dados estão protegidos
           </div>
