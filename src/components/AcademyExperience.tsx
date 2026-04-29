@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, Check, CheckCircle2, ChevronLeft, Clock, Home, MessageCircle, Plus, Search, Sparkles, UserCircle } from '../icons';
 import { appointments as initialAppointments, cases as initialCases, checklistItems as initialChecklistItems, students, type AcademyAppointment, type AcademyCase, type ChecklistGroup } from '../data/academyMockData';
@@ -362,7 +362,7 @@ export const AcademyExperience = () => {
       <Route path="checklist/:appointmentId" element={<AcademyChecklist appointments={academyAppointments} checklistItems={initialChecklistItems} onReady={handleReady} />} />
       <Route path="conteudos" element={<AcademyContents />} />
       <Route path="mais" element={<AcademyMore />} />
-      <Route path="*" element={<Navigate to="." replace />} />
+      <Route path="*" element={<PageShell><p className="text-sm text-slate-500">Rota Academy não encontrada</p></PageShell>} />
     </Routes>
   );
 };
