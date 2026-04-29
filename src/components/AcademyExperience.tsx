@@ -350,9 +350,7 @@ export const AcademyExperience = () => {
   const [academyCases, setAcademyCases] = useState<AcademyCase[]>(initialCases);
   const [academyAppointments, setAcademyAppointments] = useState<AcademyAppointment[]>(initialAppointments);
   const handleReady = (appointmentId: string) => setAcademyAppointments((prev) => prev.map((appointment) => appointment.id === appointmentId ? { ...appointment, status: 'em atendimento' } : appointment));
-  useEffect(() => {
-    console.log('AcademyExperience mounted');
-  }, []);
+
 
   return (
     <Routes>
