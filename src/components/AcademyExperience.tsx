@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, Check, CheckCircle2, ChevronLeft, Clock, Home, MessageCircle, Plus, Search, Sparkles, UserCircle } from '../icons';
 import { appointments as initialAppointments, cases as initialCases, checklistItems as initialChecklistItems, students, type AcademyAppointment, type AcademyCase, type ChecklistGroup } from '../data/academyMockData';
@@ -351,16 +351,18 @@ export const AcademyExperience = () => {
   const [academyAppointments, setAcademyAppointments] = useState<AcademyAppointment[]>(initialAppointments);
   const handleReady = (appointmentId: string) => setAcademyAppointments((prev) => prev.map((appointment) => appointment.id === appointmentId ? { ...appointment, status: 'em atendimento' } : appointment));
 
+
   return (
     <Routes>
-      <Route path="/" element={<AcademyHome nextAppointment={academyAppointments[0]} />} />
-      <Route path="/agenda" element={<AcademyAgenda appointments={academyAppointments} />} />
-      <Route path="/casos" element={<AcademyCases cases={academyCases} />} />
-      <Route path="/casos/novo" element={<AcademyCaseNew onCreateCase={(newCase) => setAcademyCases((prev) => [newCase, ...prev])} />} />
-      <Route path="/casos/:id" element={<AcademyCaseDetail cases={academyCases} />} />
-      <Route path="/checklist/:appointmentId" element={<AcademyChecklist appointments={academyAppointments} checklistItems={initialChecklistItems} onReady={handleReady} />} />
-      <Route path="/conteudos" element={<AcademyContents />} />
-      <Route path="/mais" element={<AcademyMore />} />
+      <Route index element={<AcademyHome nextAppointment={academyAppointments[0]} />} />
+      <Route path="agenda" element={<AcademyAgenda appointments={academyAppointments} />} />
+      <Route path="casos" element={<AcademyCases cases={academyCases} />} />
+      <Route path="casos/novo" element={<AcademyCaseNew onCreateCase={(newCase) => setAcademyCases((prev) => [newCase, ...prev])} />} />
+      <Route path="casos/:id" element={<AcademyCaseDetail cases={academyCases} />} />
+      <Route path="checklist/:appointmentId" element={<AcademyChecklist appointments={academyAppointments} checklistItems={initialChecklistItems} onReady={handleReady} />} />
+      <Route path="conteudos" element={<AcademyContents />} />
+      <Route path="mais" element={<AcademyMore />} />
+      <Route path="*" element={<Navigate to="." replace />} />
     </Routes>
   );
 };
