@@ -5,9 +5,74 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role TEXT CHECK (role IN ('ADMIN', 'RECEPTIONIST', 'DENTIST')) NOT NULL,
+    role TEXT CHECK (role IN ('ADMIN', 'RECEPTIONIST', 'DENTIST', 'STUDENT', 'MENTOR')) NOT NULL,
     status TEXT CHECK (status IN ('pending', 'active', 'blocked')) DEFAULT 'pending',
+    academy_onboarding_done BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS academy_profiles (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    institution TEXT NOT NULL,
+    semester TEXT NOT NULL,
+    clinical_disciplines JSONB DEFAULT '[]',
+    attends_patients BOOLEAN DEFAULT FALSE,
+    first_case_notes TEXT,
+    onboarding_completed BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS academy_patients (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    cpf TEXT,
+    phone TEXT,
+    birth_date DATE,
+    chief_complaint TEXT,
+    clinical_notes TEXT,
+    treatment_plan JSONB DEFAULT '[]',
+    difficulty_level TEXT DEFAULT 'INICIANTE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS academy_appointments (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    patient_id INTEGER REFERENCES academy_patients(id) ON DELETE SET NULL,
+    patient_name TEXT NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    status TEXT DEFAULT 'SCHEDULED',
+    procedure TEXT,
+    tooth_numbers JSONB DEFAULT '[]',
+    dentist_supervisor TEXT,
+    clinic TEXT,
+    difficulty TEXT DEFAULT 'INICIANTE',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS academy_procedures (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    patient_id INTEGER REFERENCES academy_patients(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    tooth_number INTEGER,
+    status TEXT DEFAULT 'PLANEJADO',
+    difficulty TEXT DEFAULT 'INICIANTE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS academy_study_progress (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    material_id INTEGER,
+    title TEXT NOT NULL,
+    progress INTEGER DEFAULT 0,
+    completed BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS patients (
