@@ -1,9 +1,36 @@
 import { Request, Response } from 'express';
 import { query } from '../utils/db.js';
+import { PRODUCTS, type Product } from '../utils/auth.js';
+
+function parseProduct(product: unknown): Product {
+  if (typeof product !== 'string') return 'odontohub';
+  const normalized = product.toLowerCase();
+  return PRODUCTS.includes(normalized as Product) ? normalized as Product : 'odontohub';
+}
+
+function normalizeApprovalStatus(status: unknown) {
+  if (status === 'active') return 'approved';
+  if (status === 'approved' || status === 'pending' || status === 'rejected' || status === 'blocked') return status;
+  return null;
+}
 
 export const getUsers = async (req: Request, res: Response) => {
+  const product = parseProduct(req.query.product || req.headers['x-product']);
   try {
-    const result = await query('SELECT id, name, email, role, status FROM users ORDER BY id DESC');
+    const result = await query(
+      `SELECT 
+         u.id, u.name, u.email, u.role, u.status AS global_status,
+         upa.product, upa.plan, upa.product_role, upa.approval_status, upa.onboarding_completed,
+         CASE COALESCE(upa.approval_status, 'pending')
+           WHEN 'approved' THEN 'active'
+           ELSE COALESCE(upa.approval_status, 'pending')
+         END AS status
+       FROM users u
+       LEFT JOIN user_product_access upa
+         ON upa.user_id = u.id AND upa.product = $1
+       ORDER BY u.id DESC`,
+      [product]
+    );
     return res.status(200).json(result.rows);
   } catch (error: any) {
     console.error('getUsers error:', error);
@@ -13,12 +40,30 @@ export const getUsers = async (req: Request, res: Response) => {
 
 export const updateUser = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { status, name, email } = req.body;
-  const adminUser = req.user!;
+  const { status, approval_status, name, email, product_role, plan, global_status } = req.body;
+  const product = parseProduct(req.body.product || req.headers['x-product']);
 
   try {
-    if (status) {
-      await query('UPDATE users SET status = $1 WHERE id = $2', [status, id]);
+    const nextApprovalStatus = normalizeApprovalStatus(approval_status || status);
+
+    if (nextApprovalStatus || product_role || plan) {
+      await query(
+        `INSERT INTO user_product_access (user_id, product, plan, product_role, approval_status)
+         VALUES ($1, $2, COALESCE($3, 'free'), COALESCE($4, 'DENTIST'), COALESCE($5, 'pending'))
+         ON CONFLICT (user_id, product)
+         DO UPDATE SET
+           plan = COALESCE($3, user_product_access.plan),
+           product_role = COALESCE($4, user_product_access.product_role),
+           approval_status = COALESCE($5, user_product_access.approval_status),
+           updated_at = CURRENT_TIMESTAMP`,
+        [id, product, plan || null, product_role || null, nextApprovalStatus || null]
+      );
+
+      if (nextApprovalStatus === 'approved') {
+        await query("UPDATE users SET status = 'active' WHERE id = $1 AND status = 'pending'", [id]);
+      }
+    } else if (global_status) {
+      await query('UPDATE users SET status = $1 WHERE id = $2', [global_status, id]);
     } else if (name && email) {
       await query('UPDATE users SET name = $1, email = $2 WHERE id = $3', [name, email, id]);
     }
@@ -45,6 +90,35 @@ export const updateSchema = async (req: Request, res: Response) => {
       ADD COLUMN IF NOT EXISTS welcome_seen BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS record_opened BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
+      CREATE TABLE IF NOT EXISTS user_product_access (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        product TEXT NOT NULL CHECK (product IN ('odontohub', 'academy')),
+        plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro')),
+        product_role TEXT NOT NULL,
+        approval_status TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected', 'blocked')),
+        onboarding_completed BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, product)
+      );
+
+      INSERT INTO user_product_access (user_id, product, plan, product_role, approval_status, onboarding_completed)
+      SELECT 
+        id,
+        'odontohub',
+        'free',
+        role,
+        CASE 
+          WHEN status = 'active' THEN 'approved'
+          WHEN status = 'blocked' THEN 'blocked'
+          WHEN status = 'pending' THEN 'pending'
+          ELSE 'pending'
+        END,
+        COALESCE(onboarding_done, FALSE)
+      FROM users
+      ON CONFLICT (user_id, product) DO NOTHING;
 
       ALTER TABLE patients
       ADD COLUMN IF NOT EXISTS dentist_id INTEGER REFERENCES users(id),

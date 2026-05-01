@@ -79,6 +79,7 @@ interface DashboardProps {
   onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => void;
   onDismissOnboarding: () => void;
   onDismissWelcome: () => void;
+  product: string;
   portalPendingCount?: number;
   onOpenPortalInbox?: () => void;
 }
@@ -140,6 +141,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSchedulePatient,
   onDismissOnboarding,
   onDismissWelcome,
+  product,
   portalPendingCount = 0,
   onOpenPortalInbox
 }) => {
@@ -159,7 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const fetchIntelligence = async () => {
       try {
         const token = localStorage.getItem('token');
-        const headers: Record<string, string> = { 'Accept': 'application/json' };
+        const headers: Record<string, string> = { 'Accept': 'application/json', 'x-product': product };
         if (token && token !== 'null') {
           headers['Authorization'] = `Bearer ${token}`;
           headers['x-auth-token'] = token;
@@ -446,12 +448,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // ─── Render ─────────────────────────────────────────────────────────────
 
   // ─── Onboarding: welcome + guided setup ──────────────────────────────
-  // In demo mode, force fresh onboarding for every session (Apple-style)
-  const isDemo = user?.demoMode;
   const hasPatients = patients.length > 0;
   const hasAppointments = totalAppointmentsCount > 0;
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => isDemo ? false : (user?.onboarding_done ?? false));
-  const [welcomeSeen, setWelcomeSeen] = useState(() => isDemo ? false : (user?.welcome_seen ?? false));
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => user?.onboarding_done ?? false);
+  const [welcomeSeen, setWelcomeSeen] = useState(() => user?.welcome_seen ?? false);
   const wasInOnboarding = useRef(!hasPatients || !hasAppointments);
   const showOnboarding = !onboardingDismissed && (
     !hasPatients || !hasAppointments || wasInOnboarding.current

@@ -88,6 +88,7 @@ interface MLDashboardData {
 
 interface MLInsightsProps {
   openPatientRecord: (id: number) => void;
+  product: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ type MLTab = 'overview' | 'appointments' | 'delinquency' | 'treatments';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord }) => {
+export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord, product }) => {
   const [data, setData] = useState<MLDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +142,7 @@ export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord }) => 
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const headers: Record<string, string> = { 'Accept': 'application/json' };
+        const headers: Record<string, string> = { 'Accept': 'application/json', 'x-product': product };
         if (token && token !== 'null') {
           headers['Authorization'] = `Bearer ${token}`;
           headers['x-auth-token'] = token;
@@ -157,7 +158,7 @@ export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord }) => 
       }
     };
     fetchData();
-  }, []);
+  }, [product]);
 
   if (loading) {
     return (

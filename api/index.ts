@@ -2,8 +2,7 @@ import '../server/utils/env.js';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 
-import { login, register, requestPasswordReset, resetPassword, demoLogin } from '../server/controllers/authController.js';
-import { academyLogin, academyRegister } from '../server/controllers/academyAuthController.js';
+import { login, register, requestPasswordReset, resetPassword } from '../server/controllers/authController.js';
 import { 
   getPatients, 
   getPatientById, 
@@ -98,7 +97,6 @@ import {
   getPortalData,
   requestAppointment,
   getAppointmentRequests,
-  getAppointmentRequestMetrics,
   updateAppointmentRequest,
   uploadPortalDocument,
   getIntakeForms,
@@ -150,14 +148,9 @@ app.get('/health', async (req, res) => {
 
 // Auth
 app.post(['/auth/login', '/api/auth/login'], login);
-app.post(['/auth/demo', '/api/auth/demo'], demoLogin);
 app.post(['/auth/register', '/api/auth/register'], register);
 app.post(['/auth/request-password-reset', '/api/auth/request-password-reset'], requestPasswordReset);
 app.post(['/auth/reset-password', '/api/auth/reset-password'], resetPassword);
-
-// Academy Auth (separate login for students)
-app.post(['/academy/auth/login', '/api/academy/auth/login'], academyLogin);
-app.post(['/academy/auth/register', '/api/academy/auth/register'], academyRegister);
 
 // Portal do Paciente (public routes — no dentist auth needed)
 app.get(['/portal/auth/:token', '/api/portal/auth/:token'], authenticatePortalToken);
@@ -271,12 +264,11 @@ app.get(['/ml/treatments', '/api/ml/treatments'], getTreatmentSuggestions);
 // Admin
 app.get(['/admin/users', '/api/admin/users'], requireAdmin, getUsers);
 app.patch(['/admin/users/:id', '/api/admin/users/:id'], requireAdmin, updateUser);
-app.all(['/admin/update-schema', '/api/admin/update-schema'], updateSchema);
+app.all(['/admin/update-schema', '/api/admin/update-schema'], requireAdmin, updateSchema);
 
 // Portal management (dentist side)
 app.post(['/portal/generate-link', '/api/portal/generate-link'], generatePortalLink);
 app.get(['/portal/appointment-requests', '/api/portal/appointment-requests'], getAppointmentRequests);
-app.get(['/portal/appointment-requests/metrics', '/api/portal/appointment-requests/metrics'], getAppointmentRequestMetrics);
 app.patch(['/portal/appointment-requests/:id', '/api/portal/appointment-requests/:id'], updateAppointmentRequest);
 app.get(['/portal/intake-forms', '/api/portal/intake-forms'], getIntakeForms);
 app.patch(['/portal/intake-forms/:id/review', '/api/portal/intake-forms/:id/review'], reviewIntakeForm);

@@ -4,23 +4,6 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../utils/config.js';
 
-async function logAppointmentRequestEvent(
-  appointmentRequestId: number,
-  dentistId: number,
-  eventType: 'CREATED' | 'STATUS_CHANGED' | 'VIEWED',
-  metadata: Record<string, any> = {}
-) {
-  try {
-    await query(
-      `INSERT INTO appointment_request_events (appointment_request_id, dentist_id, event_type, metadata)
-       VALUES ($1, $2, $3, $4)`,
-      [appointmentRequestId, dentistId, eventType, JSON.stringify(metadata)]
-    );
-  } catch (error) {
-    console.error('Failed to log appointment request event:', error);
-  }
-}
-
 // ─── Generate portal access link for a patient (dentist-side) ───
 export const generatePortalLink = async (req: Request, res: Response) => {
   try {
@@ -257,7 +240,7 @@ export const getPortalData = async (req: Request, res: Response) => {
   try {
     const portal = (req as any).portal;
 
-    const [patientRes, appointmentsRes, filesRes, evolutionRes, plansRes, consentsRes, anamnesisRes, transactionsRes, installmentsRes, requestStatusRes] = await Promise.all([
+    const [patientRes, appointmentsRes, filesRes, evolutionRes, plansRes, consentsRes, anamnesisRes, transactionsRes, installmentsRes] = await Promise.all([
       query(
         `SELECT id, name, email, phone, cpf, birth_date, photo_url, address,
                 consent_accepted, consent_date, emergency_contact_name, emergency_contact_phone,
@@ -325,14 +308,6 @@ export const getPortalData = async (req: Request, res: Response) => {
          WHERE i.patient_id = $1 AND i.dentist_id = $2
          ORDER BY i.due_date ASC`,
         [portal.patient_id, portal.dentist_id]
-      ).catch(() => ({ rows: [] })),
-      query(
-        `SELECT id, status, reason_category, desired_period, notes, created_at
-         FROM appointment_requests
-         WHERE patient_id = $1 AND dentist_id = $2
-         ORDER BY created_at DESC
-         LIMIT 5`,
-        [portal.patient_id, portal.dentist_id]
       ).catch(() => ({ rows: [] }))
     ]);
 
@@ -356,8 +331,7 @@ export const getPortalData = async (req: Request, res: Response) => {
       transactions: transactionsRes.rows,
       installments: installmentsRes.rows,
       consents: consentsRes.rows,
-      clinic: clinicRes.rows[0] || null,
-      appointment_requests: requestStatusRes.rows
+      clinic: clinicRes.rows[0] || null
     });
   } catch (error: any) {
     console.error('Error fetching portal data:', error);
@@ -369,46 +343,17 @@ export const getPortalData = async (req: Request, res: Response) => {
 export const requestAppointment = async (req: Request, res: Response) => {
   try {
     const portal = (req as any).portal;
-    const {
-      preferred_date,
-      preferred_time,
-      notes,
-      is_urgent,
-      reason_category,
-      desired_period
-    } = req.body;
+    const { preferred_date, preferred_time, notes } = req.body;
 
-    const normalizedReason = typeof reason_category === 'string' && reason_category.trim()
-      ? reason_category.trim()
-      : 'outro';
-    const normalizedPeriod = typeof desired_period === 'string' && desired_period.trim()
-      ? desired_period.trim()
-      : (preferred_time || 'primeiro_disponivel');
-    const fallbackDate = preferred_date || new Date().toISOString().slice(0, 10);
-
-    const insertResult = await query(
-      `INSERT INTO appointment_requests (patient_id, dentist_id, preferred_date, preferred_time, notes, is_urgent, reason_category, desired_period, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
-       RETURNING id`,
-      [portal.patient_id, portal.dentist_id, fallbackDate, preferred_time || null, notes || null, is_urgent || false, normalizedReason, normalizedPeriod]
-    );
-
-    const requestId = insertResult.rows[0]?.id;
-    if (requestId) {
-      await logAppointmentRequestEvent(requestId, portal.dentist_id, 'CREATED', {
-        patient_id: portal.patient_id,
-        reason_category: normalizedReason,
-        desired_period: normalizedPeriod
-      });
+    if (!preferred_date) {
+      return res.status(400).json({ error: 'Data preferencial é obrigatória' });
     }
 
-    console.info('Appointment request created', {
-      dentist_id: portal.dentist_id,
-      patient_id: portal.patient_id,
-      request_id: requestId,
-      desired_period: normalizedPeriod,
-      reason_category: normalizedReason
-    });
+    await query(
+      `INSERT INTO appointment_requests (patient_id, dentist_id, preferred_date, preferred_time, notes, status)
+       VALUES ($1, $2, $3, $4, $5, 'PENDING')`,
+      [portal.patient_id, portal.dentist_id, preferred_date, preferred_time || null, notes || null]
+    );
 
     res.json({ message: 'Solicitação de agendamento enviada! A clínica entrará em contato para confirmar.' });
   } catch (error: any) {
@@ -422,14 +367,13 @@ export const getAppointmentRequests = async (req: Request, res: Response) => {
   try {
     const dentistId = req.user?.id;
     const result = await query(
-      `SELECT ar.id, ar.patient_id, ar.dentist_id, ar.status, ar.notes, ar.preferred_time, ar.is_urgent,
-              ar.reason_category, ar.desired_period, ar.request_type,
+      `SELECT ar.id, ar.patient_id, ar.dentist_id, ar.status, ar.notes, ar.preferred_time,
               ar.preferred_date::text as preferred_date, ar.created_at,
               p.name as patient_name, p.phone as patient_phone
        FROM appointment_requests ar
        JOIN patients p ON p.id = ar.patient_id
        WHERE ar.dentist_id = $1
-       ORDER BY ar.is_urgent DESC, ar.created_at DESC
+       ORDER BY ar.created_at DESC
        LIMIT 50`,
       [dentistId]
     );
@@ -447,7 +391,7 @@ export const updateAppointmentRequest = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['PENDING', 'APPROVED', 'CONFIRMED', 'REJECTED', 'ARCHIVED'];
+    const validStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Status inválido' });
     }
@@ -457,55 +401,10 @@ export const updateAppointmentRequest = async (req: Request, res: Response) => {
       [status, id, dentistId]
     );
 
-    await logAppointmentRequestEvent(Number(id), Number(dentistId), 'STATUS_CHANGED', { status });
-    console.info('Appointment request status changed', { dentist_id: dentistId, request_id: Number(id), status });
-
     res.json({ message: 'Solicitação atualizada' });
   } catch (error: any) {
     console.error('Error updating appointment request:', error);
     res.status(500).json({ error: 'Erro ao atualizar solicitação' });
-  }
-};
-
-// ─── Metrics for appointment request conversion (dentist side) ───
-export const getAppointmentRequestMetrics = async (req: Request, res: Response) => {
-  try {
-    const dentistId = req.user?.id;
-    const result = await query(
-      `WITH base AS (
-         SELECT *
-         FROM appointment_requests
-         WHERE dentist_id = $1
-           AND created_at >= NOW() - INTERVAL '30 days'
-       ),
-       first_response AS (
-         SELECT
-           e.appointment_request_id,
-           MIN(e.created_at) AS first_response_at
-         FROM appointment_request_events e
-         JOIN base b ON b.id = e.appointment_request_id
-         WHERE e.event_type = 'STATUS_CHANGED'
-         GROUP BY e.appointment_request_id
-       )
-       SELECT
-         COUNT(*)::int as total,
-         COUNT(*) FILTER (WHERE b.status = 'PENDING')::int as pending,
-         COUNT(*) FILTER (WHERE b.status IN ('CONFIRMED', 'APPROVED'))::int as confirmed,
-         COUNT(*) FILTER (WHERE b.status = 'REJECTED')::int as rejected,
-         COUNT(*) FILTER (WHERE b.status = 'ARCHIVED')::int as archived,
-         ROUND(
-           CASE WHEN COUNT(*) = 0 THEN 0
-           ELSE (COUNT(*) FILTER (WHERE b.status IN ('CONFIRMED', 'APPROVED'))::decimal / COUNT(*)::decimal) * 100 END
-         , 2) as conversion_rate,
-         ROUND(AVG(EXTRACT(EPOCH FROM (fr.first_response_at - b.created_at)) / 60.0)::numeric, 1) as avg_first_response_minutes
-       FROM base b
-       LEFT JOIN first_response fr ON fr.appointment_request_id = b.id`,
-      [dentistId]
-    );
-    res.json(result.rows[0]);
-  } catch (error: any) {
-    console.error('Error fetching appointment request metrics:', error);
-    res.status(500).json({ error: 'Erro ao buscar métricas de conversão' });
   }
 };
 
@@ -874,3 +773,4 @@ export const getClinicPixInfo = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Erro ao buscar dados PIX' });
   }
 };
+

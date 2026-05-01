@@ -44,7 +44,8 @@ import {
   Pencil,
   Mail,
   Download,
-  LinkIcon
+  LinkIcon,
+  BookOpen
 } from './icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -58,7 +59,7 @@ import { PreAtendimento } from './components/PreAtendimento';
 import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
 import { MLInsights } from './components/MLInsights';
-import { ExploreDemo } from './components/ExploreDemo';
+import { Academy, AcademyPatients, AcademyAgenda, AcademyStudy, AcademyChecklist } from './components/Academy';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
 // Types
@@ -184,7 +185,6 @@ interface Dentist {
   accepted_terms?: boolean;
   accepted_terms_at?: string;
   accepted_privacy_policy?: boolean;
-  demoMode?: boolean;
 }
 
 interface Appointment {
@@ -216,6 +216,33 @@ interface Transaction {
   notes?: string;
   created_at: string;
 }
+
+type Product = 'odontohub' | 'academy';
+type ProductPlan = 'free' | 'pro';
+type ProductApprovalStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
+
+interface ProductAccess {
+  product: Product;
+  plan: ProductPlan;
+  product_role: string;
+  approval_status: ProductApprovalStatus;
+  onboarding_completed?: boolean;
+}
+
+interface CurrentUser {
+  id: number;
+  name: string;
+  role: string;
+  status?: string;
+  current_product?: Product;
+  product_accesses?: ProductAccess[];
+  onboarding_done?: boolean;
+  welcome_seen?: boolean;
+  record_opened?: boolean;
+}
+
+const ODONTOHUB_PRODUCT: Product = 'odontohub';
+const ACADEMY_PRODUCT: Product = 'academy';
 
 const SidebarItem = ({ id, icon: Icon, label, activeTab, setActiveTab, setIsSidebarOpen, navigate }: any) => (
   <button
@@ -370,7 +397,7 @@ const LegacyClinicalRedirect = () => {
 
 export default function App() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia' | 'academy'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -493,12 +520,13 @@ export default function App() {
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ id: number; name: string; role: string; onboarding_done?: boolean; welcome_seen?: boolean; record_opened?: boolean } | null>(null);
-  const [loginData, setLoginData] = useState({ email: '', password: '', rememberMe: false });
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [loginData, setLoginData] = useState({ email: '', password: '', rememberMe: false, product: ODONTOHUB_PRODUCT });
   const [registerData, setRegisterData] = useState({ 
     name: '', 
     email: '', 
     password: '',
+    product: ODONTOHUB_PRODUCT,
     acceptedTerms: false,
     acceptedPrivacyPolicy: false,
     acceptedResponsibility: false
@@ -583,6 +611,19 @@ export default function App() {
     return filtered.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [appointments, statusFilter, agendaSearchTerm, agendaViewMode, selectedDate]);
   const [agendaFocusMode, setAgendaFocusMode] = useState(true);
+  const [academyView, setAcademyView] = useState<'home' | 'pacientes' | 'agenda' | 'estudos' | 'checklist'>('home');
+
+  const getCurrentProduct = useCallback((): Product => {
+    return activeTab === 'academy' ? ACADEMY_PRODUCT : ODONTOHUB_PRODUCT;
+  }, [activeTab]);
+
+  const getProductAccess = useCallback((product: Product) => {
+    return user?.product_accesses?.find(access => access.product === product) || null;
+  }, [user?.product_accesses]);
+
+  const hasApprovedProductAccess = useCallback((product: Product) => {
+    return getProductAccess(product)?.approval_status === 'approved';
+  }, [getProductAccess]);
 
   // ─── Agenda date navigation helper ───────────────────────────────────
   const navigateDate = useCallback((direction: 'prev' | 'next' | 'today') => {
@@ -699,8 +740,6 @@ export default function App() {
   const getGuideStep = (): { message: string; action: string; tab?: string; onClick?: () => void } | null => {
     if (guideDismissedUntil === activeTab) return null;
     if (!user || loading) return null;
-    // In demo mode, always show guides (fresh experience for each session)
-    const isDemo = user?.demoMode;
     if (patients.length === 0) {
       if (activeTab === 'pacientes') return null; // already there
       return {
@@ -717,8 +756,7 @@ export default function App() {
         tab: 'agenda',
       };
     }
-    // Force show record guide in demo mode
-    const recordOpened = isDemo ? false : (user?.record_opened || hasMilestone('recordOpened'));
+    const recordOpened = user?.record_opened || hasMilestone('recordOpened');
     if (!recordOpened) {
       if (activeTab === 'prontuario') return null;
       return {
@@ -734,6 +772,12 @@ export default function App() {
   useEffect(() => {
     setGuideDismissedUntil(null);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'academy' && user && !hasApprovedProductAccess(ACADEMY_PRODUCT)) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, user, hasApprovedProductAccess]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -760,9 +804,8 @@ export default function App() {
       fetchProfile();
       if (user.role?.toUpperCase() === 'ADMIN') {
         fetchAdminUsers();
+        apiFetch('/api/admin/update-schema', { product: ODONTOHUB_PRODUCT }).catch(console.error);
       }
-      // Update schema once
-      apiFetch('/api/admin/update-schema').catch(console.error);
     }
   }, [user]);
 
@@ -784,6 +827,20 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
+        setUser(prev => {
+          if (!prev) return prev;
+          const currentAccess = data.product_accesses?.find((access: ProductAccess) => access.product === getCurrentProduct());
+          const updated = {
+            ...prev,
+            product_accesses: data.product_accesses,
+            current_product: data.current_product,
+            onboarding_done: currentAccess?.onboarding_completed ?? prev.onboarding_done,
+            welcome_seen: data.welcome_seen,
+            record_opened: data.record_opened
+          };
+          localStorage.setItem('user', JSON.stringify(updated));
+          return updated;
+        });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -1102,7 +1159,7 @@ export default function App() {
 
   const fetchAdminUsers = async () => {
     try {
-      const res = await apiFetch('/api/admin/users');
+      const res = await apiFetch('/api/admin/users?product=odontohub', { product: ODONTOHUB_PRODUCT });
       if (!res.ok) {
         const errorText = await res.text();
         console.error(`Error fetching admin users (${res.status}):`, errorText);
@@ -1119,7 +1176,8 @@ export default function App() {
     try {
       const res = await apiFetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status })
+        product: ODONTOHUB_PRODUCT,
+        body: JSON.stringify({ product: ODONTOHUB_PRODUCT, approval_status: status })
       });
       if (res.ok) {
         fetchAdminUsers();
@@ -1140,12 +1198,11 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        const demoUser = data.user.demo_mode ? { ...data.user, demoMode: true } : data.user;
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(demoUser));
-        setUser(demoUser);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
         fetchData(data.token);
-        if (demoUser.role === 'DENTIST') {
+        if (data.user.role === 'DENTIST') {
           // No filter needed
         }
       } else {
@@ -1197,14 +1254,20 @@ export default function App() {
     try {
       await fetch('/api/profile/onboarding', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ [field]: true })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'x-product': getCurrentProduct() },
+        body: JSON.stringify({ product: getCurrentProduct(), [field]: true, onboarding_completed: field === 'onboarding_done' ? true : undefined })
       });
     } catch (e) {
       console.error('Failed to update onboarding state', e);
     }
     if (user) {
-      const updated = { ...user, [field]: true };
+      const updated = {
+        ...user,
+        [field]: true,
+        product_accesses: field === 'onboarding_done'
+          ? user.product_accesses?.map(access => access.product === getCurrentProduct() ? { ...access, onboarding_completed: true } : access)
+          : user.product_accesses
+      };
       setUser(updated);
       localStorage.setItem('user', JSON.stringify(updated));
     }
@@ -1299,8 +1362,10 @@ export default function App() {
 
   const apiFetch = async (url: string, options: any = {}) => {
     const token = options.explicitToken || localStorage.getItem('token');
+    const product = options.product || getCurrentProduct();
     const headers: any = {
       'Accept': 'application/json',
+      'x-product': product,
       ...options.headers,
     };
     
@@ -1322,30 +1387,20 @@ export default function App() {
         // Not JSON
       }
       handleLogout();
+    } else if (response.status === 403) {
+      try {
+        const errorData = await response.clone().json();
+        const message = errorData?.error || '';
+        if (message.includes('produto') || message.includes('Conta global')) {
+          console.warn('Product access error details:', errorData);
+          handleLogout();
+        }
+      } catch (e) {
+        // Not JSON
+      }
     }
     return response;
   };
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    const refreshPortalPending = async () => {
-      try {
-        const res = await apiFetch('/api/portal/appointment-requests');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data)) {
-          setPortalPendingCount(data.filter((r: any) => r.status === 'PENDING').length);
-        }
-      } catch {}
-    };
-    refreshPortalPending();
-    const timer = setInterval(refreshPortalPending, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [user]);
 
   const openAppointmentModal = () => {
     const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
@@ -2315,7 +2370,6 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/explore" element={<ExploreDemo />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/portal/:token" element={<PatientPortal />} />
@@ -2362,17 +2416,6 @@ export default function App() {
               </nav>
             </aside>
             <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col pt-4 md:pt-6 lg:pt-8">
-              {user?.demoMode && (
-                <div className="mx-6 mb-4 rounded-[18px] border border-[#D1E7DB] bg-[#F3FBF6] px-4 py-3 text-sm text-[#1F4D3E] shadow-sm flex items-start justify-between">
-                  <div>
-                    <strong className="block text-[#16432C]">Modo Exploração</strong>
-                    <p className="mt-1 text-[#3F5C4F] text-xs">Dados de exemplo · Sem impacto em produção</p>
-                  </div>
-                  <button onClick={() => { localStorage.clear(); window.location.href = '/'; }} className="text-[#1F4D3E] hover:text-[#16432C] transition-colors text-xs font-medium whitespace-nowrap ml-4">
-                    Sair
-                  </button>
-                </div>
-              )}
               <ClinicalPageRoute 
                 transactions={transactions}
                 appointments={appointments}
@@ -2582,8 +2625,6 @@ export default function App() {
                   <Link to="/termos" className="hover:text-[#8B918E] transition-colors duration-200">Termos</Link>
                   <span>·</span>
                   <Link to="/privacidade" className="hover:text-[#8B918E] transition-colors duration-200">Privacidade</Link>
-                  <span>·</span>
-                  <Link to="/explore" className="hover:text-[#8B918E] transition-colors duration-200">Explorar</Link>
                 </div>
               </div>
             </motion.div>
@@ -2624,6 +2665,9 @@ export default function App() {
           <SidebarItem id="dashboard" icon={Home} label="Início" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="agenda" icon={Calendar} label="Agenda" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
+          {hasApprovedProductAccess(ACADEMY_PRODUCT) && (
+            <SidebarItem id="academy" icon={BookOpen} label="Academy" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
+          )}
           <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="inteligencia" icon={Sparkles} label="Inteligência ML" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
@@ -2803,6 +2847,7 @@ export default function App() {
                 onSchedulePatient={openScheduleSuggestion}
                 onDismissOnboarding={() => updateUserOnboarding('onboarding_done')}
                 onDismissWelcome={() => updateUserOnboarding('welcome_seen')}
+                product={getCurrentProduct()}
                 portalPendingCount={portalPendingCount}
                 onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
               />
@@ -4893,7 +4938,27 @@ export default function App() {
             )}
 
             {activeTab === 'inteligencia' && (
-              <MLInsights openPatientRecord={openPatientRecord} />
+              <MLInsights openPatientRecord={openPatientRecord} product={getCurrentProduct()} />
+            )}
+
+            {activeTab === 'academy' && hasApprovedProductAccess(ACADEMY_PRODUCT) && (
+              <>
+                {academyView === 'home' && (
+                  <Academy user={user} onNavigate={setAcademyView} />
+                )}
+                {academyView === 'pacientes' && (
+                  <AcademyPatients />
+                )}
+                {academyView === 'agenda' && (
+                  <AcademyAgenda />
+                )}
+                {academyView === 'estudos' && (
+                  <AcademyStudy />
+                )}
+                {academyView === 'checklist' && (
+                  <AcademyChecklist />
+                )}
+              </>
             )}
 
             {activeTab === 'configuracoes' && profile && (

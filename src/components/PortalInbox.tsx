@@ -15,8 +15,7 @@ import {
   Heart,
   Pill,
   Stethoscope,
-  Calendar,
-  TrendingUp
+  Calendar
 } from '../icons';
 
 interface AppointmentRequest {
@@ -27,11 +26,7 @@ interface AppointmentRequest {
   preferred_date: string;
   preferred_time: string | null;
   notes: string | null;
-  is_urgent: boolean;
-  reason_category?: string;
-  desired_period?: string;
-  status: 'PENDING' | 'APPROVED' | 'CONFIRMED' | 'REJECTED' | 'ARCHIVED';
-  request_type?: 'NEW' | 'RESCHEDULE' | 'CANCEL';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
   created_at: string;
 }
 
@@ -58,7 +53,7 @@ interface IntakeForm {
 
 interface PortalInboxProps {
   apiFetch: (url: string, options?: any) => Promise<Response>;
-  onSchedulePatient?: (patientId: number, patientName: string, preferredDate: string, preferredTime?: string | null) => void;
+  onSchedulePatient?: (patientId: number, patientName: string, preferredDate: string) => void;
   onOpenPatient?: (patientId: number) => void;
 }
 
@@ -69,7 +64,6 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
   const [loading, setLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState<IntakeForm | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const [metrics, setMetrics] = useState<{ total: number; pending: number; confirmed: number; conversion_rate: number; avg_first_response_minutes?: number | null } | null>(null);
 
   // Messages
   const [unreadThreads, setUnreadThreads] = useState<Array<{ patient_id: number; patient_name: string; unread_count: number; last_message_at: string }>>([]);
@@ -85,16 +79,14 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
   const loadData = async () => {
     setLoading(true);
     try {
-      const [reqRes, formRes, msgRes, metricsRes] = await Promise.all([
+      const [reqRes, formRes, msgRes] = await Promise.all([
         apiFetch('/api/portal/appointment-requests'),
         apiFetch('/api/portal/intake-forms'),
-        apiFetch('/api/portal/messages/unread'),
-        apiFetch('/api/portal/appointment-requests/metrics')
+        apiFetch('/api/portal/messages/unread')
       ]);
       if (reqRes.ok) setRequests(await reqRes.json());
       if (formRes.ok) setIntakeForms(await formRes.json());
       if (msgRes.ok) setUnreadThreads(await msgRes.json());
-      if (metricsRes.ok) setMetrics(await metricsRes.json());
     } catch (e) {
       console.error('Error loading portal inbox:', e);
     } finally {
@@ -126,7 +118,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
     } finally { setSendingReply(false); }
   };
 
-  const handleUpdateRequest = async (id: number, status: 'APPROVED' | 'CONFIRMED' | 'REJECTED' | 'ARCHIVED') => {
+  const handleUpdateRequest = async (id: number, status: 'APPROVED' | 'REJECTED') => {
     setUpdatingId(id);
     try {
       await apiFetch(`/api/portal/appointment-requests/${id}`, {
@@ -156,7 +148,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
 
   const timeLabel = (t: string | null) => {
     if (!t) return 'Qualquer horário';
-    const map: Record<string, string> = { manha: 'Manhã (08h–12h)', tarde: 'Tarde (13h–18h)', noite: 'Noite (18h–21h)', primeiro_disponivel: 'Primeiro disponível' };
+    const map: Record<string, string> = { manha: 'Manhã (08h–12h)', tarde: 'Tarde (13h–18h)', noite: 'Noite (18h–21h)' };
     return map[t] || t;
   };
 
@@ -168,15 +160,6 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
 
   return (
     <div className="space-y-4">
-      {metrics && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <InfoChip icon={TrendingUp} label="Conversão 30d" value={`${metrics.conversion_rate || 0}%`} />
-          <InfoChip icon={Clock} label="Pendentes" value={String(metrics.pending || 0)} />
-          <InfoChip icon={CheckCircle2} label="Confirmadas" value={String(metrics.confirmed || 0)} />
-          <InfoChip icon={Clock} label="1ª resposta" value={`${metrics.avg_first_response_minutes ?? '-'} min`} />
-        </div>
-      )}
-
       {/* ── Solicitações de Agendamento (apenas pendentes) ── */}
       <div className="space-y-3">
           {pendingRequests.length === 0 ? (
@@ -199,24 +182,13 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
                       <p className="text-xs text-slate-400">{req.patient_phone}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {req.is_urgent && (
-                      <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-bold whitespace-nowrap">
-                        🚨 URGENTE
-                      </span>
-                    )}
-                    <StatusBadgeReq status={req.status} />
-                  </div>
+                  <StatusBadgeReq status={req.status} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  <InfoChip icon={Calendar} label="Data da solicitação" value={formatDateBR(req.created_at)} />
-                  <InfoChip icon={Clock} label="Horário desejado" value={timeLabel(req.desired_period || req.preferred_time)} />
+                  <InfoChip icon={Calendar} label="Data preferida" value={formatDateBR(req.preferred_date)} />
+                  <InfoChip icon={Clock} label="Horário" value={timeLabel(req.preferred_time)} />
                 </div>
-
-                {req.reason_category && (
-                  <p className="text-xs text-slate-600 mb-2"><strong>Motivo:</strong> {req.reason_category}</p>
-                )}
 
                 {req.notes && (
                   <p className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 mb-3 italic">
@@ -224,27 +196,23 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
                   </p>
                 )}
 
-                <div className="text-[10px] text-slate-400 mb-3">Status: {req.status}</div>
+                <div className="text-[10px] text-slate-400 mb-3">
+                  Solicitado em {formatDateBR(req.created_at)}
+                </div>
 
                 {req.status === 'PENDING' && (
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
-                        handleUpdateRequest(req.id, 'CONFIRMED');
+                        handleUpdateRequest(req.id, 'APPROVED');
                         if (onSchedulePatient) {
-                          onSchedulePatient(req.patient_id, req.patient_name, req.preferred_date, req.desired_period || req.preferred_time);
+                          onSchedulePatient(req.patient_id, req.patient_name, req.preferred_date);
                         }
                       }}
                       disabled={updatingId === req.id}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                     >
-                      <Check size={13} /> Confirmar
-                    </button>
-                    <button
-                      onClick={() => window.open(`https://wa.me/${(req.patient_phone || '').replace(/\\D/g, '')}`, '_blank')}
-                      className="px-3 py-2.5 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-colors"
-                    >
-                      WhatsApp
+                      <Check size={13} /> Aprovar e Agendar
                     </button>
                     <button
                       onClick={() => handleUpdateRequest(req.id, 'REJECTED')}
@@ -262,13 +230,6 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
                         <ChevronRight size={14} />
                       </button>
                     )}
-                    <button
-                      onClick={() => handleUpdateRequest(req.id, 'ARCHIVED')}
-                      disabled={updatingId === req.id}
-                      className="px-3 py-2.5 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors disabled:opacity-50"
-                    >
-                      Arquivar
-                    </button>
                   </div>
                 )}
 
@@ -372,14 +333,9 @@ function StatusBadgeReq({ status }: { status: string }) {
       <Clock size={10} /> Pendente
     </span>
   );
-  if (status === 'APPROVED' || status === 'CONFIRMED') return (
+  if (status === 'APPROVED') return (
     <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full flex items-center gap-1">
-      <CheckCircle2 size={10} /> Confirmado
-    </span>
-  );
-  if (status === 'ARCHIVED') return (
-    <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center gap-1">
-      <FileText size={10} /> Arquivado
+      <CheckCircle2 size={10} /> Aprovado
     </span>
   );
   return (

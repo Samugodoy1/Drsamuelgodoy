@@ -30,6 +30,12 @@ export const createDentist = async (req: Request, res: Response) => {
       "INSERT INTO users (name, email, password, role, status) VALUES ($1, $2, $3, 'DENTIST', 'active') RETURNING id",
       [name, email, hashedPassword]
     );
+    await query(
+      `INSERT INTO user_product_access (user_id, product, plan, product_role, approval_status)
+       VALUES ($1, 'odontohub', 'free', 'DENTIST', 'approved')
+       ON CONFLICT (user_id, product) DO NOTHING`,
+      [result.rows[0].id]
+    );
     return res.status(201).json({ id: result.rows[0].id });
   } catch (error: any) {
     console.error('createDentist error:', error);

@@ -1,11 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from './config.js';
+import { query } from './db.js';
 
 export interface AuthUser {
   id: number;
   name: string;
   role: string;
+  status?: string;
+  product?: string;
+  plan?: string;
+  product_role?: string;
+  approval_status?: string;
 }
 
 // Extend Express Request type
@@ -53,7 +59,22 @@ export function verifyToken(req: Request): AuthUser | null {
   }
 }
 
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+export const PRODUCTS = ['odontohub', 'academy'] as const;
+export type Product = typeof PRODUCTS[number];
+
+export function getRequestedProduct(req: Request): Product | null {
+  const raw = (
+    req.headers['x-product'] ||
+    req.query?.product ||
+    req.body?.product
+  ) as string | undefined;
+
+  if (!raw) return null;
+  const product = raw.toLowerCase();
+  return PRODUCTS.includes(product as Product) ? product as Product : null;
+}
+
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   // Skip authentication for auth and health routes
   const path = req.path || '';
   const url = req.url || '';
@@ -62,8 +83,8 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   const isPublic = 
     path.includes('/auth/login') || 
     path.includes('/auth/register') || 
-    path.includes('/auth/demo') || 
     path.includes('/health') ||
+    path.includes('/portal/auth/') ||
     path.includes('/portal/data') ||
     path.includes('/portal/intake') ||
     path.includes('/portal/consent') ||
@@ -77,8 +98,8 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     path.includes('/portal/upload') ||
     url.includes('/auth/login') || 
     url.includes('/auth/register') || 
-    url.includes('/auth/demo') || 
     url.includes('/health') ||
+    url.includes('/portal/auth/') ||
     url.includes('/portal/data') ||
     url.includes('/portal/intake') ||
     url.includes('/portal/consent') ||
@@ -92,8 +113,8 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     url.includes('/portal/upload') ||
     originalUrl.includes('/auth/login') || 
     originalUrl.includes('/auth/register') || 
-    originalUrl.includes('/auth/demo') || 
     originalUrl.includes('/health') ||
+    originalUrl.includes('/portal/auth/') ||
     originalUrl.includes('/portal/data') ||
     originalUrl.includes('/portal/intake') ||
     originalUrl.includes('/portal/consent') ||
@@ -150,8 +171,51 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
       debug: reason
     });
   }
-  req.user = user;
-  next();
+  const product = getRequestedProduct(req);
+  if (!product) {
+    return res.status(400).json({ error: 'Produto invÃ¡lido ou nÃ£o informado.' });
+  }
+
+  try {
+    const result = await query(
+      `SELECT 
+         u.id, u.name, u.role, u.status,
+         upa.product, upa.plan, upa.product_role, upa.approval_status
+       FROM users u
+       LEFT JOIN user_product_access upa
+         ON upa.user_id = u.id AND upa.product = $2
+       WHERE u.id = $1`,
+      [user.id, product]
+    );
+
+    const dbUser = result.rows[0];
+    if (!dbUser) {
+      return res.status(401).json({ error: 'UsuÃ¡rio nÃ£o encontrado. FaÃ§a login novamente.' });
+    }
+
+    if (dbUser.status !== 'active') {
+      return res.status(403).json({ error: 'Conta global inativa ou bloqueada.' });
+    }
+
+    if (dbUser.approval_status !== 'approved') {
+      return res.status(403).json({ error: 'Acesso ao produto nÃ£o aprovado.' });
+    }
+
+    req.user = {
+      id: dbUser.id,
+      name: dbUser.name,
+      role: dbUser.role,
+      status: dbUser.status,
+      product: dbUser.product,
+      plan: dbUser.plan,
+      product_role: dbUser.product_role,
+      approval_status: dbUser.approval_status
+    };
+    next();
+  } catch (error) {
+    console.error('Auth database validation failed:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
 };
 
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
