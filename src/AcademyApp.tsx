@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from './config';
 import { Routes, Route } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, LogOut, Eye, EyeOff } from './icons';
@@ -59,9 +60,10 @@ export default function AcademyApp() {
     setLoginError('');
     
     try {
-      const res = await fetch('/api/academy/auth/login', {
+      const res = await fetch(`${API_URL}/api/academy/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify(loginData)
       });
       const data = await res.json();
@@ -97,9 +99,10 @@ export default function AcademyApp() {
     }
 
     try {
-      const res = await fetch('/api/academy/auth/register', {
+      const res = await fetch(`${API_URL}/api/academy/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify({
           name: registerData.name,
           email: registerData.email,

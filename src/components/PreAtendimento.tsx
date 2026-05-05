@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { API_URL } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2,
@@ -82,7 +83,7 @@ export function PreAtendimento() {
 
   const authenticateToken = async () => {
     try {
-      const res = await fetch(`/api/portal/auth/${token}`);
+      const res = await fetch(`${API_URL}/api/portal/auth/${token}`, { credentials: API_URL ? 'include' : 'same-origin' });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Link inválido ou expirado');
@@ -99,13 +100,15 @@ export function PreAtendimento() {
   };
 
   const portalFetch = async (url: string, options: any = {}) => {
-    return fetch(url, {
+    const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+    return fetch(fullUrl, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${sessionToken}`,
         ...options.headers
-      }
+      },
+      credentials: API_URL ? 'include' : 'same-origin'
     });
   };
 
@@ -138,9 +141,10 @@ export function PreAtendimento() {
         formData.append('description', `Documento: ${file.name}`);
         formData.append('file_type', file.type.includes('image') ? 'image' : 'document');
 
-        await fetch('/api/portal/upload', {
+        await fetch(`${API_URL}/api/portal/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${sessionToken}` },
+          credentials: API_URL ? 'include' : 'same-origin',
           body: formData
         });
         setUploadProgress(prev => ({ ...prev, [file.name]: true }));

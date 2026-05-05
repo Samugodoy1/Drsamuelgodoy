@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { API_URL } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
@@ -160,7 +161,7 @@ export function PatientPortal() {
 
   const authenticateAndLoad = async () => {
     try {
-      const authRes = await fetch(`/api/portal/auth/${token}`);
+      const authRes = await fetch(`${API_URL}/api/portal/auth/${token}`, { credentials: API_URL ? 'include' : 'same-origin' });
       const authData = await authRes.json();
       if (!authRes.ok) {
         setError(authData.error || 'Link inválido ou expirado');
@@ -170,8 +171,9 @@ export function PatientPortal() {
       setSessionToken(authData.session_token);
 
       // Load portal data
-      const dataRes = await fetch('/api/portal/data', {
-        headers: { 'Authorization': `Bearer ${authData.session_token}` }
+      const dataRes = await fetch(`${API_URL}/api/portal/data`, {
+        headers: { 'Authorization': `Bearer ${authData.session_token}` },
+        credentials: API_URL ? 'include' : 'same-origin'
       });
       const portalData = await dataRes.json();
       if (!dataRes.ok) throw new Error(portalData.error);
@@ -188,12 +190,13 @@ export function PatientPortal() {
     setScheduleSubmitting(true);
     try {
       const isReschedule = scheduleMode === 'reschedule' && scheduleTargetAppointment;
-      const res = await fetch(isReschedule ? '/api/portal/reschedule-appointment' : '/api/portal/request-appointment', {
+      const res = await fetch(isReschedule ? `${API_URL}/api/portal/reschedule-appointment` : `${API_URL}/api/portal/request-appointment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`
         },
+        credentials: API_URL ? 'include' : 'same-origin',
         body: JSON.stringify(
           isReschedule
             ? {
@@ -239,12 +242,13 @@ export function PatientPortal() {
     setAppointmentSubmittingId(appointmentId);
 
     try {
-      const res = await fetch('/api/portal/confirm-appointment', {
+      const res = await fetch(`${API_URL}/api/portal/confirm-appointment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`
         },
+        credentials: API_URL ? 'include' : 'same-origin',
         body: JSON.stringify({ appointment_id: appointmentId })
       });
       if (!res.ok) {
@@ -273,7 +277,7 @@ export function PatientPortal() {
   const loadPixInfo = async () => {
     if (!sessionToken || pixInfo) return;
     try {
-      const res = await fetch('/api/portal/pix-info', { headers: { 'Authorization': `Bearer ${sessionToken}` } });
+      const res = await fetch(`${API_URL}/api/portal/pix-info`, { headers: { 'Authorization': `Bearer ${sessionToken}` }, credentials: API_URL ? 'include' : 'same-origin' });
       if (res.ok) setPixInfo(await res.json());
     } catch {}
   };
@@ -281,9 +285,10 @@ export function PatientPortal() {
   const handleInformPayment = async (amount: number, installment_id?: number) => {
     setActionSubmitting(true);
     try {
-      const res = await fetch('/api/portal/inform-payment', {
+      const res = await fetch(`${API_URL}/api/portal/inform-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
         body: JSON.stringify({ amount, installment_id })
       });
       if (!res.ok) throw new Error();

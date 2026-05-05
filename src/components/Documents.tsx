@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL } from '../config';
 import {
   FileText,
   User,
@@ -162,7 +163,7 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
         const data = await res.json();
         const token = localStorage.getItem('token');
         // Trigger PDF download via browser with token in query string
-        window.location.href = `/api/documents/${data.id}/pdf?token=${token}`;
+        window.location.href = `${API_URL}/api/documents/${data.id}/pdf?token=${token}`;
       } else {
         alert('Erro ao salvar documento para gerar PDF.');
       }

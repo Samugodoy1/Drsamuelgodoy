@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API_URL } from '../config';
 import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -167,8 +168,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           headers['x-auth-token'] = token;
         }
         const [dashRes, schedRes] = await Promise.all([
-          fetch('/api/intelligence/dashboard', { headers }),
-          fetch('/api/intelligence/scheduling', { headers }),
+          fetch(`${API_URL}/api/intelligence/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
+          fetch(`${API_URL}/api/intelligence/scheduling`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
         ]);
         if (dashRes.ok && !cancelled) {
           setIntelligence(await dashRes.json());
