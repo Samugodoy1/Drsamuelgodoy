@@ -1,3 +1,5 @@
+import { API_URL } from '../config';
+
 /**
  * PaymentModal Component
  * Handles payment method selection and PIX transfer workflow
@@ -58,8 +60,9 @@ export function PaymentModal({
 
     const loadPixInfo = async () => {
       try {
-        const res = await fetch('/api/portal/pix-info', {
+        const res = await fetch(`${API_URL}/api/portal/pix-info`, {
           headers: { 'Authorization': `Bearer ${sessionToken}` },
+          credentials: API_URL ? 'include' : 'same-origin',
         });
         if (res.ok) {
           const data = await res.json();
@@ -132,12 +135,13 @@ export function PaymentModal({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/portal/inform-payment', {
+      const res = await fetch(`${API_URL}/api/portal/inform-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
         },
+        credentials: API_URL ? 'include' : 'same-origin',
         body: JSON.stringify({ amount, installment_id: installmentId }),
       });
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, ArrowRight, Sparkles } from '../icons';
@@ -12,9 +13,10 @@ export function ExploreDemo() {
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/auth/demo', {
+      const res = await fetch(`${API_URL}/api/auth/demo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify({})
       });
       

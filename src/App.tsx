@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Routes, Route, useParams, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { API_URL } from './config';
 import {
   Users,
   Calendar,
@@ -1191,9 +1192,10 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify(loginData)
       });
       const data = await res.json();
@@ -1224,9 +1226,10 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify(registerData)
       });
       const data = await res.json();
@@ -1252,9 +1255,10 @@ export default function App() {
   const updateUserOnboarding = async (field: 'onboarding_done' | 'welcome_seen') => {
     const token = localStorage.getItem('token');
     try {
-      await fetch('/api/profile/onboarding', {
+      await fetch(`${API_URL}/api/profile/onboarding`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'x-product': getCurrentProduct() },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify({ product: getCurrentProduct(), [field]: true, onboarding_completed: field === 'onboarding_done' ? true : undefined })
       });
     } catch (e) {
@@ -1378,7 +1382,8 @@ export default function App() {
       headers['x-auth-token'] = token;
     }
     
-    const response = await fetch(url, { ...options, headers });
+    const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+    const response = await fetch(fullUrl, { ...options, headers, credentials: API_URL ? 'include' : 'same-origin' });
     if (response.status === 401) {
       try {
         const errorData = await response.json();
@@ -6706,9 +6711,10 @@ function ForgotPassword() {
     setError('');
     setMessage('');
     try {
-      const res = await fetch('/api/auth/request-password-reset', {
+      const res = await fetch(`${API_URL}/api/auth/request-password-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
@@ -6835,9 +6841,10 @@ function ResetPassword() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await fetch(`${API_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
         body: JSON.stringify({ token, password }),
       });
       const data = await res.json();

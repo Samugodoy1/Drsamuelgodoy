@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, AlertTriangle, Users, Calendar, DollarSign,
@@ -147,7 +148,7 @@ export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord, produ
           headers['Authorization'] = `Bearer ${token}`;
           headers['x-auth-token'] = token;
         }
-        const res = await fetch('/api/ml/dashboard', { headers });
+        const res = await fetch(`${API_URL}/api/ml/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const });
         if (!res.ok) throw new Error('Erro ao carregar dados de ML');
         const json = await res.json();
         setData(json);

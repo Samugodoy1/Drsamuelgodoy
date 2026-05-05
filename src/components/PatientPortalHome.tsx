@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL } from '../config';
 import { AnimatePresence } from 'framer-motion';
 import { Calendar, CheckCircle2, ClipboardList, Lock, MessageCircle, UserRound, Home, MapPin } from '../icons';
 import { usePatientMoment } from '../hooks/usePatientMoment';
@@ -69,9 +70,10 @@ export function PatientPortalHome({
   const handleScheduleRequest = async (payload: { complaint: string; desiredPeriod: string; observation?: string; isUrgent?: boolean }) => {
     setIsSubmittingSchedule(true);
     try {
-      const res = await fetch('/api/portal/request-appointment', {
+      const res = await fetch(`${API_URL}/api/portal/request-appointment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
         body: JSON.stringify({
           preferred_date: new Date().toLocaleDateString('en-CA'),
           desired_period: payload.desiredPeriod,
