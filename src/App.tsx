@@ -727,6 +727,15 @@ export default function App() {
   const [guideDismissedUntil, setGuideDismissedUntil] = useState<string | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ─── Stable refs for apiFetch dependencies ────────────────────────────
+  const userRef = useRef(user);
+  userRef.current = user;
+  const getCurrentProductRef = useRef(getCurrentProduct);
+  getCurrentProductRef.current = getCurrentProduct;
+  const dataFetchedRef = useRef(false);
+  const profileFetchingRef = useRef(false);
+  const adminFetchedRef = useRef(false);
+
   const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false, onUndo?: () => void) => {
     if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
     setNotification({ message, type, celebration, onUndo });
@@ -800,15 +809,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      fetchData();
-      fetchProfile();
-      if (user.role?.toUpperCase() === 'ADMIN') {
-        fetchAdminUsers();
-        apiFetch('/api/admin/update-schema', { product: ODONTOHUB_PRODUCT }).catch(console.error);
-      }
+    if (!user?.id) { dataFetchedRef.current = false; adminFetchedRef.current = false; return; }
+    if (dataFetchedRef.current) return;
+    dataFetchedRef.current = true;
+    fetchData();
+    fetchProfile();
+    if (user.role?.toUpperCase() === 'ADMIN' && !adminFetchedRef.current) {
+      adminFetchedRef.current = true;
+      fetchAdminUsers();
+      apiFetch('/api/admin/update-schema', { product: ODONTOHUB_PRODUCT }).catch(console.error);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (selectedPatientTab === 'financeiro' && selectedPatient) {
@@ -816,13 +827,18 @@ export default function App() {
     }
   }, [selectedPatientTab, selectedPatient?.id]);
 
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    if ((activeTab === 'configuracoes' || activeTab === 'documentos') && user) {
+    if (prevTabRef.current === activeTab) return;
+    prevTabRef.current = activeTab;
+    if ((activeTab === 'configuracoes' || activeTab === 'documentos') && userRef.current) {
       fetchProfile();
     }
-  }, [activeTab, user]);
+  }, [activeTab]);
 
   const fetchProfile = async () => {
+    if (profileFetchingRef.current) return;
+    profileFetchingRef.current = true;
     try {
       const res = await apiFetch('/api/profile');
       if (res.ok) {
@@ -830,14 +846,30 @@ export default function App() {
         setProfile(data);
         setUser(prev => {
           if (!prev) return prev;
-          const currentAccess = data.product_accesses?.find((access: ProductAccess) => access.product === getCurrentProduct());
+          const currentAccess = data.product_accesses?.find((access: ProductAccess) => access.product === getCurrentProductRef.current());
+          const newAccesses = data.product_accesses;
+          const newOnboarding = currentAccess?.onboarding_completed ?? prev.onboarding_done;
+          const newWelcome = data.welcome_seen;
+          const newRecord = data.record_opened;
+          const newProduct = data.current_product;
+          // Only create a new object if something actually changed
+          if (
+            JSON.stringify(prev.product_accesses) === JSON.stringify(newAccesses) &&
+            prev.current_product === newProduct &&
+            prev.onboarding_done === newOnboarding &&
+            prev.welcome_seen === newWelcome &&
+            prev.record_opened === newRecord
+          ) {
+            localStorage.setItem('user', JSON.stringify(prev));
+            return prev; // same reference — no re-render
+          }
           const updated = {
             ...prev,
-            product_accesses: data.product_accesses,
-            current_product: data.current_product,
-            onboarding_done: currentAccess?.onboarding_completed ?? prev.onboarding_done,
-            welcome_seen: data.welcome_seen,
-            record_opened: data.record_opened
+            product_accesses: newAccesses,
+            current_product: newProduct,
+            onboarding_done: newOnboarding,
+            welcome_seen: newWelcome,
+            record_opened: newRecord
           };
           localStorage.setItem('user', JSON.stringify(updated));
           return updated;
@@ -845,6 +877,8 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    } finally {
+      profileFetchingRef.current = false;
     }
   };
 
@@ -1202,10 +1236,15 @@ export default function App() {
       if (res.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        dataFetchedRef.current = true; // prevent duplicate fetch from useEffect
+        adminFetchedRef.current = false;
         setUser(data.user);
         fetchData(data.token);
-        if (data.user.role === 'DENTIST') {
-          // No filter needed
+        fetchProfile();
+        if (data.user.role?.toUpperCase() === 'ADMIN') {
+          adminFetchedRef.current = true;
+          fetchAdminUsers();
+          apiFetch('/api/admin/update-schema', { product: ODONTOHUB_PRODUCT }).catch(console.error);
         }
       } else {
         setLoginError(data.error || 'Erro ao fazer login');
@@ -1245,6 +1284,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    dataFetchedRef.current = false;
+    adminFetchedRef.current = false;
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -1364,9 +1405,9 @@ export default function App() {
 
   const maxWeeklyRevenue = Math.max(...weeklyRevenueData.map(d => d.amount), 1);
 
-  const apiFetch = async (url: string, options: any = {}) => {
+  const apiFetch = useCallback(async (url: string, options: any = {}) => {
     const token = options.explicitToken || localStorage.getItem('token');
-    const product = options.product || getCurrentProduct();
+    const product = options.product || getCurrentProductRef.current();
     const headers: any = {
       'Accept': 'application/json',
       'x-product': product,
@@ -1405,7 +1446,7 @@ export default function App() {
       }
     }
     return response;
-  };
+  }, []);  // stable — reads volatile values via refs
 
   const openAppointmentModal = () => {
     const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
@@ -7224,6 +7265,8 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
   const [doc, setDoc] = useState<any>(null);
   const [fullPatient, setFullPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const apiFetchRef = useRef(apiFetch);
+  apiFetchRef.current = apiFetch;
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -7231,7 +7274,7 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
       const genericTypes = ['receituario', 'declaracao', 'atestado', 'encaminhamento', 'ficha', 'orcamento'];
       if (type && genericTypes.includes(type) && id) {
         try {
-          const res = await apiFetch(`/api/documents/${id}`);
+          const res = await apiFetchRef.current(`/api/documents/${id}`);
           if (res.ok) {
             const data = await res.json();
             const parsedDoc = {
@@ -7241,7 +7284,7 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
             setDoc(parsedDoc);
             
             if (data.patient_id) {
-              const pRes = await apiFetch(`/api/patients/${data.patient_id}`);
+              const pRes = await apiFetchRef.current(`/api/patients/${data.patient_id}`);
               if (pRes.ok) {
                 const pData = await pRes.json();
                 setFullPatient(pData);
@@ -7259,7 +7302,7 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
     };
 
     fetchDoc();
-  }, [id, type, apiFetch]);
+  }, [id, type]);
 
   if (loading) return <div className="bg-white flex items-center justify-center font-bold text-slate-400 py-20">Carregando dados para impressão...</div>;
 
