@@ -1,39 +1,43 @@
-# Projeto OdontoHub
+# OdontoHub — Frontend
 
-Este é um projeto Full-Stack (React + Node.js/TypeScript) para gestão de clínicas odontológicas.
+Frontend React do sistema OdontoHub para gestao de clinicas odontologicas.  
+O backend roda na API central: [odontohub-api](https://github.com/Samugodoy1/odontohub-api) (`https://api.odontohub.app.br`).
 
-## Tecnologias Utilizadas
+## Tecnologias
 
-### Backend
-- **Express**: Framework web para Node.js.
-- **PostgreSQL (Neon)**: Banco de dados relacional.
-- **Vercel Serverless Functions**: Para execução do backend em produção.
-- **tsx**: Para execução em desenvolvimento.
-
-### Frontend
-- **React**: Biblioteca para construção de interfaces.
-- **Vite**: Ferramenta de build e desenvolvimento.
-- **Tailwind CSS**: Framework CSS utilitário.
-- **Lucide React**: Ícones SVG.
-- **Motion**: Biblioteca de animações.
+- **React 19** + **TypeScript**
+- **Vite** — build e dev server
+- **Tailwind CSS 4**
+- **Lucide React** — icones
+- **Motion / Framer Motion** — animacoes
 
 ## Requisitos
-- **Node.js**: >= 18.0.0
-- **npm**: >= 9.0.0
+
+- Node.js >= 18
+- npm >= 9
 
 ## Como executar localmente
 
-1. Instale as dependências:
+1. Instale as dependencias:
    ```bash
    npm install
    ```
 
-2. Configure as variáveis de ambiente no arquivo `.env`:
+2. Configure `.env` (copie de `.env.example`):
    ```env
-   DATABASE_URL=seu_url_do_postgres
+   VITE_API_URL=https://api.odontohub.app.br
    ```
 
-3. Inicie o servidor de desenvolvimento:
+3. Inicie o dev server:
    ```bash
    npm run dev
    ```
+
+## Scripts
+
+| Comando | Descricao |
+|---------|-----------|
+| `npm run dev` | Inicia o Vite dev server |
+| `npm run build` | Build de producao |
+| `npm run preview` | Preview do build local |
+| `npm run lint` | Verifica tipos com TypeScript |
