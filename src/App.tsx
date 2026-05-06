@@ -60,6 +60,7 @@ import { PreAtendimento } from './components/PreAtendimento';
 import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
 import { MLInsights } from './components/MLInsights';
+import { SubscriptionManagement } from './components/SubscriptionManagement';
 import { Academy, AcademyPatients, AcademyAgenda, AcademyStudy, AcademyChecklist } from './components/Academy';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 
@@ -219,7 +220,7 @@ interface Transaction {
 }
 
 type Product = 'odontohub' | 'academy';
-type ProductPlan = 'free' | 'pro';
+type ProductPlan = 'free' | 'pro' | 'student';
 type ProductApprovalStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
 
 interface ProductAccess {
@@ -5262,6 +5263,13 @@ export default function App() {
                     </div>
                   </form>
                 )}
+
+                {/* ── SUBSCRIPTION ── */}
+                <SubscriptionManagement
+                  apiFetch={apiFetch}
+                  product="odontohub"
+                  currentPlan={getProductAccess('odontohub')?.plan || 'free'}
+                />
 
                 {/* ── LEGAL (minimal) ── */}
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
