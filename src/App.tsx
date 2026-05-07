@@ -397,7 +397,98 @@ const LegacyClinicalRedirect = () => {
   const { id } = useParams();
   return <Navigate to={id ? `/prontuario/${id}` : '/'} replace />;
 };
+const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
+  if (!data?.open) return null;
 
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-slate-950/40 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.96 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className="w-full max-w-[460px] rounded-[28px] bg-white shadow-2xl border border-slate-100 overflow-hidden"
+        >
+          <div className="p-7">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-5">
+              <Sparkles size={24} />
+            </div>
+
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 mb-2">
+              Plano Free
+            </p>
+
+            <h2 className="text-2xl font-bold text-slate-950 tracking-[-0.04em] mb-3">
+              Seu OdontoHub está ficando cheio.
+            </h2>
+
+            <p className="text-slate-500 leading-relaxed mb-6">
+              Você já organizou {data.currentUsage} pacientes. Para continuar cadastrando novos pacientes e manter tudo em um só lugar, mude para o OdontoHub Pro.
+            </p>
+
+            <div className="mb-6">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="font-semibold text-slate-700">Pacientes no Free</span>
+                <span className="font-bold text-slate-950">
+                  {data.currentUsage}/{data.limit}
+                </span>
+              </div>
+
+              <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full w-full rounded-full bg-emerald-500" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 mb-6">
+              <p className="font-bold text-slate-900 mb-3">
+                Com o Pro você libera:
+              </p>
+
+              <div className="space-y-2 text-sm text-slate-600">
+                <div className="flex gap-2">
+                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+                  <span>Pacientes ilimitados</span>
+                </div>
+                <div className="flex gap-2">
+                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+                  <span>Agenda e prontuário sem limite</span>
+                </div>
+                <div className="flex gap-2">
+                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+                  <span>Inteligência para lembrar quem precisa voltar</span>
+                </div>
+                <div className="flex gap-2">
+                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+                  <span>Portal do paciente e financeiro completo</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={onUpgrade}
+              className="w-full h-13 rounded-2xl bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition"
+            >
+              Mudar para Pro
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-full h-11 mt-2 rounded-2xl text-slate-500 font-semibold hover:bg-slate-50 transition"
+            >
+              Agora não
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 export default function App() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia' | 'academy'>('dashboard');
@@ -410,6 +501,11 @@ export default function App() {
     endDate: new Date().toLocaleDateString('en-CA'),
     patientId: 'all',
     category: 'all',
+  });
+  const [upgradeLimitModal, setUpgradeLimitModal] = useState<any>({
+  open: false,
+  limit: 0,
+  currentUsage: 0,
   });
 
   const exportPatients = () => {
@@ -2417,6 +2513,7 @@ export default function App() {
   };
 
   return (
+    <>
     <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
@@ -6760,6 +6857,16 @@ export default function App() {
         )
       } />
     </Routes>
+        <UpgradeLimitModal
+      data={upgradeLimitModal}
+      onClose={() => setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 })}
+      onUpgrade={() => {
+        setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 });
+        setActiveTab('configuracoes');
+        navigate('/');
+      }}
+    />
+  </>
   );
 }
 
