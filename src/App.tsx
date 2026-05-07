@@ -503,7 +503,7 @@ export default function App() {
     category: 'all',
   });
   const [upgradeLimitModal, setUpgradeLimitModal] = useState<any>({
-  open: true,
+  open: false,
   limit: 15,
   currentUsage: 15,
   });
