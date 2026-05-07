@@ -2136,6 +2136,16 @@ export default function App() {
         );
       } else {
         const data = await res.json();
+      
+        if (data.upgrade_required) {
+          setUpgradeLimitModal({
+            open: true,
+            limit: data.limit,
+            currentUsage: data.current_usage,
+          });
+          return;
+        }
+      
         showNotification(data.error || 'Erro ao cadastrar paciente', 'error');
       }
     } catch (error) {
