@@ -505,7 +505,7 @@ export default function App() {
   const [upgradeLimitModal, setUpgradeLimitModal] = useState<any>({
   open: false,
   limit: 15,
-  currentUsage: 15,
+  currentUsage: 0,
   });
 
   const exportPatients = () => {
