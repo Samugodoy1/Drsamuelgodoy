@@ -406,46 +406,55 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
     <AnimatePresence>
       {data?.open && (
         <motion.div
-          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-slate-950/30 backdrop-blur-xl"
+          className="fixed inset-0 z-[9999] bg-slate-950/35 backdrop-blur-md sm:flex sm:items-center sm:justify-center sm:px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            initial={{ opacity: 0, y: 42, scale: 1 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="relative w-full max-w-[480px] overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.22)] border border-white/70"
+            exit={{ opacity: 0, y: 42, scale: 1 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="
+              fixed bottom-0 left-0 right-0
+              max-h-[92dvh] overflow-hidden
+              rounded-t-[30px] bg-white shadow-[0_-20px_70px_rgba(15,23,42,0.22)]
+              sm:relative sm:bottom-auto sm:left-auto sm:right-auto
+              sm:w-full sm:max-w-[460px] sm:rounded-[34px]
+              sm:max-h-[90vh]
+            "
           >
+            <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-slate-200 sm:hidden" />
+
             <button
               onClick={onClose}
-              className="absolute right-5 top-5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100/80 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100/90 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
               aria-label="Fechar"
             >
               <X size={18} />
             </button>
 
-            <div className="px-7 pt-8 pb-7">
-              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[22px] bg-slate-950 text-white shadow-lg shadow-slate-950/15">
-                <Sparkles size={28} />
+            <div className="max-h-[92dvh] overflow-y-auto px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pb-7 sm:pt-8">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[20px] bg-slate-950 text-white shadow-lg shadow-slate-950/15 sm:h-16 sm:w-16 sm:rounded-[22px]">
+                <Sparkles size={25} />
               </div>
 
               <div className="text-center">
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400 sm:text-[11px]">
                   OdontoHub Free
                 </p>
 
-                <h2 className="mx-auto max-w-[360px] text-[28px] font-bold leading-[1.05] tracking-[-0.055em] text-slate-950">
+                <h2 className="mx-auto max-w-[330px] text-[25px] font-bold leading-[1.06] tracking-[-0.055em] text-slate-950 sm:max-w-[360px] sm:text-[28px]">
                   Seu OdontoHub está crescendo.
                 </h2>
 
-                <p className="mx-auto mt-4 max-w-[360px] text-[15px] leading-6 text-slate-500">
-                  Você já organizou {currentUsage} pacientes. Para continuar cadastrando sem perder o controle da agenda, prontuários e retornos, mude para o Pro.
+                <p className="mx-auto mt-3 max-w-[330px] text-[14px] leading-6 text-slate-500 sm:mt-4 sm:max-w-[360px] sm:text-[15px]">
+                  Você já organizou {currentUsage} pacientes. Para continuar cadastrando sem perder o controle, mude para o Pro.
                 </p>
               </div>
 
-              <div className="mt-7 rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
+              <div className="mt-6 rounded-[22px] border border-slate-100 bg-slate-50/80 p-4 sm:rounded-[24px]">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-700">
                     Pacientes no Free
@@ -466,16 +475,15 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-2.5">
+              <div className="mt-4 grid gap-2">
                 {[
                   'Pacientes ilimitados',
                   'Agenda e prontuário sem limite',
                   'Lembretes inteligentes de retorno',
-                  'Portal do paciente e financeiro completo',
                 ].map((item) => (
                   <div
                     key={item}
-                    className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 text-sm text-slate-600 ring-1 ring-slate-100"
+                    className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 text-[13px] text-slate-600 ring-1 ring-slate-100 sm:text-sm"
                   >
                     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                       <CheckCircle2 size={15} />
@@ -485,19 +493,19 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
                 ))}
               </div>
 
-              <div className="mt-7 space-y-2.5">
+              <div className="sticky bottom-0 mt-6 space-y-2 bg-white/95 pt-3 backdrop-blur-md">
                 <button
                   onClick={onUpgrade}
-                  className="h-12 w-full rounded-full bg-slate-950 text-[15px] font-bold text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0"
+                  className="h-12 w-full rounded-full bg-slate-950 text-[15px] font-bold text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition active:scale-[0.99] sm:hover:-translate-y-0.5 sm:hover:bg-slate-800"
                 >
                   Mudar para o Pro
                 </button>
 
                 <button
                   onClick={onClose}
-                  className="h-11 w-full rounded-full text-[14px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="h-11 w-full rounded-full text-[14px] font-semibold text-slate-500 transition active:scale-[0.99] sm:hover:bg-slate-100 sm:hover:text-slate-700"
                 >
-                  Continuar no Free por enquanto
+                  Continuar no Free
                 </button>
               </div>
             </div>
