@@ -122,6 +122,40 @@ function openWhatsApp(phone: string, name: string) {
   window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`, '_blank');
 }
 
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function appointmentDateKey(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-CA');
+}
+
+function appointmentMinutes(value: string): number {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return -1;
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function suggestionConflictsWithAppointments(suggestion: SchedulingSuggestion, appointments: any[]): boolean {
+  const slot = suggestion.suggested_slot;
+  const startMin = timeToMinutes(slot.start);
+  const endMin = timeToMinutes(slot.end);
+
+  return appointments.some((appointment) => {
+    if (appointment.status === 'CANCELLED') return false;
+    if (appointmentDateKey(appointment.start_time) !== slot.date) return false;
+
+    const appointmentStart = appointmentMinutes(appointment.start_time);
+    const appointmentEnd = appointmentMinutes(appointment.end_time);
+    if (appointmentStart < 0 || appointmentEnd <= appointmentStart) return false;
+
+    return startMin < appointmentEnd && endMin > appointmentStart;
+  });
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -188,6 +222,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return () => { cancelled = true; };
   }, []);
 
+  const availableSchedulingSuggestions = schedulingSuggestions.filter(
+    suggestion => !suggestionConflictsWithAppointments(suggestion, appointments)
+  );
+
   const nextPatient = nextAppointments[0];
   const otherAppointments = nextAppointments.slice(1, 5);
 
@@ -214,7 +252,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const urgentCount = intelligence?.needsActionToday?.length || 0;
     const abandonCount = intelligence?.abandonmentRisk?.length || 0;
     const remaining = todayAppointmentsRemainingCount;
-    const suggestionsCount = schedulingSuggestions.length;
+    const suggestionsCount = availableSchedulingSuggestions.length;
 
     // Use a daily seed so the variant stays consistent throughout the day
     const daySeed = new Date().toISOString().slice(0, 10);
@@ -299,7 +337,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const getInsightCard = (): { text: string; icon: React.ReactNode; accent: string } | null => {
     const abandonCount = intelligence?.abandonmentRisk?.length || 0;
-    const suggestionsCount = schedulingSuggestions.length;
+    const suggestionsCount = availableSchedulingSuggestions.length;
     const remaining = todayAppointmentsRemainingCount;
     const unconfirmed = tomorrowUnconfirmedCount;
     const revenue = todayRevenue || 0;
@@ -1089,8 +1127,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-1.5 text-center">
             <p className="text-[19px] font-bold text-[#1C1C1E]">Agenda livre</p>
             <p className="text-[14px] text-[#8E8E93]">
-              {schedulingSuggestions.length > 0
-                ? `${schedulingSuggestions.length} paciente${schedulingSuggestions.length === 1 ? '' : 's'} aguardando encaixe`
+              {availableSchedulingSuggestions.length > 0
+                ? `${availableSchedulingSuggestions.length} paciente${availableSchedulingSuggestions.length === 1 ? '' : 's'} aguardando encaixe`
                 : 'Nenhuma consulta por agora'}
             </p>
           </div>
@@ -1348,17 +1386,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       })()}
 
       {/* 8. SMART SCHEDULING SUGGESTIONS — neutral with violet accent */}
-      {schedulingSuggestions.length > 0 && (
+      {availableSchedulingSuggestions.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-1 h-5 rounded-full bg-violet-400" />
               <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Sugestões de encaixe</h3>
             </div>
-            <span className="text-[12px] font-bold text-[#8E8E93]">{schedulingSuggestions.length}</span>
+            <span className="text-[12px] font-bold text-[#8E8E93]">{availableSchedulingSuggestions.length}</span>
           </div>
           <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-            {schedulingSuggestions.slice(0, 4).map((sug, i) => {
+            {availableSchedulingSuggestions.slice(0, 4).map((sug, i) => {
               const dayLabel = (() => {
                 const d = new Date(sug.suggested_slot.date + 'T12:00:00');
                 const today = new Date(); today.setHours(0,0,0,0);
@@ -1372,7 +1410,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   key={`sug-${i}`}
                   whileTap={{ backgroundColor: '#F2F2F7' }}
                   transition={{ duration: 0.15 }}
-                  className={`flex items-center gap-4 px-5 py-[14px] cursor-pointer ${i !== Math.min(schedulingSuggestions.length, 4) - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+                  className={`flex items-center gap-4 px-5 py-[14px] cursor-pointer ${i !== Math.min(availableSchedulingSuggestions.length, 4) - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
                   onClick={() => openPatientRecord(sug.patient.patient_id)}
                 >
                   <div className="w-10 h-10 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-[13px] overflow-hidden border border-violet-100 shrink-0">
@@ -1399,9 +1437,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               );
             })}
           </div>
-          {schedulingSuggestions.length > 4 && (
+          {availableSchedulingSuggestions.length > 4 && (
             <button type="button" onClick={() => setActiveTab('agenda')} className="text-[13px] font-semibold text-violet-600 px-1">
-              Ver todas as {schedulingSuggestions.length} sugestões →
+              Ver todas as {availableSchedulingSuggestions.length} sugestões →
             </button>
           )}
         </section>
