@@ -398,94 +398,112 @@ const LegacyClinicalRedirect = () => {
   return <Navigate to={id ? `/prontuario/${id}` : '/'} replace />;
 };
 const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
-  if (!data?.open) return null;
+  const limit = data?.limit || 15;
+  const currentUsage = data?.currentUsage || limit;
+  const progress = Math.min(100, Math.round((currentUsage / limit) * 100));
 
   return (
     <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-slate-950/40 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
+      {data?.open && (
         <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.96 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-          className="w-full max-w-[460px] rounded-[28px] bg-white shadow-2xl border border-slate-100 overflow-hidden"
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-slate-950/30 backdrop-blur-xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
         >
-          <div className="p-7">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-5">
-              <Sparkles size={24} />
-            </div>
-
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 mb-2">
-              Plano Free
-            </p>
-
-            <h2 className="text-2xl font-bold text-slate-950 tracking-[-0.04em] mb-3">
-              Seu OdontoHub está ficando cheio.
-            </h2>
-
-            <p className="text-slate-500 leading-relaxed mb-6">
-              Você já organizou {data.currentUsage} pacientes. Para continuar cadastrando novos pacientes e manter tudo em um só lugar, mude para o OdontoHub Pro.
-            </p>
-
-            <div className="mb-6">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="font-semibold text-slate-700">Pacientes no Free</span>
-                <span className="font-bold text-slate-950">
-                  {data.currentUsage}/{data.limit}
-                </span>
-              </div>
-
-              <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full w-full rounded-full bg-emerald-500" />
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 mb-6">
-              <p className="font-bold text-slate-900 mb-3">
-                Com o Pro você libera:
-              </p>
-
-              <div className="space-y-2 text-sm text-slate-600">
-                <div className="flex gap-2">
-                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
-                  <span>Pacientes ilimitados</span>
-                </div>
-                <div className="flex gap-2">
-                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
-                  <span>Agenda e prontuário sem limite</span>
-                </div>
-                <div className="flex gap-2">
-                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
-                  <span>Inteligência para lembrar quem precisa voltar</span>
-                </div>
-                <div className="flex gap-2">
-                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
-                  <span>Portal do paciente e financeiro completo</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={onUpgrade}
-              className="w-full h-13 rounded-2xl bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition"
-            >
-              Mudar para Pro
-            </button>
-
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="relative w-full max-w-[480px] overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.22)] border border-white/70"
+          >
             <button
               onClick={onClose}
-              className="w-full h-11 mt-2 rounded-2xl text-slate-500 font-semibold hover:bg-slate-50 transition"
+              className="absolute right-5 top-5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100/80 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              aria-label="Fechar"
             >
-              Agora não
+              <X size={18} />
             </button>
-          </div>
+
+            <div className="px-7 pt-8 pb-7">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[22px] bg-slate-950 text-white shadow-lg shadow-slate-950/15">
+                <Sparkles size={28} />
+              </div>
+
+              <div className="text-center">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                  OdontoHub Free
+                </p>
+
+                <h2 className="mx-auto max-w-[360px] text-[28px] font-bold leading-[1.05] tracking-[-0.055em] text-slate-950">
+                  Seu OdontoHub está crescendo.
+                </h2>
+
+                <p className="mx-auto mt-4 max-w-[360px] text-[15px] leading-6 text-slate-500">
+                  Você já organizou {currentUsage} pacientes. Para continuar cadastrando sem perder o controle da agenda, prontuários e retornos, mude para o Pro.
+                </p>
+              </div>
+
+              <div className="mt-7 rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Pacientes no Free
+                  </span>
+
+                  <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-slate-950 shadow-sm ring-1 ring-slate-100">
+                    {currentUsage}/{limit}
+                  </span>
+                </div>
+
+                <div className="h-2.5 overflow-hidden rounded-full bg-slate-200/70">
+                  <motion.div
+                    className="h-full rounded-full bg-slate-950"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.45, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-2.5">
+                {[
+                  'Pacientes ilimitados',
+                  'Agenda e prontuário sem limite',
+                  'Lembretes inteligentes de retorno',
+                  'Portal do paciente e financeiro completo',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 text-sm text-slate-600 ring-1 ring-slate-100"
+                  >
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 size={15} />
+                    </div>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-7 space-y-2.5">
+                <button
+                  onClick={onUpgrade}
+                  className="h-12 w-full rounded-full bg-slate-950 text-[15px] font-bold text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0"
+                >
+                  Mudar para o Pro
+                </button>
+
+                <button
+                  onClick={onClose}
+                  className="h-11 w-full rounded-full text-[14px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                >
+                  Continuar no Free por enquanto
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
     </AnimatePresence>
   );
 };
