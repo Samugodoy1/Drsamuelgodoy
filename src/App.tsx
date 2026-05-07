@@ -401,32 +401,6 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
   const limit = data?.limit || 15;
   const currentUsage = data?.currentUsage || limit;
   const progress = Math.min(100, Math.round((currentUsage / limit) * 100));
-  const product = data?.product === ACADEMY_PRODUCT ? ACADEMY_PRODUCT : ODONTOHUB_PRODUCT;
-  const copy = product === ACADEMY_PRODUCT
-    ? {
-        eyebrow: 'Academy Free',
-        title: 'Seu Academy já tem seus primeiros casos.',
-        description: 'Você já organizou 3 casos. Para continuar acompanhando seus pacientes, evoluções e atendimentos da faculdade, mude para o Academy Student.',
-        usageLabel: 'Casos no Free',
-        button: 'Mudar para Student',
-        benefits: [
-          'Casos ilimitados',
-          'Agenda acadêmica sem limite',
-          'Evoluções e modo box completos',
-        ],
-      }
-    : {
-        eyebrow: 'OdontoHub Free',
-        title: 'Seu OdontoHub está crescendo.',
-        description: `Você já organizou ${currentUsage} pacientes. Para continuar cadastrando sem perder o controle, mude para o Pro.`,
-        usageLabel: 'Pacientes no Free',
-        button: 'Mudar para o Pro',
-        benefits: [
-          'Pacientes ilimitados',
-          'Agenda e prontuário sem limite',
-          'Lembretes inteligentes de retorno',
-        ],
-      };
 
   return (
     <AnimatePresence>
@@ -468,22 +442,22 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
 
               <div className="text-center">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400 sm:text-[11px]">
-                  {copy.eyebrow}
+                  OdontoHub Free
                 </p>
 
                 <h2 className="mx-auto max-w-[330px] text-[25px] font-bold leading-[1.06] tracking-[-0.055em] text-slate-950 sm:max-w-[360px] sm:text-[28px]">
-                  {copy.title}
+                  Seu OdontoHub está crescendo.
                 </h2>
 
                 <p className="mx-auto mt-3 max-w-[330px] text-[14px] leading-6 text-slate-500 sm:mt-4 sm:max-w-[360px] sm:text-[15px]">
-                  {copy.description}
+                  Você já organizou {currentUsage} pacientes. Para continuar cadastrando sem perder o controle, mude para o Pro.
                 </p>
               </div>
 
               <div className="mt-6 rounded-[22px] border border-slate-100 bg-slate-50/80 p-4 sm:rounded-[24px]">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-700">
-                    {copy.usageLabel}
+                    Pacientes no Free
                   </span>
 
                   <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-slate-950 shadow-sm ring-1 ring-slate-100">
@@ -502,7 +476,11 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
               </div>
 
               <div className="mt-4 grid gap-2">
-                {copy.benefits.map((item) => (
+                {[
+                  'Pacientes ilimitados',
+                  'Agenda e prontuário sem limite',
+                  'Lembretes inteligentes de retorno',
+                ].map((item) => (
                   <div
                     key={item}
                     className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 text-[13px] text-slate-600 ring-1 ring-slate-100 sm:text-sm"
@@ -520,7 +498,7 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
                   onClick={onUpgrade}
                   className="h-12 w-full rounded-full bg-slate-950 text-[15px] font-bold text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition active:scale-[0.99] sm:hover:-translate-y-0.5 sm:hover:bg-slate-800"
                 >
-                  {copy.button}
+                  Mudar para o Pro
                 </button>
 
                 <button
@@ -555,7 +533,6 @@ export default function App() {
   limit: 15,
   currentUsage: 0,
   });
-  const [subscriptionProduct, setSubscriptionProduct] = useState<Product>(ODONTOHUB_PRODUCT);
 
   const exportPatients = () => {
     let filteredP = patients;
@@ -2191,8 +2168,6 @@ export default function App() {
             open: true,
             limit: data.limit,
             currentUsage: data.current_usage,
-            product: data.product || getCurrentProductRef.current(),
-            upgradePlan: data.upgrade_plan,
           });
           return;
         }
@@ -5440,8 +5415,8 @@ export default function App() {
                 {/* ── SUBSCRIPTION ── */}
                 <SubscriptionManagement
                   apiFetch={apiFetch}
-                  product={subscriptionProduct}
-                  currentPlan={getProductAccess(subscriptionProduct)?.plan || 'free'}
+                  product="odontohub"
+                  currentPlan={getProductAccess('odontohub')?.plan || 'free'}
                 />
 
                 {/* ── LEGAL (minimal) ── */}
@@ -6922,8 +6897,6 @@ export default function App() {
       data={upgradeLimitModal}
       onClose={() => setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 })}
       onUpgrade={() => {
-        const product = upgradeLimitModal.product === ACADEMY_PRODUCT ? ACADEMY_PRODUCT : ODONTOHUB_PRODUCT;
-        setSubscriptionProduct(product);
         setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 });
         setActiveTab('configuracoes');
         navigate('/');
