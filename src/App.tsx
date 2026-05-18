@@ -247,6 +247,23 @@ interface CurrentUser {
 const ODONTOHUB_PRODUCT: Product = 'odontohub';
 const ACADEMY_PRODUCT: Product = 'academy';
 
+const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
+
+const getTokenFromPublicUrl = (value?: string | null) => {
+  if (!value) return null;
+
+  try {
+    const parsed = new URL(value);
+    return parsed.pathname.split('/').filter(Boolean).pop() || null;
+  } catch {
+    return value.split(/[?#]/)[0].split('/').filter(Boolean).pop() || null;
+  }
+};
+
+const buildPatientPublicUrl = (path: 'portal' | 'pre-atendimento', token: string) => {
+  return `${trimTrailingSlashes(window.location.origin)}/${path}/${token}`;
+};
+
 const SidebarItem = ({ id, icon: Icon, label, activeTab, setActiveTab, setIsSidebarOpen, navigate }: any) => (
   <button
     onClick={() => {
@@ -1698,9 +1715,15 @@ export default function App() {
 
       // Only show pre-atendimento link for first visit (no finished appointments)
       const hasFinished = appointments.some(a => a.patient_id === patient.id && a.status === 'FINISHED');
+      const token = data.token || getTokenFromPublicUrl(data.portal_url) || getTokenFromPublicUrl(data.pre_atendimento_url);
+      const portalUrl = token ? buildPatientPublicUrl('portal', token) : data.portal_url;
+      const preAtendimentoUrl = token && data.pre_atendimento_url
+        ? buildPatientPublicUrl('pre-atendimento', token)
+        : data.pre_atendimento_url;
+
       setPortalLinkData({
-        url: data.portal_url,
-        preUrl: hasFinished ? null : data.pre_atendimento_url,
+        url: portalUrl,
+        preUrl: hasFinished ? null : preAtendimentoUrl,
         patientName: patient.name
       });
     } catch {
