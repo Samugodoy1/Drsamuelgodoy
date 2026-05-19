@@ -1,60 +1,55 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { API_URL } from '../config';
 import {
-  Calendar,
-  FileText,
-  DollarSign,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  ChevronRight,
-  Stethoscope,
   Activity,
+  AlertCircle,
+  Calendar,
   CalendarPlus,
-  User,
-  Heart,
-  Shield,
-  Download,
-  X,
-  Home,
+  Check,
+  CheckCircle2,
   ClipboardList,
+  CreditCard,
+  DollarSign,
+  Download,
+  FileText,
+  Home,
+  Info,
+  Lock,
+  MapPin,
+  MessageCircle,
   Phone,
-  MessageCircle
+  Send,
+  Shield,
+  Stethoscope,
+  User,
+  WalletCards,
+  X,
 } from '../icons';
+import {
+  PortalAction,
+  PortalAppointment,
+  PortalDataForState,
+  buildPatientPortalState,
+  formatPortalTime,
+} from '../utils/patientPortalState';
 
-interface PortalData {
-  patient: {
+interface PortalData extends PortalDataForState {
+  patient: PortalDataForState['patient'] & {
     id: number;
-    name: string;
     email: string;
     phone: string;
     cpf: string;
     birth_date: string;
     photo_url: string;
     address: string;
-    consent_accepted: boolean;
     emergency_contact_name?: string;
     emergency_contact_phone?: string;
     health_insurance?: string;
     health_insurance_number?: string;
-    treatment_plan?: Array<{ id: string; procedure?: string; value?: number; status?: string }>;
   };
-  anamnesis: {
-    medical_history: string;
-    allergies: string;
-    medications: string;
-    chief_complaint: string;
-  } | null;
-  appointments: Array<{
-    id: number;
-    start_time: string;
-    end_time: string;
-    status: string;
-    notes: string;
-    dentist_name: string;
-  }>;
+  appointments: Array<PortalAppointment & { dentist_name: string }>;
   files: Array<{
     id: number;
     file_url: string;
@@ -62,20 +57,13 @@ interface PortalData {
     description: string;
     created_at: string;
   }>;
-  evolution: Array<{
-    id: number;
-    date: string;
-    procedure_performed: string;
-    notes: string;
-    dentist_name: string;
-  }>;
   payment_plans: Array<{
     id: number;
     procedure: string;
     total_amount: number;
     installments_count: number;
     status: string;
-    installments: Array<{
+    installments?: Array<{
       number: number;
       amount: number;
       due_date: string;
@@ -119,7 +107,28 @@ interface PortalData {
   } | null;
 }
 
-type Tab = 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro' | 'agendar';
+type Tab = 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro';
+type MedicalForm = {
+  allergies: string;
+  medications: string;
+  systemic_diseases: string;
+  blood_pressure_or_diabetes: string;
+  anticoagulant_use: string;
+  pregnancy: string;
+  important_notes: string;
+};
+
+type MessageContext = 'clinic' | 'post-care';
+
+const emptyMedicalForm: MedicalForm = {
+  allergies: '',
+  medications: '',
+  systemic_diseases: '',
+  blood_pressure_or_diabetes: '',
+  anticoagulant_use: '',
+  pregnancy: '',
+  important_notes: '',
+};
 
 export function PatientPortal() {
   const { token } = useParams<{ token: string }>();
@@ -127,789 +136,1037 @@ export function PatientPortal() {
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('inicio');
 
-  // Appointment request form
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({
-    preferred_date: '',
-    preferred_time: '',
-    notes: ''
-  });
+  const [scheduleForm, setScheduleForm] = useState({ preferred_date: '', preferred_time: '', notes: '' });
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
-  const [scheduleSuccess, setScheduleSuccess] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'new' | 'reschedule'>('new');
-  const [scheduleTargetAppointment, setScheduleTargetAppointment] = useState<PortalData['appointments'][number] | null>(null);
+  const [scheduleTargetAppointment, setScheduleTargetAppointment] = useState<PortalAppointment | null>(null);
   const [appointmentSubmittingId, setAppointmentSubmittingId] = useState<number | null>(null);
-  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<number | null>(null);
-  const [rescheduleRequestedAppointmentId, setRescheduleRequestedAppointmentId] = useState<number | null>(null);
 
-  const scheduleModalRef = useRef<HTMLDivElement | null>(null);
-  const pixModalRef = useRef<HTMLDivElement | null>(null);
+  const [showMedicalModal, setShowMedicalModal] = useState(false);
+  const [medicalForm, setMedicalForm] = useState<MedicalForm>(emptyMedicalForm);
+  const [medicalSubmitting, setMedicalSubmitting] = useState(false);
 
-  // Payment
-  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageContext, setMessageContext] = useState<MessageContext>('clinic');
+  const [messageBody, setMessageBody] = useState('');
+  const [messageSubmitting, setMessageSubmitting] = useState(false);
 
-  // Payment
-  const [showPixModal, setShowPixModal] = useState<{ amount: number; installment_id?: number; label: string } | null>(null);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [instructionMode, setInstructionMode] = useState<'pre' | 'post'>('pre');
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pixInfo, setPixInfo] = useState<{ has_pix: boolean; pix_key?: string; pix_key_type?: string; beneficiary_name?: string } | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
-  const [paymentInformed, setPaymentInformed] = useState(false);
+  const [paymentSubmittingId, setPaymentSubmittingId] = useState<number | null>(null);
+
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     authenticateAndLoad();
   }, [token]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const id = window.setTimeout(() => setNotice(null), 4500);
+    return () => window.clearTimeout(id);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!showScheduleModal && !showMedicalModal && !showMessageModal && !showInstructionsModal && !showPaymentModal) return;
+    const first = modalRef.current?.querySelector<HTMLElement>('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
+    first?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeAnyModal();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showScheduleModal, showMedicalModal, showMessageModal, showInstructionsModal, showPaymentModal]);
+
+  const portalState = useMemo(() => data ? buildPatientPortalState(data) : null, [data]);
+
+  const futureAppointments = useMemo(() => {
+    const now = new Date();
+    return (data?.appointments || [])
+      .filter((appointment) => {
+        const status = (appointment.status || '').toUpperCase();
+        return new Date(appointment.end_time || appointment.start_time) >= now && !['CANCELLED', 'FINISHED', 'NO_SHOW'].includes(status);
+      })
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [data]);
+
+  const pastAppointments = useMemo(() => {
+    const now = new Date();
+    return (data?.appointments || [])
+      .filter((appointment) => new Date(appointment.end_time || appointment.start_time) < now || ['CANCELLED', 'FINISHED', 'NO_SHOW'].includes((appointment.status || '').toUpperCase()))
+      .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+  }, [data]);
+
+  const pendingInstallments = useMemo(() => {
+    return (data?.installments || []).filter((installment) => {
+      const status = (installment.status || '').toUpperCase();
+      return status === 'PENDING' || status === 'OVERDUE';
+    });
+  }, [data]);
+
   const authenticateAndLoad = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const authRes = await fetch(`${API_URL}/api/portal/auth/${token}`);
+      const authRes = await fetch(`${API_URL}/api/portal/auth/${token}`, { credentials: API_URL ? 'include' : 'same-origin' });
       const authData = await authRes.json();
       if (!authRes.ok) {
-        setError(authData.error || 'Link inválido ou expirado');
-        setLoading(false);
+        setError(authData.error || 'Link invalido ou expirado');
         return;
       }
       setSessionToken(authData.session_token);
 
-      // Load portal data
-      const dataRes = await fetch(`${API_URL}/api/portal/data`, {
-        headers: { 'Authorization': `Bearer ${authData.session_token}` }
-      });
-      const portalData = await dataRes.json();
-      if (!dataRes.ok) throw new Error(portalData.error);
+      const portalData = await loadPortalData(authData.session_token);
       setData(portalData);
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados');
+      setError(err.message || 'Erro ao carregar dados do portal');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadPortalData = async (jwt: string) => {
+    const dataRes = await fetch(`${API_URL}/api/portal/data`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+      credentials: API_URL ? 'include' : 'same-origin',
+    });
+    const payload = await dataRes.json();
+    if (!dataRes.ok) throw new Error(payload.error || 'Erro ao carregar dados do portal');
+    return payload as PortalData;
+  };
+
+  const refreshPortalData = async () => {
+    if (!sessionToken) return;
+    const fresh = await loadPortalData(sessionToken);
+    setData(fresh);
+  };
+
+  const handleAction = (action: PortalAction) => {
+    switch (action.id) {
+      case 'confirmAppointment':
+        if (action.appointmentId) handleConfirmAppointment(action.appointmentId);
+        break;
+      case 'viewInstructions':
+        setInstructionMode('pre');
+        setShowInstructionsModal(true);
+        break;
+      case 'viewAppointment':
+        setActiveTab('consultas');
+        break;
+      case 'requestAppointment':
+        openNewScheduleModal();
+        break;
+      case 'openMedicalForm':
+        openMedicalFormModal();
+        break;
+      case 'openMessages':
+        openMessageModal('clinic');
+        break;
+      case 'openPostCare':
+        setInstructionMode('post');
+        setShowInstructionsModal(true);
+        break;
+      case 'openDirections':
+        openDirections();
+        break;
+      case 'openPayment':
+        openPaymentModal();
+        break;
+      case 'openHistory':
+        setActiveTab('evolucao');
+        break;
+    }
+  };
+
+  const handleConfirmAppointment = async (appointmentId: number) => {
+    if (!sessionToken || !data) return;
+    setAppointmentSubmittingId(appointmentId);
+    const confirmedAt = new Date().toISOString();
+    const previous = data;
+    setData({
+      ...data,
+      appointments: data.appointments.map((appointment) =>
+        appointment.id === appointmentId
+          ? { ...appointment, status: 'CONFIRMED', confirmed_at: confirmedAt }
+          : appointment
+      ),
+    });
+
+    try {
+      const res = await fetch(`${API_URL}/api/portal/confirm-appointment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
+        body: JSON.stringify({ appointment_id: appointmentId }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Erro ao confirmar consulta');
+      setNotice('Presenca confirmada.');
+      await refreshPortalData();
+    } catch (err: any) {
+      setData(previous);
+      setError(err.message || 'Nao foi possivel confirmar a consulta');
+    } finally {
+      setAppointmentSubmittingId(null);
+    }
+  };
+
   const handleRequestAppointment = async () => {
-    if (!scheduleForm.preferred_date) return;
+    if (!sessionToken || !scheduleForm.preferred_date) return;
     setScheduleSubmitting(true);
+    setError(null);
     try {
       const isReschedule = scheduleMode === 'reschedule' && scheduleTargetAppointment;
-      const res = await fetch(isReschedule ? `${API_URL}/api/portal/reschedule-appointment` : `${API_URL}/api/portal/request-appointment`, {
+      const res = await fetch(`${API_URL}/api/portal/${isReschedule ? 'reschedule-appointment' : 'request-appointment'}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify(
-          isReschedule
-            ? {
-                appointment_id: scheduleTargetAppointment.id,
-                preferred_date: scheduleForm.preferred_date,
-                preferred_time: scheduleForm.preferred_time,
-                reason: scheduleForm.notes
-              }
-            : scheduleForm
-        )
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
+        body: JSON.stringify(isReschedule ? {
+          appointment_id: scheduleTargetAppointment.id,
+          preferred_date: scheduleForm.preferred_date,
+          preferred_time: scheduleForm.preferred_time,
+          reason: scheduleForm.notes,
+        } : scheduleForm),
       });
-      if (!res.ok) throw new Error('Erro ao solicitar');
-      setScheduleSuccess(true);
-      if (isReschedule) {
-        setRescheduleRequestedAppointmentId(scheduleTargetAppointment.id);
-      }
-      setTimeout(() => {
-        setShowScheduleModal(false);
-        setScheduleSuccess(false);
-        setScheduleMode('new');
-        setScheduleTargetAppointment(null);
-        setScheduleForm({ preferred_date: '', preferred_time: '', notes: '' });
-      }, 2000);
-    } catch {
-      setError(scheduleMode === 'reschedule' ? 'Erro ao solicitar reagendamento' : 'Erro ao solicitar agendamento');
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Erro ao solicitar horario');
+      setNotice(isReschedule ? 'Pedido de reagendamento enviado.' : 'Solicitacao enviada para a clinica.');
+      closeAnyModal();
+      await refreshPortalData();
+    } catch (err: any) {
+      setError(err.message || 'Nao foi possivel solicitar horario');
     } finally {
       setScheduleSubmitting(false);
     }
   };
 
-  const handleConfirmAppointment = async (appointmentId: number) => {
-    // Optimistic update — muda status imediatamente na UI
-    setData((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        appointments: current.appointments.map((a) =>
-          a.id === appointmentId ? { ...a, status: 'CONFIRMED' } : a
-        )
-      };
-    });
-    setConfirmedAppointmentId(appointmentId);
-    setAppointmentSubmittingId(appointmentId);
-
+  const handleSaveMedicalForm = async () => {
+    if (!sessionToken || !data) return;
+    setMedicalSubmitting(true);
+    setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/portal/confirm-appointment`, {
+      const res = await fetch(`${API_URL}/api/portal/intake`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify({ appointment_id: appointmentId })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
+        body: JSON.stringify({
+          allergies: medicalForm.allergies,
+          medications: medicalForm.medications,
+          medical_history: medicalForm.systemic_diseases,
+          systemic_diseases: medicalForm.systemic_diseases,
+          blood_pressure_or_diabetes: medicalForm.blood_pressure_or_diabetes,
+          anticoagulant_use: medicalForm.anticoagulant_use,
+          pregnancy: medicalForm.pregnancy,
+          important_notes: medicalForm.important_notes,
+          habits: medicalForm.important_notes,
+          vital_signs: medicalForm.blood_pressure_or_diabetes,
+        }),
       });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        // Reverte update otimista em caso de erro
-        setData((current) => {
-          if (!current) return current;
-          return {
-            ...current,
-            appointments: current.appointments.map((a) =>
-              a.id === appointmentId ? { ...a, status: 'SCHEDULED' } : a
-            )
-          };
-        });
-        setConfirmedAppointmentId(null);
-        throw new Error(payload?.error || 'Erro ao confirmar consulta');
-      }
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Erro ao salvar ficha medica');
+
+      setData({
+        ...data,
+        anamnesis: {
+          ...(data.anamnesis || {}),
+          allergies: medicalForm.allergies,
+          medications: medicalForm.medications,
+          medical_history: medicalForm.systemic_diseases,
+          vital_signs: medicalForm.blood_pressure_or_diabetes,
+          habits: medicalForm.important_notes,
+          family_history: [
+            medicalForm.anticoagulant_use ? `Anticoagulante: ${medicalForm.anticoagulant_use}` : null,
+            medicalForm.pregnancy ? `Gravidez: ${medicalForm.pregnancy}` : null,
+          ].filter(Boolean).join('\n'),
+        },
+        latest_intake_form: {
+          id: data.latest_intake_form?.id || Date.now(),
+          status: 'SUBMITTED',
+          created_at: new Date().toISOString(),
+          form_data: { ...medicalForm },
+        },
+      });
+      setNotice('Ficha medica atualizada.');
+      closeAnyModal();
     } catch (err: any) {
-      setError(err.message || 'Erro ao confirmar consulta');
-      setTimeout(() => setError(null), 4000);
+      setError(err.message || 'Nao foi possivel salvar a ficha medica');
     } finally {
-      setAppointmentSubmittingId(null);
+      setMedicalSubmitting(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!sessionToken || !messageBody.trim()) return;
+    setMessageSubmitting(true);
+    setError(null);
+    try {
+      const prefix = messageContext === 'post-care' ? 'Duvida pos-atendimento: ' : '';
+      const res = await fetch(`${API_URL}/api/portal/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
+        body: JSON.stringify({ message: `${prefix}${messageBody.trim()}` }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Erro ao enviar mensagem');
+      setNotice('Mensagem enviada para a clinica.');
+      setMessageBody('');
+      closeAnyModal();
+    } catch (err: any) {
+      setError(err.message || 'Nao foi possivel enviar a mensagem');
+    } finally {
+      setMessageSubmitting(false);
+    }
+  };
+
+  const handleInformPayment = async (installmentId: number, amount: number) => {
+    if (!sessionToken) return;
+    setPaymentSubmittingId(installmentId);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/portal/inform-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
+        body: JSON.stringify({ installment_id: installmentId, amount }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Erro ao informar pagamento');
+      setNotice('Pagamento informado. A clinica vai conferir o recebimento.');
+    } catch (err: any) {
+      setError(err.message || 'Nao foi possivel informar pagamento');
+    } finally {
+      setPaymentSubmittingId(null);
     }
   };
 
   const loadPixInfo = async () => {
     if (!sessionToken || pixInfo) return;
     try {
-      const res = await fetch(`${API_URL}/api/portal/pix-info`, { headers: { 'Authorization': `Bearer ${sessionToken}` } });
-      if (res.ok) setPixInfo(await res.json());
-    } catch {}
-  };
-
-  const handleInformPayment = async (amount: number, installment_id?: number) => {
-    setActionSubmitting(true);
-    try {
-      const res = await fetch(`${API_URL}/api/portal/inform-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ amount, installment_id })
+      const res = await fetch(`${API_URL}/api/portal/pix-info`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+        credentials: API_URL ? 'include' : 'same-origin',
       });
-      if (!res.ok) throw new Error();
-      setPaymentInformed(true);
-      setTimeout(() => { setShowPixModal(null); setPaymentInformed(false); }, 2500);
-    } catch { setError('Erro ao informar pagamento'); }
-    finally { setActionSubmitting(false); }
+      if (res.ok) setPixInfo(await res.json());
+    } catch {
+      setPixInfo({ has_pix: false });
+    }
   };
 
-  const copyToClipboard = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); setPixCopied(true); setTimeout(() => setPixCopied(false), 2000); } catch {}
+  const openPaymentModal = () => {
+    setShowPaymentModal(true);
+    loadPixInfo();
   };
 
-  // Manage focus + keyboard for modals (basic trap + Escape)
-  useEffect(() => {
-    if (!showScheduleModal) return;
-    const el = scheduleModalRef.current;
-    const first = el?.querySelector<HTMLElement>('input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
-    first?.focus();
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeScheduleModal();
-      }
-      if (e.key === 'Tab') {
-        const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
-        if (!focusable || focusable.length === 0) return;
-        const nodes = Array.from(focusable) as HTMLElement[];
-        const idx = nodes.indexOf(document.activeElement as HTMLElement);
-        if (e.shiftKey) {
-          if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
-        } else {
-          if (idx === nodes.length - 1) { nodes[0].focus(); e.preventDefault(); }
-        }
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [showScheduleModal]);
+  const openMedicalFormModal = () => {
+    setMedicalForm(buildMedicalForm(data));
+    setShowMedicalModal(true);
+  };
 
-  useEffect(() => {
-    if (!showPixModal) return;
-    const el = pixModalRef.current;
-    const first = el?.querySelector<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    first?.focus();
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (!actionSubmitting) setShowPixModal(null);
-      }
-      if (e.key === 'Tab') {
-        const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
-        if (!focusable || focusable.length === 0) return;
-        const nodes = Array.from(focusable) as HTMLElement[];
-        const idx = nodes.indexOf(document.activeElement as HTMLElement);
-        if (e.shiftKey) {
-          if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
-        } else {
-          if (idx === nodes.length - 1) { nodes[0].focus(); e.preventDefault(); }
-        }
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [showPixModal, actionSubmitting]);
+  const openMessageModal = (context: MessageContext) => {
+    setMessageContext(context);
+    setMessageBody('');
+    setShowMessageModal(true);
+  };
 
   const openNewScheduleModal = () => {
     setScheduleMode('new');
     setScheduleTargetAppointment(null);
-    setScheduleSuccess(false);
     setScheduleForm({ preferred_date: '', preferred_time: '', notes: '' });
     setShowScheduleModal(true);
   };
 
-  const openRescheduleModal = (appointment: PortalData['appointments'][number]) => {
+  const openRescheduleModal = (appointment: PortalAppointment) => {
     setScheduleMode('reschedule');
     setScheduleTargetAppointment(appointment);
-    setScheduleSuccess(false);
     setScheduleForm({
       preferred_date: new Date(appointment.start_time).toLocaleDateString('en-CA'),
       preferred_time: '',
-      notes: ''
+      notes: '',
     });
     setShowScheduleModal(true);
   };
 
-  const closeScheduleModal = () => {
-    if (scheduleSubmitting) return;
+  const openDirections = () => {
+    if (!data?.clinic?.clinic_address) return;
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.clinic.clinic_address)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const copyPix = async () => {
+    if (!pixInfo?.pix_key) return;
+    await navigator.clipboard.writeText(pixInfo.pix_key);
+    setPixCopied(true);
+    window.setTimeout(() => setPixCopied(false), 2200);
+  };
+
+  const closeAnyModal = () => {
+    if (scheduleSubmitting || medicalSubmitting || messageSubmitting || paymentSubmittingId) return;
     setShowScheduleModal(false);
-    setScheduleSuccess(false);
-    setScheduleMode('new');
-    setScheduleTargetAppointment(null);
-    setScheduleForm({ preferred_date: '', preferred_time: '', notes: '' });
+    setShowMedicalModal(false);
+    setShowMessageModal(false);
+    setShowInstructionsModal(false);
+    setShowPaymentModal(false);
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-academy-bg flex items-center justify-center">
-      <div className="flex flex-col items-center gap-5">
-        <div className="w-10 h-10 border-[3px] border-[#C6C6C8] border-t-[#0C9B72] rounded-full animate-spin" />
-        <p role="status" aria-live="polite" className="text-academy-muted text-[15px] font-medium tracking-tight">Carregando...</p>
-      </div>
-    </div>
-  );
-
-  if (error && !data) return (
-    <div className="min-h-screen bg-academy-bg flex items-center justify-center px-6">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
-          <AlertCircle size={28} className="text-[#FF3B30]" />
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F6F7F8] flex items-center justify-center px-6">
+        <div className="flex flex-col items-center gap-5">
+          <div className="h-10 w-10 rounded-full border-[3px] border-[#D6DADF] border-t-[#216153] animate-spin" />
+          <p role="status" className="text-[15px] font-medium text-[#667085]">Carregando portal...</p>
         </div>
-        <h2 className="text-[20px] font-semibold text-academy-text mb-2 tracking-tight">Acesso Indisponível</h2>
-        <p className="text-academy-muted text-[15px] leading-relaxed">{error}</p>
       </div>
-    </div>
-  );
-
-  if (!data) return null;
-
-  const { patient, clinic, appointments, evolution, files, payment_plans, transactions = [], installments = [] } = data;
-
-  const futureAppointments = appointments
-    .filter(a => new Date(a.start_time) > new Date() && a.status !== 'CANCELLED')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  const pastAppointments = appointments
-    .filter(a => new Date(a.start_time) <= new Date() || a.status === 'CANCELLED')
-    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-
-  const tabs: { id: Tab; icon: React.ElementType; label: string }[] = [
-    { id: 'inicio', icon: Home, label: 'Início' },
-    { id: 'consultas', icon: Calendar, label: 'Consultas' },
-    { id: 'evolucao', icon: Activity, label: 'Evolução' },
-    { id: 'documentos', icon: FileText, label: 'Documentos' },
-    { id: 'financeiro', icon: DollarSign, label: 'Financeiro' },
-  ];
-
-  const formatDateBR = (d: string) => {
-    try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
-  };
-
-  const formatTimeBR = (d: string) => {
-    try { return new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
-  };
-
-  const getConfirmationQuestion = (appointmentDate: string) => {
-    const date = new Date(appointmentDate);
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
-
-    const isSameDay = (left: Date, right: Date) => (
-      left.getFullYear() === right.getFullYear()
-      && left.getMonth() === right.getMonth()
-      && left.getDate() === right.getDate()
     );
+  }
 
-    const dayLabel = isSameDay(date, today)
-      ? 'hoje'
-      : isSameDay(date, tomorrow)
-      ? 'amanhã'
-      : `dia ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-
-    return `Você vem ${dayLabel} às ${formatTimeBR(appointmentDate)}?`;
-  };
-
-  const statusLabel = (s: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      'SCHEDULED': { label: 'Agendado', color: 'bg-[#007AFF]/10 text-[#007AFF]' },
-      'CONFIRMED': { label: 'Confirmado', color: 'bg-[#34C759]/10 text-[#34C759]' },
-      'IN_PROGRESS': { label: 'Em Atendimento', color: 'bg-[#FF9500]/10 text-[#FF9500]' },
-      'FINISHED': { label: 'Finalizado', color: 'bg-academy-border text-academy-muted' },
-      'CANCELLED': { label: 'Cancelado', color: 'bg-[#FF3B30]/10 text-[#FF3B30]' },
-      'NO_SHOW': { label: 'Faltou', color: 'bg-[#FF3B30]/10 text-[#FF3B30]' }
-    };
-    return map[s] || { label: s, color: 'bg-academy-border text-academy-muted' };
-  };
-
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bom dia';
-    if (h < 18) return 'Boa tarde';
-    return 'Boa noite';
-  };
-
-  // ─── Detect recent procedures for post-care guide ───
-  type ProcedureCategory = 'implante' | 'enxerto' | 'extracao' | 'cirurgia' | 'canal' | 'restauracao' | 'clareamento' | 'protese' | 'ortodontia' | 'raspagem' | 'limpeza';
-
-  const PROCEDURE_PATTERNS: Array<{ category: ProcedureCategory; pattern: RegExp; days: number }> = [
-    { category: 'implante',    pattern: /implante/i, days: 3 },
-    { category: 'enxerto',     pattern: /enxerto/i, days: 3 },
-    { category: 'extracao',    pattern: /extração|extraç|exodontia|exo\b|siso|terceiro.?molar/i, days: 3 },
-    { category: 'cirurgia',    pattern: /cirurgia|frenectomia|apicectomia|gengivectomia|biópsia|biopsia|alveoloplastia/i, days: 3 },
-    { category: 'canal',       pattern: /canal|endo(?:dont|do)|pulpectomia/i, days: 2 },
-    { category: 'restauracao', pattern: /restaura[çc]|resina|amálgama|amalgama|obtura[çc]/i, days: 1 },
-    { category: 'clareamento', pattern: /clareamento|branqueamento|whitening/i, days: 2 },
-    { category: 'protese',     pattern: /prótese|protese|coroa|faceta|lente|onlay|inlay|overlay/i, days: 2 },
-    { category: 'ortodontia',  pattern: /ortod|aparelho|bracket|alinhador|invisalign|manuten[çc]ão ortod/i, days: 1 },
-    { category: 'raspagem',    pattern: /raspagem|curetagem|periodon/i, days: 2 },
-    { category: 'limpeza',     pattern: /limpeza|profilaxia|tartaro|tártaro/i, days: 1 },
-  ];
-
-  const detectCategory = (text: string): { category: ProcedureCategory; days: number } | null => {
-    for (const p of PROCEDURE_PATTERNS) {
-      if (p.pattern.test(text)) return { category: p.category, days: p.days };
-    }
-    return null;
-  };
-
-  const getRecentProcedures = () => {
-    const results: Array<{ date: string; procedure: string; category: ProcedureCategory }> = [];
-    const seen = new Set<string>();
-
-    // Dates of cancelled appointments — skip any procedures tied to these
-    const cancelledDates = new Set(
-      appointments.filter(a => a.status === 'CANCELLED').map(a => new Date(a.start_time).toDateString())
+  if (error && !data) {
+    return (
+      <div className="min-h-screen bg-[#F6F7F8] flex items-center justify-center px-6">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
+            <AlertCircle size={28} className="text-red-500" />
+          </div>
+          <h2 className="text-[22px] font-bold tracking-tight text-[#111827]">Acesso indisponivel</h2>
+          <p className="mt-2 text-[15px] leading-6 text-[#667085]">{error}</p>
+        </div>
+      </div>
     );
+  }
 
-    // Words that indicate the procedure is just STARTING, not completed
-    const START_KEYWORDS = /início|inicio|preparo|moldagem|planejamento|provisór|escaneamento|cimentação provisória|teste|prova|avaliação|consulta inicial|primeira etapa|1[ªa] etapa|abertura/i;
+  if (!data || !portalState) return null;
 
-    // Check evolution records (skip if matching a cancelled appointment date or indicates start of treatment)
-    evolution.forEach(e => {
-      const text = `${e.procedure_performed || ''} ${e.notes || ''}`;
-      const match = detectCategory(text);
-      if (!match) return;
-      if (START_KEYWORDS.test(e.notes || '') || START_KEYWORDS.test(e.procedure_performed || '')) return;
-      const date = new Date(e.date);
-      if (isNaN(date.getTime())) return;
-      if (cancelledDates.has(date.toDateString())) return;
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - match.days);
-      cutoff.setHours(0, 0, 0, 0);
-      if (date < cutoff) return;
-      const key = `${date.toDateString()}-${match.category}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      results.push({ date: e.date, procedure: e.procedure_performed || e.notes || 'Procedimento', category: match.category });
-    });
-
-    // Also check FINISHED appointments with notes (covers case where no evolution was created)
-    appointments.filter(a => a.status === 'FINISHED' && a.notes).forEach(a => {
-      const match = detectCategory(a.notes);
-      if (!match) return;
-      if (START_KEYWORDS.test(a.notes)) return;
-      const date = new Date(a.start_time);
-      if (cancelledDates.has(date.toDateString())) return;
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - match.days);
-      if (date < cutoff) return;
-      const key = `${date.toDateString()}-${match.category}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      results.push({ date: a.start_time, procedure: a.notes, category: match.category });
-    });
-
-    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  };
-
-  const recentProcedures = getRecentProcedures();
-
-  const PROCEDURE_GUIDES: Record<ProcedureCategory, { title: string; color: string; borderColor: string; iconBg: string; items: Array<{ icon: string; text: string }> }> = {
-    implante: {
-      title: 'Cuidados Pós-Implante',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 48h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nas primeiras 72h' },
-        { icon: '🚫', text: 'Não faça bochechos nas primeiras 24h' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🦷', text: 'Evite mastigar do lado operado por 7 dias' },
-        { icon: '🚭', text: 'Não fume por pelo menos 7 dias — o cigarro compromete a cicatrização' },
-        { icon: '🛌', text: 'Durma com a cabeça elevada nas primeiras 2 noites' },
-        { icon: '⚠️', text: 'Sangramento leve nas primeiras 24h é normal. Se persistir, entre em contato' },
-      ]
-    },
-    enxerto: {
-      title: 'Cuidados Pós-Enxerto',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 48h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nas primeiras 72h' },
-        { icon: '🚫', text: 'Não toque a região operada com a língua ou os dedos' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🦷', text: 'Evite mastigar do lado operado por até 14 dias' },
-        { icon: '🚭', text: 'Não fume — o cigarro pode comprometer o enxerto' },
-        { icon: '🛌', text: 'Durma com a cabeça elevada nas primeiras 2 noites' },
-        { icon: '🏃', text: 'Evite atividades físicas intensas por 5 dias' },
-      ]
-    },
-    extracao: {
-      title: 'Cuidados Pós-Extração',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 24h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nas primeiras 48h' },
-        { icon: '🚫', text: 'Não faça bochechos nas primeiras 24h' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🩸', text: 'Morda a gaze por 30 minutos para ajudar na coagulação' },
-        { icon: '🚭', text: 'Não fume por pelo menos 3 dias' },
-        { icon: '🏃', text: 'Evite atividades físicas intensas por 48h' },
-        { icon: '⚠️', text: 'Sangramento leve é normal. Se for intenso, entre em contato' },
-      ]
-    },
-    cirurgia: {
-      title: 'Cuidados Pós-Cirúrgicos',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🧊', text: 'Aplique gelo no rosto (20 min sim / 20 min não) nas primeiras 24–48h' },
-        { icon: '🍽️', text: 'Alimentação pastosa e fria nos primeiros dias' },
-        { icon: '🚫', text: 'Não faça bochechos vigorosos nas primeiras 24h' },
-        { icon: '💊', text: 'Tome a medicação prescrita nos horários corretos' },
-        { icon: '🚭', text: 'Evite fumar durante o período de recuperação' },
-        { icon: '🏃', text: 'Evite atividades físicas intensas por 48h' },
-        { icon: '🛌', text: 'Durma com a cabeça elevada nas primeiras noites' },
-        { icon: '⚠️', text: 'Em caso de dor intensa, sangramento ou inchaço anormal, entre em contato' },
-      ]
-    },
-    canal: {
-      title: 'Cuidados Pós-Canal',
-      color: 'text-[#AF52DE]', borderColor: 'border-[#AF52DE]/15', iconBg: 'from-[#AF52DE]/5 to-[#8B3FC7]/5',
-      items: [
-        { icon: '🦷', text: 'Evite mastigar com o dente tratado até a restauração definitiva' },
-        { icon: '💊', text: 'Tome a medicação prescrita para dor e inflamação' },
-        { icon: '🍽️', text: 'Prefira alimentos macios do lado oposto nas primeiras 24h' },
-        { icon: '🚫', text: 'Não morda objetos duros (canetas, gelo, unhas)' },
-        { icon: '🪥', text: 'Escove normalmente, mas com cuidado na região tratada' },
-        { icon: '⚠️', text: 'Sensibilidade leve nos primeiros dias é normal — se a dor aumentar, entre em contato' },
-      ]
-    },
-    restauracao: {
-      title: 'Orientações Pós-Restauração',
-      color: 'text-[#007AFF]', borderColor: 'border-[#007AFF]/15', iconBg: 'from-[#007AFF]/5 to-[#005EC4]/5',
-      items: [
-        { icon: '🍽️', text: 'Evite alimentos muito duros ou pegajosos nas primeiras 24h' },
-        { icon: '🥤', text: 'Evite bebidas e alimentos muito quentes ou muito frios nas primeiras horas' },
-        { icon: '🦷', text: 'A mordida pode parecer diferente — se incomodar após 2 dias, entre em contato para ajuste' },
-        { icon: '🪥', text: 'Escove e use fio dental normalmente' },
-        { icon: '⚠️', text: 'Sensibilidade leve é normal e tende a diminuir em alguns dias' },
-      ]
-    },
-    clareamento: {
-      title: 'Cuidados Pós-Clareamento',
-      color: 'text-[#5AC8FA]', borderColor: 'border-[#5AC8FA]/15', iconBg: 'from-[#5AC8FA]/5 to-[#34AADC]/5',
-      items: [
-        { icon: '🚫', text: 'Evite alimentos e bebidas com corantes por 48h (café, vinho, açaí, beterraba, molho de tomate)' },
-        { icon: '🚭', text: 'Não fume por pelo menos 48h — o tabaco mancha os dentes' },
-        { icon: '🍽️', text: 'Prefira a "dieta branca": arroz, frango, leite, banana, água' },
-        { icon: '🥤', text: 'Se tomar bebidas escuras, use canudo' },
-        { icon: '🪥', text: 'Use creme dental para sensibilidade se houver desconforto' },
-        { icon: '⚠️', text: 'Sensibilidade temporária é normal e costuma cessar em 24–48h' },
-      ]
-    },
-    protese: {
-      title: 'Orientações para Prótese/Coroa',
-      color: 'text-[#34C759]', borderColor: 'border-[#34C759]/15', iconBg: 'from-[#34C759]/5 to-[#28A745]/5',
-      items: [
-        { icon: '🍽️', text: 'Evite alimentos muito duros ou pegajosos nas primeiras 24h' },
-        { icon: '🦷', text: 'A mordida pode parecer diferente no início — isso é normal e se ajusta em alguns dias' },
-        { icon: '🪥', text: 'Escove e use fio dental normalmente, passando o fio com cuidado ao redor da peça' },
-        { icon: '🚫', text: 'Evite morder objetos duros diretamente sobre a prótese' },
-        { icon: '🗓️', text: 'Compareça ao retorno agendado para checagem e ajuste final' },
-        { icon: '⚠️', text: 'Se a prótese soltar ou machucar, entre em contato imediatamente' },
-      ]
-    },
-    ortodontia: {
-      title: 'Orientações Pós-Ajuste Ortodôntico',
-      color: 'text-[#FF2D55]', borderColor: 'border-[#FF2D55]/15', iconBg: 'from-[#FF2D55]/5 to-[#D4234A]/5',
-      items: [
-        { icon: '💊', text: 'Desconforto e sensibilidade nos dentes é normal por 2–3 dias após o ajuste' },
-        { icon: '🍽️', text: 'Prefira alimentos macios nos primeiros dias' },
-        { icon: '🚫', text: 'Evite alimentos duros, pegajosos e pipoca que podem soltar bráquetes' },
-        { icon: '🪥', text: 'Escove após cada refeição usando escova ortodôntica e fio dental com passa-fio' },
-        { icon: '🧴', text: 'Use cera ortodôntica se algum fio ou bráquete estiver machucando' },
-        { icon: '⚠️', text: 'Se um bráquete soltar ou o fio machucar, entre em contato antes do próximo ajuste' },
-      ]
-    },
-    raspagem: {
-      title: 'Cuidados Pós-Raspagem',
-      color: 'text-[#FF9500]', borderColor: 'border-[#FF9500]/15', iconBg: 'from-[#FF9500]/5 to-[#FF6B00]/5',
-      items: [
-        { icon: '🩸', text: 'Sangramento leve na gengiva é normal nas primeiras 24h' },
-        { icon: '🪥', text: 'Escove suavemente e use fio dental — não deixe de escovar mesmo se doer um pouco' },
-        { icon: '🧴', text: 'Use enxaguante bucal ou o bochecho prescrito para auxiliar na recuperação gengival' },
-        { icon: '🍽️', text: 'Evite alimentos muito condimentados ou ácidos nas primeiras 24h' },
-        { icon: '🚭', text: 'Evite fumar — o cigarro prejudica a cicatrização da gengiva' },
-        { icon: '⚠️', text: 'Se o sangramento persistir após 48h ou houver febre, entre em contato' },
-      ]
-    },
-    limpeza: {
-      title: 'Após sua Limpeza',
-      color: 'text-[#34C759]', borderColor: 'border-[#34C759]/15', iconBg: 'from-[#34C759]/5 to-[#28A745]/5',
-      items: [
-        { icon: '🪥', text: 'Mantenha a escovação 3x ao dia e use fio dental diariamente' },
-        { icon: '🧴', text: 'Enxaguante bucal após as refeições ajuda a manter a saúde gengival' },
-        { icon: '🍬', text: 'Reduza o consumo de açúcar para prevenir cáries' },
-        { icon: '💧', text: 'Beba bastante água — ela ajuda a manter a boca limpa' },
-        { icon: '🗓️', text: 'Agende seu retorno para daqui a 6 meses para manter os dentes saudáveis' },
-      ]
-    },
-  };
+  const clinicName = data.clinic?.clinic_name || data.clinic?.name || 'OdontoHub';
 
   return (
-    <div className="min-h-screen bg-white pb-10">
-      {/* Accessible announcer for screen readers */}
-      <div id="a11y-announcer" aria-live="polite" className="sr-only">
-        {error || (scheduleSuccess ? (scheduleMode === 'reschedule' ? 'Pedido de reagendamento enviado' : 'Solicitação de agendamento enviada') : '') || (paymentInformed ? 'Pagamento informado' : '') || (pixCopied ? 'Chave PIX copiada' : '')}
-      </div>
+    <div className="min-h-screen bg-[#F6F7F8] pb-28 text-[#111827]">
+      <div className="mx-auto w-full max-w-3xl px-4 pt-5 sm:px-6 sm:pt-8">
+        <header className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#216153] text-[15px] font-black text-white shadow-sm">
+              OH
+            </div>
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#216153]">Portal do paciente</p>
+              <p className="mt-0.5 max-w-[220px] truncate text-[13px] font-semibold text-[#667085]">{clinicName}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-[12px] font-semibold text-[#667085] shadow-sm ring-1 ring-black/5">
+            <Lock size={14} className="text-[#216153]" />
+            Seguro
+          </div>
+        </header>
 
-      {/* ─── Header Minimalista ─── */}
-      <div className="px-6 pt-10 pb-4 flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#216153] rounded-[10px] flex items-center justify-center text-white font-bold text-lg tracking-tight">
-          OH
+        <div id="portal-announcer" aria-live="polite" className="sr-only">
+          {notice || error || ''}
         </div>
-        <p className="text-[#216153] text-[13px] font-bold tracking-[0.1em]">PORTAL DO PACIENTE</p>
-      </div>
 
-      {/* ─── Content ─── */}
-      <div className="px-6 pt-8 max-w-lg mx-auto">
-        {/* Saudação */}
-        <div className="mb-10">
-          <h1 className="text-[32px] font-bold text-[#0F172A] leading-tight tracking-tight">
-            Olá, {patient.name.split(' ')[0]} {patient.name.split(' ')[1] ? patient.name.split(' ')[1].slice(0, 3) + '.' : ''}
-          </h1>
-          {futureAppointments.length > 0 ? (
-            (() => {
-              const nextDate = new Date(futureAppointments[0].start_time);
-              const today = new Date();
-              const tomorrow = new Date();
-              tomorrow.setDate(today.getDate() + 1);
-
-              const isSameDay = (left: Date, right: Date) => (
-                left.getFullYear() === right.getFullYear()
-                && left.getMonth() === right.getMonth()
-                && left.getDate() === right.getDate()
-              );
-
-              const dayLabel = isSameDay(nextDate, today)
-                ? 'hoje'
-                : isSameDay(nextDate, tomorrow)
-                ? 'amanhã'
-                : `dia ${nextDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-
-              const nextTime = formatTimeBR(futureAppointments[0].start_time);
-              const timeLabel = nextTime.endsWith(':00') ? nextTime.replace(':00', 'h') : nextTime.replace(':', 'h');
-
-              return (
-                <p className="text-[#216153] text-[17px] font-semibold mt-2">
-                  Sua próxima visita é {dayLabel} às {timeLabel}.
-                </p>
-              );
-            })()
-          ) : (
-            <p className="text-[#216153] text-[17px] font-semibold mt-2">
-              Nenhuma visita agendada.
-            </p>
+        <AnimatePresence>
+          {(notice || error) && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className={`mb-4 rounded-2xl px-4 py-3 text-[14px] font-semibold shadow-sm ${error ? 'bg-red-50 text-red-700 ring-1 ring-red-100' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'}`}
+            >
+              {error || notice}
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
 
-        {/* Botões Principais */}
-        <div className="space-y-4 mb-14">
-          <button
-            onClick={() => futureAppointments.length > 0 ? handleConfirmAppointment(futureAppointments[0].id) : null}
-            disabled={futureAppointments.length > 0 && appointmentSubmittingId === futureAppointments[0].id}
-            className="w-full h-[64px] bg-[#216153] rounded-2xl flex items-center justify-center gap-3 text-white font-bold text-[17px] shadow-[0_8px_24px_rgba(33,97,83,0.25)] active:scale-[0.98] transition-transform disabled:opacity-70"
-          >
-            {appointmentSubmittingId === futureAppointments[0]?.id ? (
-              <div className="w-5 h-5 border-[2px] border-white/25 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-white flex items-center justify-center">
-                  <CheckCircle2 size={14} className="text-white" weight="bold" />
+        {activeTab === 'inicio' && (
+          <main className="space-y-5">
+            <section className="overflow-hidden rounded-[28px] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)] ring-1 ring-black/[0.04]">
+              <div className="px-5 pb-5 pt-6 sm:px-7 sm:pt-8">
+                <div className="mb-7 flex items-start justify-between gap-4">
+                  <div>
+                    <h1 className="text-[34px] font-bold leading-[1.05] tracking-tight text-[#0F172A] sm:text-[42px]">
+                      {portalState.headline}
+                    </h1>
+                    <p className="mt-3 max-w-xl text-[17px] font-semibold leading-7 text-[#216153]">
+                      {portalState.subheadline}
+                    </p>
+                  </div>
+                  {portalState.appointmentContext.isConfirmed && (
+                    <div className="hidden rounded-full bg-emerald-50 px-3 py-2 text-[12px] font-black uppercase tracking-wide text-emerald-700 sm:block">
+                      Presenca confirmada
+                    </div>
+                  )}
                 </div>
-                Confirmar minha ida
-              </>
+
+                <button
+                  onClick={() => handleAction(portalState.primaryAction)}
+                  disabled={portalState.primaryAction.id === 'confirmAppointment' && appointmentSubmittingId === portalState.primaryAction.appointmentId}
+                  className="flex h-14 w-full items-center justify-center gap-2.5 rounded-[18px] bg-[#216153] px-5 text-[16px] font-bold text-white shadow-[0_14px_34px_rgba(33,97,83,0.26)] transition active:scale-[0.99] disabled:opacity-70 sm:h-16 sm:text-[17px]"
+                >
+                  {portalState.primaryAction.id === 'confirmAppointment' && appointmentSubmittingId === portalState.primaryAction.appointmentId ? (
+                    <span className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={22} />
+                  )}
+                  {portalState.primaryAction.label}
+                </button>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {portalState.secondaryActions.map((action) => (
+                    <ContextActionButton key={`${action.id}-${action.label}`} action={action} onClick={() => handleAction(action)} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-[#EEF0F3] bg-[#FBFCFD] px-5 py-4 sm:px-7">
+                <div className="flex gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F2ECFF] text-[#7C3AED]">
+                    <Info size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7C3AED]">Dica de hoje</p>
+                    <p className="mt-1 text-[14px] font-medium leading-6 text-[#667085]">{portalState.tip}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-3 sm:grid-cols-3">
+              <StatusChip icon={Calendar} label="Consultas" value={String(data.appointments.length)} />
+              <StatusChip icon={ClipboardList} label="Ficha" value={portalState.patientFlags.medicalFormPending ? 'Pendente' : 'Atualizada'} />
+              <StatusChip icon={WalletCards} label="Pagamentos" value={portalState.patientFlags.hasPendingPayment ? currency(portalState.patientFlags.pendingPaymentAmount) : 'Em dia'} />
+            </section>
+
+            {portalState.appointmentContext.nextAppointment && (
+              <AppointmentSummary
+                appointment={portalState.appointmentContext.nextAppointment}
+                procedureText={portalState.appointmentContext.procedureText}
+                isConfirmed={portalState.appointmentContext.isConfirmed}
+                onReschedule={() => openRescheduleModal(portalState.appointmentContext.nextAppointment!)}
+              />
             )}
-          </button>
+          </main>
+        )}
 
-          <button className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <ClipboardList size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Orientações da cirurgia</span>
-          </button>
+        {activeTab === 'consultas' && (
+          <ListPanel title="Consultas" emptyText="Nenhuma consulta encontrada." icon={Calendar}>
+            {futureAppointments.map((appointment) => (
+              <AppointmentRow
+                key={appointment.id}
+                appointment={appointment}
+                onConfirm={() => handleConfirmAppointment(appointment.id)}
+                onReschedule={() => openRescheduleModal(appointment)}
+                confirming={appointmentSubmittingId === appointment.id}
+              />
+            ))}
+            {pastAppointments.map((appointment) => (
+              <AppointmentRow key={appointment.id} appointment={appointment} past />
+            ))}
+          </ListPanel>
+        )}
 
-          <button className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <User size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Atualizar ficha médica</span>
-          </button>
+        {activeTab === 'evolucao' && (
+          <ListPanel title="Historico clinico" emptyText="Ainda nao ha evolucoes registradas." icon={Activity}>
+            {(data.evolution || []).map((entry) => (
+              <div key={entry.id || `${entry.date}-${entry.procedure_performed}`} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
+                <p className="text-[13px] font-semibold text-[#667085]">{formatDate(entry.date)}</p>
+                <p className="mt-1 text-[16px] font-bold text-[#111827]">{entry.procedure_performed || 'Atendimento'}</p>
+                {entry.notes && <p className="mt-2 text-[14px] leading-6 text-[#667085]">{entry.notes}</p>}
+              </div>
+            ))}
+          </ListPanel>
+        )}
 
-          <button className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <MessageCircle size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Dúvidas pós-atendimento</span>
-          </button>
-        </div>
+        {activeTab === 'documentos' && (
+          <ListPanel title="Documentos" emptyText="Nenhum documento disponivel." icon={FileText}>
+            {(data.files || []).map((file) => (
+              <a
+                key={file.id}
+                href={file.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]"
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-[#216153]">
+                  <Download size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-bold text-[#111827]">{file.description || 'Documento'}</p>
+                  <p className="mt-0.5 text-[12px] font-medium text-[#667085]">{formatDate(file.created_at)}</p>
+                </div>
+              </a>
+            ))}
+          </ListPanel>
+        )}
 
-        {/* Dica de Hoje */}
-        <div className="w-full bg-[#FCF8FF] border border-[#F3E8FF] rounded-[24px] p-6">
-          <h3 className="text-[#7C3AED] text-[11px] font-extrabold tracking-widest uppercase mb-3">DICA DE HOJE</h3>
-          <p className="text-[#64748B] text-[15px] font-medium leading-relaxed">
-            {recentProcedures.length > 0 && detectCategory(recentProcedures[0].procedure) 
-              ? PROCEDURE_GUIDES[recentProcedures[0].category].items[0].text 
-              : 'Beba bastante água após o procedimento de amanhã.'}
-          </p>
-        </div>
+        {activeTab === 'financeiro' && (
+          <ListPanel title="Financeiro" emptyText="Nenhum pagamento em aberto." icon={DollarSign}>
+            {pendingInstallments.map((installment) => (
+              <PaymentCard
+                key={installment.id}
+                installment={installment}
+                onOpenPayment={openPaymentModal}
+              />
+            ))}
+            {(data.payment_plans || []).length > 0 && (
+              <div className="pt-2">
+                <p className="mb-2 text-[12px] font-black uppercase tracking-wide text-[#98A2B3]">Planos</p>
+                {data.payment_plans.map((plan) => (
+                  <div key={plan.id} className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
+                    <p className="text-[15px] font-bold text-[#111827]">{plan.procedure}</p>
+                    <p className="mt-1 text-[13px] font-semibold text-[#667085]">{currency(Number(plan.total_amount))} - {plan.status}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ListPanel>
+        )}
       </div>
 
-      {/* Mantendo Modais Existentes ocultos para não quebrar funcionalidade caso sejam abertos por outro meio no futuro */}
+      <BottomTabs activeTab={activeTab} onChange={setActiveTab} />
+
       <AnimatePresence>
         {showScheduleModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center"
-            onClick={closeScheduleModal}
-          >
-            <motion.div
-              ref={scheduleModalRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="schedule-modal-title"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl"
-            >
-              <div className="flex justify-center pt-3 pb-1 sm:hidden">
-                <div className="w-9 h-1 bg-[#C6C6C8] rounded-full" />
+          <PortalModal title={scheduleMode === 'reschedule' ? 'Solicitar reagendamento' : 'Solicitar novo horario'} onClose={closeAnyModal} modalRef={modalRef}>
+            <div className="space-y-4">
+              <Input label="Data preferencial" type="date" value={scheduleForm.preferred_date} onChange={(value) => setScheduleForm({ ...scheduleForm, preferred_date: value })} />
+              <Select label="Melhor periodo" value={scheduleForm.preferred_time} onChange={(value) => setScheduleForm({ ...scheduleForm, preferred_time: value })} options={[
+                ['', 'Sem preferencia'],
+                ['manha', 'Manha'],
+                ['tarde', 'Tarde'],
+                ['noite', 'Noite'],
+              ]} />
+              <TextArea label="Observacoes para a clinica" value={scheduleForm.notes} onChange={(value) => setScheduleForm({ ...scheduleForm, notes: value })} placeholder="Conte o motivo ou uma preferencia de horario." />
+              <button
+                onClick={handleRequestAppointment}
+                disabled={!scheduleForm.preferred_date || scheduleSubmitting}
+                className="h-12 w-full rounded-2xl bg-[#216153] text-[15px] font-bold text-white disabled:opacity-50"
+              >
+                {scheduleSubmitting ? 'Enviando...' : 'Enviar solicitacao'}
+              </button>
+            </div>
+          </PortalModal>
+        )}
+
+        {showMedicalModal && (
+          <PortalModal title="Atualizar ficha medica" onClose={closeAnyModal} modalRef={modalRef}>
+            <div className="space-y-4">
+              <TextArea label="Alergias" value={medicalForm.allergies} onChange={(value) => setMedicalForm({ ...medicalForm, allergies: value })} placeholder="Ex: dipirona, latex, penicilina..." />
+              <TextArea label="Medicamentos em uso" value={medicalForm.medications} onChange={(value) => setMedicalForm({ ...medicalForm, medications: value })} placeholder="Liste medicamentos e doses, se souber." />
+              <TextArea label="Doencas sistemicas" value={medicalForm.systemic_diseases} onChange={(value) => setMedicalForm({ ...medicalForm, systemic_diseases: value })} placeholder="Ex: hipertensao, diabetes, cardiopatias..." />
+              <Input label="Pressao/diabetes" value={medicalForm.blood_pressure_or_diabetes} onChange={(value) => setMedicalForm({ ...medicalForm, blood_pressure_or_diabetes: value })} placeholder="Ex: pressao controlada, diabetes tipo 2..." />
+              <Input label="Uso de anticoagulante" value={medicalForm.anticoagulant_use} onChange={(value) => setMedicalForm({ ...medicalForm, anticoagulant_use: value })} placeholder="Ex: nao uso, AAS, rivaroxabana..." />
+              <Input label="Gravidez, se aplicavel" value={medicalForm.pregnancy} onChange={(value) => setMedicalForm({ ...medicalForm, pregnancy: value })} placeholder="Ex: nao, 20 semanas..." />
+              <TextArea label="Observacoes importantes" value={medicalForm.important_notes} onChange={(value) => setMedicalForm({ ...medicalForm, important_notes: value })} placeholder="Qualquer informacao que a clinica deve saber." />
+              <button
+                onClick={handleSaveMedicalForm}
+                disabled={medicalSubmitting}
+                className="h-12 w-full rounded-2xl bg-[#216153] text-[15px] font-bold text-white disabled:opacity-50"
+              >
+                {medicalSubmitting ? 'Salvando...' : 'Salvar ficha'}
+              </button>
+            </div>
+          </PortalModal>
+        )}
+
+        {showMessageModal && (
+          <PortalModal title={messageContext === 'post-care' ? 'Duvida pos-atendimento' : 'Falar com a clinica'} onClose={closeAnyModal} modalRef={modalRef}>
+            <div className="space-y-4">
+              <TextArea
+                label="Mensagem"
+                value={messageBody}
+                onChange={setMessageBody}
+                placeholder={messageContext === 'post-care' ? 'Conte sua duvida, sintoma ou desconforto.' : 'Escreva sua mensagem para a equipe.'}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!messageBody.trim() || messageSubmitting}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#216153] text-[15px] font-bold text-white disabled:opacity-50"
+              >
+                <Send size={18} />
+                {messageSubmitting ? 'Enviando...' : 'Enviar mensagem'}
+              </button>
+            </div>
+          </PortalModal>
+        )}
+
+        {showInstructionsModal && (
+          <PortalModal title={portalState.appointmentContext.procedureGuide.title} onClose={closeAnyModal} modalRef={modalRef}>
+            <div className="space-y-5">
+              <div className="rounded-2xl bg-[#F6F7F8] p-4">
+                <p className="text-[12px] font-black uppercase tracking-wide text-[#98A2B3]">Procedimento</p>
+                <p className="mt-1 text-[16px] font-bold text-[#111827]">{portalState.appointmentContext.procedureText}</p>
               </div>
-              <div className="px-5 pb-6 pt-3">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 id="schedule-modal-title" className="text-[18px] font-semibold text-academy-text tracking-tight">
-                    Agendamento
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={closeScheduleModal}
-                    className="w-8 h-8 bg-academy-border rounded-full flex items-center justify-center active:scale-90 transition-transform"
-                  >
-                    <X size={16} className="text-academy-muted" />
+
+              {(instructionMode === 'pre' || portalState.patientFlags.hasPreCare) && (
+                <GuideSection title={portalState.appointmentContext.procedureGuide.isSurgical ? 'Antes da cirurgia' : 'Antes da consulta'} items={portalState.appointmentContext.procedureGuide.pre} />
+              )}
+              {(instructionMode === 'post' || portalState.patientFlags.hasPostCare) && (
+                <GuideSection title="Depois do atendimento" items={portalState.appointmentContext.procedureGuide.post} />
+              )}
+              <button
+                onClick={() => openMessageModal(portalState.patientFlags.hasPostCare ? 'post-care' : 'clinic')}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#E4E7EC] bg-white text-[15px] font-bold text-[#216153]"
+              >
+                <MessageCircle size={18} />
+                Falar com a clinica
+              </button>
+            </div>
+          </PortalModal>
+        )}
+
+        {showPaymentModal && (
+          <PortalModal title="Pagamento" onClose={closeAnyModal} modalRef={modalRef}>
+            <div className="space-y-4">
+              {pendingInstallments.length === 0 ? (
+                <p className="rounded-2xl bg-emerald-50 p-4 text-[14px] font-semibold text-emerald-700">Nao ha pagamento pendente no momento.</p>
+              ) : (
+                pendingInstallments.map((installment) => (
+                  <div key={installment.id} className="rounded-2xl border border-[#E4E7EC] bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[15px] font-bold text-[#111827]">{installment.procedure || 'Parcela'}</p>
+                        <p className="mt-1 text-[13px] font-semibold text-[#667085]">Vencimento {formatDate(installment.due_date)}</p>
+                      </div>
+                      <p className="text-[17px] font-black text-[#111827]">{currency(Number(installment.amount))}</p>
+                    </div>
+                    <button
+                      onClick={() => handleInformPayment(installment.id, Number(installment.amount))}
+                      disabled={paymentSubmittingId === installment.id}
+                      className="mt-4 h-11 w-full rounded-2xl bg-[#216153] text-[14px] font-bold text-white disabled:opacity-50"
+                    >
+                      {paymentSubmittingId === installment.id ? 'Informando...' : 'Informar pagamento'}
+                    </button>
+                  </div>
+                ))
+              )}
+
+              {pixInfo?.has_pix && (
+                <div className="rounded-2xl bg-[#F6F7F8] p-4">
+                  <p className="text-[12px] font-black uppercase tracking-wide text-[#98A2B3]">PIX da clinica</p>
+                  <p className="mt-2 break-all text-[15px] font-bold text-[#111827]">{pixInfo.pix_key}</p>
+                  <p className="mt-1 text-[13px] text-[#667085]">{pixInfo.pix_key_type} - {pixInfo.beneficiary_name}</p>
+                  <button onClick={copyPix} className="mt-3 h-10 rounded-xl bg-white px-4 text-[13px] font-bold text-[#216153] shadow-sm">
+                    {pixCopied ? 'Chave copiada' : 'Copiar chave PIX'}
                   </button>
                 </div>
-              </div>
-            </motion.div>
-          </motion.div>
+              )}
+            </div>
+          </PortalModal>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-// ─── Helper Components ───
+function ContextActionButton({ action, onClick }: { action: PortalAction; onClick: () => void }) {
+  const Icon = action.id === 'openPayment' ? CreditCard
+    : action.id === 'openMedicalForm' ? User
+    : action.id === 'openDirections' ? MapPin
+    : action.id === 'openPostCare' || action.id === 'openMessages' ? MessageCircle
+    : action.id === 'viewInstructions' ? ClipboardList
+    : action.id === 'openHistory' ? Activity
+    : Calendar;
 
-function PortalQuickAction({ icon: Icon, label, onClick }: {
-  icon: React.ElementType; label: string; onClick: () => void;
-}) {
+  const toneClass = action.tone === 'warning'
+    ? 'bg-amber-50 text-amber-800 ring-amber-100'
+    : action.tone === 'success'
+      ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+      : 'bg-white text-[#111827] ring-black/[0.06]';
+
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-white shadow-[0_1px_6px_rgba(0,0,0,0.05)] active:scale-95 transition-transform"
+      className={`flex min-h-[64px] items-center gap-3 rounded-[18px] px-4 text-left text-[15px] font-bold shadow-sm ring-1 transition active:scale-[0.99] ${toneClass}`}
     >
-      <div className="w-10 h-10 bg-academy-bg rounded-full flex items-center justify-center">
-        <Icon size={18} className="text-[#0C9B72]" />
-      </div>
-      <span className="text-academy-muted text-[11px] font-medium">{label}</span>
+      <Icon size={21} className="shrink-0" />
+      <span className="min-w-0 flex-1 leading-snug">{action.label}</span>
     </button>
   );
 }
 
-function PortalStatCard({ value, label }: { value: number; label: string }) {
+function StatusChip({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="bg-white rounded-2xl p-4 text-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-      <p className="text-academy-text text-[24px] font-bold tracking-tight">{value}</p>
-      <p className="text-[#AEAEB2] text-[11px] font-medium uppercase tracking-wider mt-0.5">{label}</p>
+    <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
+      <div className="flex items-center gap-2 text-[#216153]">
+        <Icon size={18} />
+        <p className="text-[12px] font-black uppercase tracking-wide">{label}</p>
+      </div>
+      <p className="mt-2 text-[18px] font-bold text-[#111827]">{value}</p>
     </div>
   );
 }
 
-function PortalAppointmentRow({ appointment, formatDate, formatTime, statusLabel, past, actionContent, actionNotice }: any) {
-  const s = statusLabel(appointment.status);
-  const statusColors: Record<string, string> = {
-    'SCHEDULED': 'bg-[#007AFF]/10 text-[#007AFF]',
-    'CONFIRMED': 'bg-[#34C759]/10 text-[#34C759]',
-    'IN_PROGRESS': 'bg-[#FF9500]/10 text-[#FF9500]',
-    'FINISHED': 'bg-academy-border text-academy-muted',
-    'CANCELLED': 'bg-[#FF3B30]/10 text-[#FF3B30]',
-    'NO_SHOW': 'bg-[#FF3B30]/10 text-[#FF3B30]',
-  };
+function AppointmentSummary({ appointment, procedureText, isConfirmed, onReschedule }: {
+  appointment: PortalAppointment;
+  procedureText: string;
+  isConfirmed: boolean;
+  onReschedule: () => void;
+}) {
   return (
-    <div className={`px-4 py-3.5 ${past ? 'opacity-40' : ''}`}>
-      <div className="flex items-center gap-3.5">
-        <div className="w-10 h-10 bg-academy-bg rounded-xl flex items-center justify-center shrink-0">
-          <Calendar size={16} className="text-academy-muted" />
+    <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-black/[0.04]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[12px] font-black uppercase tracking-wide text-[#98A2B3]">Proxima consulta</p>
+          <p className="mt-1 text-[20px] font-bold text-[#111827]">{formatDate(appointment.start_time)} as {formatPortalTime(appointment.start_time)}</p>
+          <p className="mt-1 text-[14px] font-medium text-[#667085]">{procedureText}</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-academy-text text-[15px] font-medium">{formatDate(appointment.start_time)}</p>
-          <p className="text-academy-muted text-[13px] mt-0.5">
-            {formatTime(appointment.start_time)} · Dr(a). {appointment.dentist_name}
-          </p>
-        </div>
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${statusColors[appointment.status] || 'bg-academy-border text-academy-muted'}`}>
-          {s.label}
+        <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${isConfirmed ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+          {isConfirmed ? 'Confirmada' : 'A confirmar'}
         </span>
       </div>
-      {appointment.notes && (
-        <p className="text-academy-muted text-[13px] mt-2 ml-[54px]">{appointment.notes}</p>
-      )}
-      {actionContent && !past && (
-        <div className="mt-3 ml-[54px]">
-          {actionContent}
+      <button onClick={onReschedule} className="mt-4 text-[14px] font-bold text-[#216153]">
+        Solicitar reagendamento
+      </button>
+    </section>
+  );
+}
+
+function AppointmentRow({ appointment, past, onConfirm, onReschedule, confirming }: {
+  appointment: PortalAppointment;
+  past?: boolean;
+  onConfirm?: () => void;
+  onReschedule?: () => void;
+  confirming?: boolean;
+}) {
+  const status = (appointment.status || '').toUpperCase();
+  return (
+    <div className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04] ${past ? 'opacity-70' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[16px] font-bold text-[#111827]">{formatDate(appointment.start_time)} as {formatPortalTime(appointment.start_time)}</p>
+          <p className="mt-1 text-[13px] font-semibold text-[#667085]">Dr(a). {appointment.dentist_name || 'Clinica'}</p>
+          {appointment.notes && <p className="mt-2 text-[14px] leading-6 text-[#667085]">{appointment.notes}</p>}
         </div>
-      )}
-      {actionNotice && !past && (
-        <p className="text-[#34C759] text-[12px] font-medium mt-1.5 ml-[54px]">{actionNotice}</p>
+        <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-700' : status === 'SCHEDULED' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+          {status === 'CONFIRMED' ? 'Confirmada' : status === 'SCHEDULED' ? 'Agendada' : status}
+        </span>
+      </div>
+      {!past && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {status === 'SCHEDULED' && onConfirm && (
+            <button onClick={onConfirm} disabled={confirming} className="rounded-full bg-[#216153] px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50">
+              {confirming ? 'Confirmando...' : 'Confirmar ida'}
+            </button>
+          )}
+          {onReschedule && (
+            <button onClick={onReschedule} className="rounded-full bg-slate-100 px-4 py-2 text-[13px] font-bold text-[#475467]">
+              Reagendar
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function PortalEmptyState({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
+function PaymentCard({ installment, onOpenPayment }: { installment: PortalData['installments'][number]; onOpenPayment: () => void }) {
   return (
-    <div className="py-16 text-center">
-      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-        <Icon size={24} className="text-academy-muted" />
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[15px] font-bold text-[#111827]">{installment.procedure || 'Pagamento pendente'}</p>
+          <p className="mt-1 text-[13px] font-semibold text-[#667085]">Vencimento {formatDate(installment.due_date)}</p>
+        </div>
+        <p className="text-[17px] font-black text-[#111827]">{currency(Number(installment.amount))}</p>
       </div>
-      <p className="text-[#AEAEB2] text-[15px]">{text}</p>
+      <button onClick={onOpenPayment} className="mt-4 rounded-full bg-[#216153] px-4 py-2 text-[13px] font-bold text-white">
+        Ver pagamento
+      </button>
     </div>
   );
+}
+
+function ListPanel({ title, emptyText, icon: Icon, children }: {
+  title: string;
+  emptyText: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  const items = React.Children.toArray(children).filter(Boolean);
+  return (
+    <section className="space-y-3">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#216153] shadow-sm ring-1 ring-black/[0.04]">
+          <Icon size={20} />
+        </div>
+        <h1 className="text-[26px] font-bold tracking-tight text-[#111827]">{title}</h1>
+      </div>
+      {items.length > 0 ? items : (
+        <div className="rounded-[24px] bg-white p-10 text-center shadow-sm ring-1 ring-black/[0.04]">
+          <p className="text-[15px] font-semibold text-[#98A2B3]">{emptyText}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BottomTabs({ activeTab, onChange }: { activeTab: Tab; onChange: (tab: Tab) => void }) {
+  const tabs: Array<{ id: Tab; label: string; icon: React.ElementType }> = [
+    { id: 'inicio', label: 'Inicio', icon: Home },
+    { id: 'consultas', label: 'Consultas', icon: Calendar },
+    { id: 'evolucao', label: 'Historico', icon: Activity },
+    { id: 'documentos', label: 'Docs', icon: FileText },
+    { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
+  ];
+
+  return (
+    <nav className="fixed inset-x-0 bottom-3 z-40 px-3">
+      <div className="mx-auto grid max-w-3xl grid-cols-5 rounded-[24px] border border-white/70 bg-white/95 p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.16)] backdrop-blur-2xl">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-bold transition ${activeTab === id ? 'bg-[#216153] text-white' : 'text-[#667085]'}`}
+          >
+            <Icon size={20} />
+            <span className="truncate">{label}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function PortalModal({ title, children, onClose, modalRef }: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  modalRef: React.MutableRefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 px-0 backdrop-blur-md sm:items-center sm:px-4"
+      onClick={onClose}
+    >
+      <motion.div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        onClick={(event) => event.stopPropagation()}
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[30px] bg-white p-5 shadow-2xl sm:max-w-lg sm:rounded-[30px] sm:p-6"
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 className="text-[20px] font-bold tracking-tight text-[#111827]">{title}</h2>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-[#667085]">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function GuideSection({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <p className="mb-2 text-[12px] font-black uppercase tracking-wide text-[#98A2B3]">{title}</p>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item} className="flex gap-3 rounded-2xl bg-[#F6F7F8] p-3">
+            <Check size={17} className="mt-0.5 shrink-0 text-[#216153]" />
+            <p className="text-[14px] font-medium leading-6 text-[#475467]">{item}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = 'text', placeholder }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-bold text-[#344054]">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-12 w-full rounded-2xl border border-[#D0D5DD] bg-white px-4 text-[15px] font-medium outline-none transition focus:border-[#216153] focus:ring-4 focus:ring-[#216153]/10"
+      />
+    </label>
+  );
+}
+
+function Select({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<[string, string]>;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-bold text-[#344054]">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-12 w-full rounded-2xl border border-[#D0D5DD] bg-white px-4 text-[15px] font-medium outline-none transition focus:border-[#216153] focus:ring-4 focus:ring-[#216153]/10"
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextArea({ label, value, onChange, placeholder }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-bold text-[#344054]">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        className="w-full rounded-2xl border border-[#D0D5DD] bg-white px-4 py-3 text-[15px] font-medium leading-6 outline-none transition focus:border-[#216153] focus:ring-4 focus:ring-[#216153]/10"
+      />
+    </label>
+  );
+}
+
+function buildMedicalForm(data: PortalData | null): MedicalForm {
+  if (!data) return emptyMedicalForm;
+  const formData = data.latest_intake_form?.form_data || {};
+  return {
+    allergies: String(formData.allergies ?? data.anamnesis?.allergies ?? ''),
+    medications: String(formData.medications ?? data.anamnesis?.medications ?? ''),
+    systemic_diseases: String(formData.systemic_diseases ?? formData.medical_history ?? data.anamnesis?.medical_history ?? ''),
+    blood_pressure_or_diabetes: String(formData.blood_pressure_or_diabetes ?? data.anamnesis?.vital_signs ?? ''),
+    anticoagulant_use: String(formData.anticoagulant_use ?? ''),
+    pregnancy: String(formData.pregnancy ?? ''),
+    important_notes: String(formData.important_notes ?? data.anamnesis?.habits ?? ''),
+  };
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function currency(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }

@@ -27,10 +27,10 @@ const EmptyState: React.FC<{ icon: React.ElementType; title: string; description
     animate={{ opacity: 1, scale: 1 }}
     className="px-4 mb-6"
   >
-    <div className="ios-card bg-academy-study text-center py-8">
-      <Icon size={40} className="mx-auto mb-3 text-academy-muted/50" />
-      <p className="text-academy-muted font-medium">{title}</p>
-      {description && <p className="text-sm text-academy-muted/70 mt-1">{description}</p>}
+    <div className="ios-card bg-slate-50 text-center py-8">
+      <Icon size={40} className="mx-auto mb-3 text-slate-300" />
+      <p className="text-slate-500 font-medium">{title}</p>
+      {description && <p className="text-sm text-slate-400 mt-1">{description}</p>}
     </div>
   </motion.div>
 );
@@ -45,15 +45,15 @@ const SectionCard: React.FC<{
     whileHover={{ scale: 1.02 }}
     whileTap={{ scale: 0.98 }}
     onClick={onClick}
-    className="ios-card w-full text-left transition-all duration-200 hover:shadow-[0_8px_32px_rgba(139,92,246,0.12)]"
+    className="ios-card w-full text-left transition-all duration-200 hover:shadow-[0_8px_32px_rgba(12,155,114,0.15)]"
   >
     <div className="flex items-start justify-between mb-3">
       <div className="bg-primary/10 rounded-full p-3">
         <Icon size={24} className="text-primary" />
       </div>
     </div>
-    <h3 className="font-bold text-academy-text mb-1">{title}</h3>
-    <p className="text-[13px] text-academy-muted mb-3">{description}</p>
+    <h3 className="font-bold text-[#1C1C1E] mb-1">{title}</h3>
+    <p className="text-[13px] text-slate-600 mb-3">{description}</p>
     <div className="flex items-center gap-1 text-primary font-medium text-sm">
       Ver <ChevronRight size={16} />
     </div>
@@ -62,17 +62,17 @@ const SectionCard: React.FC<{
 
 export const Academy: React.FC<AcademyProps> = ({ onNavigate }) => {
   return (
-    <div className="flex-1 bg-academy-bg overflow-y-auto pb-20">
+    <div className="flex-1 bg-[#F2F2F7] overflow-y-auto pb-20">
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-academy-bg/80 backdrop-blur-md">
+        <div className="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-[#F2F2F7]/80 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
               <Stethoscope size={20} className="text-white" />
             </div>
-            <span className="font-bold text-academy-text">Academy</span>
+            <span className="font-bold text-[#1C1C1E]">Academy</span>
           </div>
           <button className="p-2 hover:bg-white/60 rounded-full transition-all">
-            <Home size={20} className="text-academy-text" />
+            <Home size={20} className="text-[#1C1C1E]" />
           </button>
         </div>
 
@@ -104,14 +104,14 @@ export const Academy: React.FC<AcademyProps> = ({ onNavigate }) => {
           transition={{ duration: 0.3, delay: 0.1 }}
           className="px-4 mb-6"
         >
-          <div className="ios-card bg-academy-study border border-academy-border/70">
+          <div className="ios-card bg-gradient-to-br from-primary/5 to-primary/2">
             <div className="flex items-start gap-3 mb-4">
               <div className="bg-primary/10 rounded-full p-2">
                 <Zap size={20} className="text-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-academy-text">Preparacao rapida</h3>
-                <p className="text-[13px] text-academy-muted">Nenhum roteiro disponivel</p>
+                <h3 className="font-bold text-[#1C1C1E]">Preparacao rapida</h3>
+                <p className="text-[13px] text-slate-600">Nenhum roteiro disponivel</p>
               </div>
             </div>
             <button className="w-full mt-4 py-2 bg-primary text-white rounded-[16px] font-semibold text-sm hover:opacity-95 transition-all">
