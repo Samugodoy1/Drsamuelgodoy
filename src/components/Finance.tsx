@@ -1215,7 +1215,7 @@ export function Finance({
     <div className="max-w-screen-xl mx-auto pt-10 px-2 pb-32 md:pb-10 space-y-10 bg-[linear-gradient(180deg,#f8f9fb_0%,#fbfcfd_100%)] rounded-[36px] min-h-full">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between px-2">
         <div className="space-y-1">
-          <h2 className="text-[28px] font-bold tracking-tight text-[#1C1C1E]">Financeiro</h2>
+          <h2 className="text-[28px] font-bold tracking-tight text-academy-text">Financeiro</h2>
         </div>
 
         <div className="flex flex-wrap gap-2">

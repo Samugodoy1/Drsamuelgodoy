@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { API_URL } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_URL } from '../config';
 import {
   TrendingUp, AlertTriangle, Users, Calendar, DollarSign,
   Stethoscope, Clock, ChevronRight, Activity, Sparkles,
@@ -148,7 +148,7 @@ export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord, produ
           headers['Authorization'] = `Bearer ${token}`;
           headers['x-auth-token'] = token;
         }
-        const res = await fetch(`${API_URL}/api/ml/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const });
+        const res = await fetch(`${API_URL}/api/ml/dashboard`, { headers });
         if (!res.ok) throw new Error('Erro ao carregar dados de ML');
         const json = await res.json();
         setData(json);
@@ -195,7 +195,7 @@ export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord, produ
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Inteligência Preditiva</h2>
-          <span className="px-3 py-1 bg-violet-100 text-violet-700 text-[11px] font-bold rounded-full uppercase tracking-wider">ML</span>
+          <span className="px-3 py-1 bg-violet-100 text-academy-primary-dark text-[11px] font-bold rounded-full uppercase tracking-wider">ML</span>
         </div>
         <p className="text-[13px] text-slate-400">Previsões baseadas no histórico da sua clínica</p>
       </div>
@@ -480,7 +480,7 @@ export const MLInsights: React.FC<MLInsightsProps> = ({ openPatientRecord, produ
                                 </div>
                                 <p className="text-[12px] text-slate-400 mt-0.5">{t.reason}</p>
                               </div>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-50 text-violet-600 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-academy-soft text-academy-primary whitespace-nowrap">
                                 {basedOnLabels[t.based_on]}
                               </span>
                             </div>
@@ -512,7 +512,7 @@ function KPICard({ label, value, subtitle, color, icon }: {
     emerald: 'bg-emerald-50 text-emerald-700',
     rose:    'bg-rose-50 text-rose-700',
     amber:   'bg-amber-50 text-amber-700',
-    violet:  'bg-violet-50 text-violet-700',
+    violet:  'bg-academy-soft text-academy-primary-dark',
     slate:   'bg-slate-100 text-slate-700',
   };
   const cls = colorClasses[color] || colorClasses.slate;

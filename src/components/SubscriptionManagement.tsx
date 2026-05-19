@@ -76,7 +76,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
 
   const fetchSubscription = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/subscriptions/me?product=${product}`);
+      const res = await apiFetch(`/api/subscriptions/me?product=${product}`, { product });
       if (res.ok) {
         const data = await res.json();
         setSubscription(data.subscription);
@@ -115,6 +115,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
     try {
       const res = await apiFetch('/api/subscriptions/create', {
         method: 'POST',
+        product,
         body: JSON.stringify({ product, plan_id: planId }),
       });
       const data = await res.json();
@@ -136,6 +137,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
     try {
       const res = await apiFetch('/api/subscriptions/cancel', {
         method: 'POST',
+        product,
         body: JSON.stringify({ product }),
       });
       const data = await res.json();
