@@ -166,16 +166,35 @@ export function PatientPortal() {
   };
 
   const handleAnamnesisSubmit = async () => {
+    if (!sessionToken) return;
     setAnamnesisSubmitting(true);
-    // Optimistic / Mock update since patient portal API might not have this endpoint yet
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${API_URL}/api/portal/intake`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+          medical_history: anamnesisForm.medical_history,
+          allergies: anamnesisForm.allergies,
+          medications: anamnesisForm.medications
+        })
+      });
+      if (!res.ok) throw new Error('Erro ao enviar ficha médica');
+      
       setData((current: any) => current ? {
         ...current, 
         anamnesis: { ...current.anamnesis, ...anamnesisForm }
       } : current);
+      
+      setTimeout(() => setShowAnamnesisModal(false), 500);
+    } catch (err) {
+      console.error(err);
+      // Aqui você poderia colocar um estado de erro, se quiser mostrar uma mensagem pro paciente.
+    } finally {
       setAnamnesisSubmitting(false);
-      setShowAnamnesisModal(false);
-    }, 1000);
+    }
   };
 
   // Payment
@@ -725,9 +744,13 @@ export function PatientPortal() {
 
       {/* ─── Header Minimalista ─── */}
       <div className="px-6 pt-10 pb-4 flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#216153] rounded-[10px] flex items-center justify-center text-white font-bold text-lg tracking-tight">
-          OH
-        </div>
+        {clinic?.photo_url ? (
+          <img src={clinic.photo_url} alt="Dentista" className="w-10 h-10 rounded-[10px] object-cover shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-slate-100/50" />
+        ) : (
+          <div className="w-10 h-10 bg-[#216153] rounded-[10px] flex items-center justify-center text-white font-bold text-lg tracking-tight">
+            {clinic?.name ? clinic.name.charAt(0).toUpperCase() : 'OH'}
+          </div>
+        )}
         <p className="text-[#216153] text-[13px] font-bold tracking-[0.1em]">PORTAL DO PACIENTE</p>
       </div>
 
@@ -775,21 +798,42 @@ export function PatientPortal() {
 
         {/* Botões Principais */}
         <div className="space-y-4 mb-14">
-          <button
-            onClick={() => futureAppointments.length > 0 ? handleConfirmAppointment(futureAppointments[0].id) : null}
-            disabled={futureAppointments.length > 0 && appointmentSubmittingId === futureAppointments[0].id}
-            className="w-full h-[64px] bg-[#216153] rounded-2xl flex items-center justify-center gap-3 text-white font-bold text-[17px] shadow-[0_8px_24px_rgba(33,97,83,0.25)] active:scale-[0.98] transition-transform disabled:opacity-70"
-          >
-            {appointmentSubmittingId === futureAppointments[0]?.id ? (
-              <div className="w-5 h-5 border-[2px] border-white/25 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-white flex items-center justify-center">
-                  <CheckCircle2 size={14} className="text-white" weight="bold" />
-                </div>
-                Confirmar minha ida
-              </>
-            )}
+          {futureAppointments.length > 0 && (() => {
+            const nextAppt = futureAppointments[0];
+            const isConfirmed = nextAppt.status === 'CONFIRMED' || confirmedAppointmentId === nextAppt.id;
+
+            return (
+              <button
+                onClick={() => !isConfirmed ? handleConfirmAppointment(nextAppt.id) : null}
+                disabled={isConfirmed || appointmentSubmittingId === nextAppt.id}
+                className={`w-full h-[64px] rounded-2xl flex items-center justify-center gap-3 font-bold text-[17px] transition-transform ${
+                  isConfirmed 
+                    ? 'bg-[#34C759]/10 text-[#34C759] cursor-default' 
+                    : 'bg-[#216153] text-white active:scale-[0.98] shadow-[0_8px_24px_rgba(33,97,83,0.25)]'
+                }`}
+              >
+                {appointmentSubmittingId === nextAppt.id ? (
+                  <div className="w-5 h-5 border-[2px] border-white/25 border-t-white rounded-full animate-spin" />
+                ) : isConfirmed ? (
+                  <>
+                    <CheckCircle2 size={22} className="text-[#34C759]" weight="bold" />
+                    Presença confirmada
+                  </>
+                ) : (
+                  <>
+                    <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-white flex items-center justify-center">
+                      <CheckCircle2 size={14} className="text-white" weight="bold" />
+                    </div>
+                    Confirmar minha ida
+                  </>
+                )}
+              </button>
+            );
+          })()}
+
+          <button onClick={openNewScheduleModal} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
+            <CalendarPlus size={24} className="text-[#1E293B]" />
+            <span className="text-[#0F172A] font-bold text-[16px]">Solicitar consulta</span>
           </button>
 
           <button onClick={() => setShowPreOpModal(true)} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
