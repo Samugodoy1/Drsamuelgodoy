@@ -1039,17 +1039,87 @@ export function PatientPortal() {
               </div>
               <div className="px-5 pb-6 pt-3">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 id="schedule-modal-title" className="text-[18px] font-semibold text-academy-text tracking-tight">
-                    Agendamento
+                  <h3 id="schedule-modal-title" className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">
+                    {scheduleMode === 'reschedule' ? 'Reagendar Consulta' : 'Solicitar Nova Consulta'}
                   </h3>
                   <button
                     type="button"
                     onClick={closeScheduleModal}
-                    className="w-8 h-8 bg-academy-border rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-90 transition-transform"
                   >
-                    <X size={16} className="text-academy-muted" />
+                    <X size={16} className="text-[#8E8E93]" />
                   </button>
                 </div>
+
+                {scheduleSuccess ? (
+                  <div className="py-6 text-center">
+                    <div className="w-16 h-16 bg-[#34C759]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 size={32} className="text-[#34C759]" />
+                    </div>
+                    <p className="text-[#1C1C1E] text-[17px] font-semibold mb-2">Pedido Enviado!</p>
+                    <p className="text-[#64748B] text-[15px] leading-relaxed">A clínica entrará em contato em breve para confirmar o agendamento.</p>
+                  </div>
+                ) : (
+                  <form onSubmit={(e) => { e.preventDefault(); handleRequestAppointment(); }} className="space-y-4">
+                    {scheduleMode === 'reschedule' && scheduleTargetAppointment && (
+                      <div className="p-4 bg-[#F2F2F7] rounded-xl mb-4">
+                        <p className="text-[#8E8E93] text-[13px] font-medium mb-1">Consulta original</p>
+                        <p className="text-[#1C1C1E] text-[15px] font-semibold">
+                          {new Date(scheduleTargetAppointment.start_time).toLocaleDateString('pt-BR')} às {new Date(scheduleTargetAppointment.start_time).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Data de preferência</label>
+                      <input 
+                        type="date"
+                        required
+                        min={new Date().toISOString().split('T')[0]}
+                        value={scheduleForm.preferred_date}
+                        onChange={(e) => setScheduleForm(prev => ({...prev, preferred_date: e.target.value}))}
+                        className="w-full px-4 py-3.5 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Qual o melhor horário?</label>
+                      <select
+                        value={scheduleForm.preferred_time}
+                        onChange={(e) => setScheduleForm(prev => ({...prev, preferred_time: e.target.value}))}
+                        className="w-full px-4 py-3.5 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors appearance-none"
+                      >
+                        <option value="">Qualquer horário</option>
+                        <option value="Manhã">Manhã (08:00 - 12:00)</option>
+                        <option value="Tarde">Tarde (13:00 - 18:00)</option>
+                        <option value="Noite">Noite (Após 18:00)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Motivo / Observações</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Ex: Dor de dente, limpeza de rotina..."
+                        value={scheduleForm.notes}
+                        onChange={(e) => setScheduleForm(prev => ({...prev, notes: e.target.value}))}
+                        className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#8E8E93]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={scheduleSubmitting || !scheduleForm.preferred_date}
+                      className="w-full h-14 mt-2 bg-[#216153] text-white rounded-xl font-bold text-[16px] active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-70"
+                    >
+                      {scheduleSubmitting ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        'Enviar Solicitação'
+                      )}
+                    </button>
+                  </form>
+                )}
               </div>
             </motion.div>
           </motion.div>
