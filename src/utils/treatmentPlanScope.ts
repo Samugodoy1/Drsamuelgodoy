@@ -1,5 +1,7 @@
 import { TREATMENT_SCOPES, type TreatmentScope, getProcedureDefinition } from '../constants/clinicalProcedures';
 
+export { TREATMENT_SCOPES, type TreatmentScope } from '../constants/clinicalProcedures';
+
 export type QuadrantId = 1 | 2 | 3 | 4;
 
 /** Âncora regional extensível (sextante, arcada, etc.) sem alterar o shape base do plano. */
