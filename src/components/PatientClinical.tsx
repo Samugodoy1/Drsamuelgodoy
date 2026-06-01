@@ -29,12 +29,11 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { CLINICAL_PROCEDURES, getProcedureDefinition, resolveProcedureValue } from '../constants/clinicalProcedures';
 import { NovaEvolucao } from './NovaEvolucao';
-import { DentitionIndicator } from './DentitionIndicator';
+import { DentitionIndicator, DentitionRevealHint } from './DentitionIndicator';
 import { Odontogram } from './Odontogram';
 import { OdontogramActiveSummary } from './OdontogramActiveSummary';
 import { ScopeProcedureMenu } from './ScopeProcedureMenu';
 import {
-  DENTITION_MODE_LABELS,
   type DentitionMode,
   type DentitionSource,
   inferDentitionFromAge,
@@ -1753,52 +1752,42 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             />
           </div>
 
-          <DentitionIndicator
-            effectiveMode={effectiveDentitionMode}
-            suggestedMode={suggestedDentitionMode}
-            source={dentitionSource}
-            ageYears={age}
-            hasBirthDate={hasBirthDate}
-            showUpdatePrompt={showDentitionUpdatePrompt}
-            onSelectMode={handleDentitionModeSelect}
-            onAcceptSuggestion={handleAcceptDentitionSuggestion}
-            onDismissSuggestion={handleDismissDentitionSuggestion}
-          />
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <OdontogramActiveSummary
+                items={treatmentInProgress}
+                toothStatuses={mergedOdontogram}
+                highlightedTreatmentId={highlightedTreatmentId}
+                onSelectTooth={handleSelectToothFromSummary}
+                onSelectQuadrant={flashQuadrantHighlight}
+                onSelectPatientItem={flashTreatmentHighlight}
+                onRemoveTreatment={handleRemoveScopeTreatment}
+              />
+            </div>
+            <DentitionIndicator
+              effectiveMode={effectiveDentitionMode}
+              suggestedMode={suggestedDentitionMode}
+              source={dentitionSource}
+              ageYears={age}
+              hasBirthDate={hasBirthDate}
+              showUpdatePrompt={showDentitionUpdatePrompt}
+              onSelectMode={handleDentitionModeSelect}
+              onAcceptSuggestion={handleAcceptDentitionSuggestion}
+              onDismissSuggestion={handleDismissDentitionSuggestion}
+            />
+          </div>
 
           {pendingRevealTooth && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-2">
-              <p className="text-[11px] text-slate-700 flex-1 min-w-[200px]">
-                Dente {pendingRevealTooth.tooth} não aparece em{' '}
-                {DENTITION_MODE_LABELS[effectiveDentitionMode].toLowerCase()}.
-              </p>
-              <button
-                type="button"
-                onClick={() => void handleDentitionModeSelect(pendingRevealTooth.mode, 'manual')}
-                className="rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800"
-              >
-                Ver em {DENTITION_MODE_LABELS[pendingRevealTooth.mode]}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPendingRevealTooth(null)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Fechar
-              </button>
-            </div>
+            <DentitionRevealHint
+              tooth={pendingRevealTooth.tooth}
+              currentMode={effectiveDentitionMode}
+              targetMode={pendingRevealTooth.mode}
+              onReveal={() => void handleDentitionModeSelect(pendingRevealTooth.mode, 'manual')}
+              onDismiss={() => setPendingRevealTooth(null)}
+            />
           )}
 
-          <OdontogramActiveSummary
-            items={treatmentInProgress}
-            toothStatuses={mergedOdontogram}
-            highlightedTreatmentId={highlightedTreatmentId}
-            onSelectTooth={handleSelectToothFromSummary}
-            onSelectQuadrant={flashQuadrantHighlight}
-            onSelectPatientItem={flashTreatmentHighlight}
-            onRemoveTreatment={handleRemoveScopeTreatment}
-          />
-
-          <div className="rounded-[26px] p-1 sm:p-1.5 bg-slate-50/50 ring-1 ring-slate-100/60">
+          <div className="rounded-[24px] p-0.5 sm:p-1 ring-1 ring-slate-100/50">
             <Odontogram
               data={mergedOdontogram}
               history={patient?.toothHistory || []}

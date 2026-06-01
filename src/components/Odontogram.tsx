@@ -5,6 +5,7 @@ import {
   getAllTeethInMode,
   getDentitionLayout,
   isToothActionAllowed,
+  MIXED_DECIDUOUS_GRID_SLOTS,
   type QuadrantTeethLayout,
 } from '../constants/dentition';
 import { deriveToothFlagsPure } from '../utils/toothStatusDerivation';
@@ -264,7 +265,7 @@ const Tooth: React.FC<ToothProps> = ({
         onMouseEnter={(event) => onHover(event, number)}
         onMouseLeave={onLeave}
         className={`
-          ${compact ? 'w-8 h-[3rem] sm:w-9 sm:h-[3.35rem] rounded-[14px] text-[9px] sm:text-[10px]' : 'w-10 h-[3.6rem] sm:w-12 sm:h-[4.1rem] rounded-[16px] sm:rounded-[18px] text-[10px] sm:text-[12px]'}
+          ${compact ? 'w-9 h-[3.15rem] sm:w-10 sm:h-[3.5rem] rounded-[14px] text-[9px] sm:text-[10px]' : 'w-10 h-[3.6rem] sm:w-12 sm:h-[4.1rem] rounded-[16px] sm:rounded-[18px] text-[10px] sm:text-[12px]'}
           border
           flex items-center justify-center font-semibold tracking-tight
           transition-all duration-200
@@ -541,10 +542,6 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     () => getAllTeethInMode(dentitionMode),
     [dentitionMode]
   );
-  const archSpineClass =
-    dentitionMode === 'mixed'
-      ? 'h-[7.4rem] sm:h-[8.6rem]'
-      : 'h-[4.1rem] sm:h-[5.2rem]';
   const [selectedTooth, setSelectedTooth] = React.useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
@@ -582,15 +579,6 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     });
     return map;
   }, [treatments]);
-
-  const getQuadrantJawClass = (quadrant: QuadrantId) => {
-    const isActive = activeQuadrantSet.has(quadrant);
-    const isHighlighted = highlightedQuadrant === quadrant;
-    if (!isActive && !isHighlighted) return '';
-    return isHighlighted
-      ? 'ring-2 ring-indigo-400/70 bg-indigo-50/25 shadow-[0_0_0_1px_rgba(99,102,241,0.12)]'
-      : 'ring-2 ring-emerald-300/70 bg-emerald-50/20';
-  };
 
   const deriveToothFlags = React.useCallback(
     (num: number) => {
@@ -798,35 +786,90 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     );
   };
 
-  const renderToothRow = (teeth: number[], reverse: boolean, compact: boolean) => {
-    const list = reverse ? [...teeth].reverse() : teeth;
+  type ArchHalfKey = 'upperRight' | 'upperLeft' | 'lowerLeft' | 'lowerRight';
+
+  const halfQuadrants: Record<ArchHalfKey, QuadrantId[]> = {
+    upperRight: [1],
+    upperLeft: [2],
+    lowerLeft: [3],
+    lowerRight: [4],
+  };
+
+  const getHalfHighlightClass = (halfKey: ArchHalfKey) => {
+    const quadrants = halfQuadrants[halfKey];
+    const isActive = quadrants.some((q) => activeQuadrantSet.has(q));
+    const isHighlighted = quadrants.some((q) => highlightedQuadrant === q);
+    if (!isActive && !isHighlighted) return '';
+    return isHighlighted
+      ? 'ring-1 ring-indigo-300/50 bg-indigo-50/15'
+      : 'ring-1 ring-emerald-200/50 bg-emerald-50/10';
+  };
+
+  const renderArchHalf = (
+    halfKey: ArchHalfKey,
+    block: QuadrantTeethLayout,
+    reversePermanent: boolean
+  ) => {
+    const highlight = getHalfHighlightClass(halfKey);
+    const permanent = block.permanent
+      ? reversePermanent
+        ? [...block.permanent].reverse()
+        : block.permanent
+      : [];
+    const deciduous = block.deciduous
+      ? reversePermanent
+        ? [...block.deciduous].reverse()
+        : block.deciduous
+      : [];
+
+    if (dentitionMode === 'mixed' && permanent.length > 0 && deciduous.length > 0) {
+      const slots = MIXED_DECIDUOUS_GRID_SLOTS[halfKey];
+      const slotTeeth = reversePermanent ? [...slots].reverse() : slots;
+      return (
+        <div className={`flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-0.5 py-0.5 ${highlight}`}>
+          <div className="grid grid-cols-8 gap-1">
+            {permanent.map((num) => (
+              <div key={num} className="flex justify-center">
+                {renderTooth(num, false)}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-8 gap-1">
+            {slotTeeth.map((num, idx) => (
+              <div key={`${halfKey}-slot-${idx}`} className="flex justify-center">
+                {num ? (
+                  renderTooth(num, true)
+                ) : (
+                  <div className="w-9 sm:w-10" aria-hidden />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    const teeth = permanent.length > 0 ? permanent : deciduous;
+    const compact = permanent.length === 0;
     return (
-      <div className={`flex gap-1 ${compact ? 'justify-center' : 'gap-1.5'}`}>
-        {list.map((num) => renderTooth(num, compact))}
+      <div className={`flex min-w-0 flex-1 justify-center gap-1.5 rounded-xl px-0.5 py-0.5 ${highlight}`}>
+        {teeth.map((num) => renderTooth(num, compact))}
       </div>
     );
   };
 
-  const renderQuadrantBlock = (
-    quadrant: QuadrantId,
-    block: QuadrantTeethLayout,
-    reverse = false
-  ) => {
-    const hasPermanent = Boolean(block.permanent?.length);
-    const hasDeciduous = Boolean(block.deciduous?.length);
-    const isMixedBlock = hasPermanent && hasDeciduous;
+  const renderArch = (arch: 'upper' | 'lower') => {
+    const layout = dentitionLayout[arch];
+    const reverseLower = arch === 'lower';
+    const rightKey: ArchHalfKey = arch === 'upper' ? 'upperRight' : 'lowerRight';
+    const leftKey: ArchHalfKey = arch === 'upper' ? 'upperLeft' : 'lowerLeft';
 
     return (
-      <div
-        className={`relative rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2 transition-all duration-300 ${getQuadrantJawClass(quadrant)} ${isMixedBlock ? 'min-w-[11.5rem] sm:min-w-[14rem]' : ''}`}
-      >
-        <div className="flex flex-col gap-1">
-          {hasPermanent && renderToothRow(block.permanent!, reverse, false)}
-          {hasDeciduous && (
-            <div className={isMixedBlock ? 'pt-0.5 border-t border-dashed border-slate-200/80' : ''}>
-              {renderToothRow(block.deciduous!, reverse, isMixedBlock || dentitionMode === 'deciduous')}
-            </div>
-          )}
+      <div className="rounded-[20px] border border-slate-200/70 bg-white px-2 py-2 sm:rounded-[22px] sm:px-3 sm:py-2.5">
+        <div className="flex items-stretch justify-center gap-2 sm:gap-3">
+          {renderArchHalf(rightKey, layout.right, reverseLower)}
+          <div className="w-px shrink-0 self-stretch bg-slate-200/80" aria-hidden />
+          {renderArchHalf(leftKey, layout.left, reverseLower)}
         </div>
       </div>
     );
@@ -835,32 +878,12 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   return (
     <div className="space-y-4 p-1 sm:p-2 bg-transparent rounded-none shadow-none border-none">
       <div className="overflow-x-auto pb-2">
-        <div className="mx-auto min-w-max space-y-5">
-          {/* Upper Jaw */}
-          <div className="rounded-[22px] sm:rounded-[24px] border border-slate-200/80 bg-white/80 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
-            <div className="flex items-center justify-center gap-2 sm:gap-3">
-              {renderQuadrantBlock(1, dentitionLayout.upper.right)}
-              <div className={`flex ${archSpineClass} w-2.5 sm:w-4 items-center justify-center`}>
-                <span className="h-full w-px bg-slate-200" />
-              </div>
-              {renderQuadrantBlock(2, dentitionLayout.upper.left)}
-            </div>
+        <div className="mx-auto min-w-max space-y-3">
+          {renderArch('upper')}
+          <div className="flex justify-center px-4" aria-hidden>
+            <span className="h-px w-16 bg-slate-200/80" />
           </div>
-
-          <div className="flex items-center justify-center px-4">
-            <span className="h-px w-20 bg-slate-200" />
-          </div>
-
-          {/* Lower Jaw */}
-          <div className="rounded-[22px] sm:rounded-[24px] border border-slate-200/80 bg-white/80 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
-            <div className="flex items-center justify-center gap-2 sm:gap-3">
-              {renderQuadrantBlock(4, dentitionLayout.lower.right, true)}
-              <div className={`flex ${archSpineClass} w-2.5 sm:w-4 items-center justify-center`}>
-                <span className="h-full w-px bg-slate-200" />
-              </div>
-              {renderQuadrantBlock(3, dentitionLayout.lower.left, true)}
-            </div>
-          </div>
+          {renderArch('lower')}
         </div>
       </div>
 

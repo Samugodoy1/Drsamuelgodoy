@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from '../icons';
 import {
-  DENTITION_MODE_LABELS,
+  DENTITION_MODE_SHORT,
   type DentitionMode,
   type DentitionSource,
-  shouldShowPediatricContext,
 } from '../constants/dentition';
 
 export interface DentitionIndicatorProps {
@@ -20,10 +19,10 @@ export interface DentitionIndicatorProps {
 }
 
 const MODE_OPTIONS: Array<{ value: DentitionMode | 'auto'; label: string }> = [
-  { value: 'auto', label: 'Automático (pela idade)' },
-  { value: 'deciduous', label: DENTITION_MODE_LABELS.deciduous },
-  { value: 'mixed', label: DENTITION_MODE_LABELS.mixed },
-  { value: 'permanent', label: DENTITION_MODE_LABELS.permanent },
+  { value: 'auto', label: 'Automático' },
+  { value: 'deciduous', label: DENTITION_MODE_SHORT.deciduous },
+  { value: 'mixed', label: DENTITION_MODE_SHORT.mixed },
+  { value: 'permanent', label: DENTITION_MODE_SHORT.permanent },
 ];
 
 export const DentitionIndicator: React.FC<DentitionIndicatorProps> = ({
@@ -49,104 +48,110 @@ export const DentitionIndicator: React.FC<DentitionIndicatorProps> = ({
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [open]);
 
-  const contextParts: string[] = [];
-  if (shouldShowPediatricContext(effectiveMode, ageYears)) {
-    contextParts.push('Odontopediatria');
-  }
-  contextParts.push(DENTITION_MODE_LABELS[effectiveMode]);
-  if (ageYears != null) {
-    contextParts.push(`${ageYears} ${ageYears === 1 ? 'ano' : 'anos'}`);
-  }
+  const chipLabel = [
+    DENTITION_MODE_SHORT[effectiveMode],
+    ageYears != null ? `${ageYears}a` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const selectValue = source === 'manual' ? effectiveMode : 'auto';
+  const birthDateTitle =
+    'Exibindo dentição permanente. Cadastre a data de nascimento para sugestão automática por idade.';
 
   return (
-    <div ref={rootRef} className="space-y-2 mb-3">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <p className="text-[11px] font-medium text-slate-500 tracking-tight">
-          {contextParts.join(' • ')}
-        </p>
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors"
-          aria-expanded={open}
-        >
-          Alterar
-          <ChevronDown size={12} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
-        </button>
-        {source === 'auto' && hasBirthDate && (
-          <span className="text-[10px] text-slate-400">Automático</span>
-        )}
-        {source === 'manual' && (
-          <span className="text-[10px] text-slate-400">Manual</span>
-        )}
-      </div>
+    <div ref={rootRef} className="relative flex flex-wrap items-center justify-end gap-x-1">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-slate-300 hover:text-slate-800 transition-colors"
+        aria-expanded={open}
+        title={!hasBirthDate ? birthDateTitle : undefined}
+      >
+        <span>{chipLabel}</span>
+        <ChevronDown size={11} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-[13.5rem] rounded-xl border border-slate-200/90 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.1)]">
+          {MODE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              disabled={option.value === 'auto' && !hasBirthDate}
+              title={option.value === 'auto' && !hasBirthDate ? birthDateTitle : undefined}
+              onClick={() => {
+                if (option.value === 'auto') {
+                  if (suggestedMode) onSelectMode(suggestedMode, 'auto');
+                } else {
+                  onSelectMode(option.value, 'manual');
+                }
+                setOpen(false);
+              }}
+              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-[12px] font-medium transition-colors ${
+                selectValue === option.value
+                  ? 'bg-slate-100 text-slate-900'
+                  : 'text-slate-600 hover:bg-slate-50'
+              } ${option.value === 'auto' && !hasBirthDate ? 'cursor-not-allowed opacity-40' : ''}`}
+            >
+              {option.label}
+              {selectValue === option.value && (
+                <span className="text-[10px] text-slate-400">✓</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!hasBirthDate && (
-        <p className="text-[11px] text-amber-800/90 bg-amber-50/80 border border-amber-200/60 rounded-xl px-3 py-2">
-          Data de nascimento não cadastrada — exibindo {DENTITION_MODE_LABELS.permanent.toLowerCase()} como
-          padrão seguro. A sugestão automática por idade não está disponível até cadastrar a data.
-        </p>
+        <span
+          className="ml-1.5 inline text-[10px] text-slate-400"
+          title={birthDateTitle}
+        >
+          · sem data
+        </span>
       )}
 
       {showUpdatePrompt && suggestedMode && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sky-200/80 bg-sky-50/70 px-3 py-2">
-          <p className="text-[11px] text-sky-900 flex-1 min-w-[200px]">
-            A idade do paciente indica {DENTITION_MODE_LABELS[suggestedMode].toLowerCase()}. Atualizar o
-            odontograma?
-          </p>
+        <span className="ml-1.5 inline text-[10px] text-slate-500">
+          · {DENTITION_MODE_SHORT[suggestedMode]}?{' '}
           <button
             type="button"
             onClick={onAcceptSuggestion}
-            className="rounded-lg bg-sky-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-sky-700"
+            className="font-semibold text-slate-700 hover:text-slate-900"
           >
-            Atualizar
+            Sim
           </button>
+          <span className="text-slate-300"> / </span>
           <button
             type="button"
             onClick={onDismissSuggestion}
-            className="rounded-lg border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-50"
+            className="text-slate-500 hover:text-slate-700"
           >
-            Manter atual
+            Não
           </button>
-        </div>
-      )}
-
-      {open && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_12px_32px_rgba(15,23,42,0.08)] max-w-xs">
-          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Tipo de dentição
-          </p>
-          <div className="space-y-0.5">
-            {MODE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                disabled={option.value === 'auto' && !hasBirthDate}
-                onClick={() => {
-                  if (option.value === 'auto') {
-                    if (suggestedMode) onSelectMode(suggestedMode, 'auto');
-                  } else {
-                    onSelectMode(option.value, 'manual');
-                  }
-                  setOpen(false);
-                }}
-                className={`w-full text-left rounded-xl px-3 py-2 text-[12px] font-medium transition-colors ${
-                  selectValue === option.value
-                    ? 'bg-slate-100 text-slate-900'
-                    : 'text-slate-600 hover:bg-slate-50'
-                } ${option.value === 'auto' && !hasBirthDate ? 'opacity-40 cursor-not-allowed' : ''}`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <p className="px-2 pt-2 text-[10px] text-slate-400 leading-snug">
-            Para erupção precoce, atraso ou casos específicos, escolha manualmente.
-          </p>
-        </div>
+        </span>
       )}
     </div>
   );
 };
+
+/** Linha auxiliar: dente fora do layout atual (sem banner). */
+export const DentitionRevealHint: React.FC<{
+  tooth: number;
+  currentMode: DentitionMode;
+  targetMode: DentitionMode;
+  onReveal: () => void;
+  onDismiss: () => void;
+}> = ({ tooth, currentMode, targetMode, onReveal, onDismiss }) => (
+  <p className="mb-1.5 text-[10px] text-slate-500">
+    Dente {tooth} fora de {DENTITION_MODE_SHORT[currentMode].toLowerCase()}.{' '}
+    <button type="button" onClick={onReveal} className="font-medium text-slate-700 hover:text-slate-900">
+      Ver {DENTITION_MODE_SHORT[targetMode].toLowerCase()}
+    </button>
+    <span className="text-slate-300"> · </span>
+    <button type="button" onClick={onDismiss} className="text-slate-400 hover:text-slate-600">
+      Fechar
+    </button>
+  </p>
+);

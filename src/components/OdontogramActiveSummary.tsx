@@ -46,15 +46,15 @@ export const OdontogramActiveSummary: React.FC<OdontogramActiveSummaryProps> = (
   if (!compactLabel || items.length === 0) return null;
 
   return (
-    <div className="mb-2">
+    <div>
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="group flex w-full items-center gap-2 py-1 text-left transition-colors"
+        className="group flex w-full items-center gap-2 py-0.5 text-left transition-colors rounded-lg hover:bg-slate-50/80"
         aria-expanded={expanded}
       >
-        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-slate-600 group-hover:text-slate-800">
+        <span className="inline-block h-2 w-0.5 shrink-0 rounded-full bg-emerald-500" />
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700 tabular-nums group-hover:text-slate-900">
           {compactLabel}
         </span>
         <ChevronDown

@@ -38,6 +38,24 @@ export const DENTITION_MODE_LABELS: Record<DentitionMode, string> = {
   permanent: 'Dentição Permanente',
 };
 
+/** Rótulos curtos para UI compacta (chip / menu). */
+export const DENTITION_MODE_SHORT: Record<DentitionMode, string> = {
+  deciduous: 'Decídua',
+  mixed: 'Mista',
+  permanent: 'Permanente',
+};
+
+/** Posição dos decíduos na grade de 8 colunas (alinhados aos permanentes). */
+export const MIXED_DECIDUOUS_GRID_SLOTS: Record<
+  'upperRight' | 'upperLeft' | 'lowerLeft' | 'lowerRight',
+  Array<number | null>
+> = {
+  upperRight: [null, null, 55, 54, 53, 52, 51, null],
+  upperLeft: [null, 61, 62, 63, 64, 65, null, null],
+  lowerLeft: [null, 71, 72, 73, 74, 75, null, null],
+  lowerRight: [null, null, 85, 84, 83, 82, 81, null],
+};
+
 /** Ações do menu do dente ocultas em dentes decíduos ou no modo decídua inteiro. */
 export const DECIDUOUS_HIDDEN_TOOTH_ACTION_KEYS = new Set(['implant', 'prosthesis', 'facet']);
 
