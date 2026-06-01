@@ -18,6 +18,7 @@ import {
 
 export interface OdontogramActiveSummaryProps {
   items: TreatmentPlanItemLike[];
+  teethCounterLabel?: string;
   toothStatuses?: Record<number, { status: ToothStatus }>;
   highlightedTreatmentId?: string | null;
   onSelectTooth?: (toothNumber: number) => void;
@@ -28,6 +29,7 @@ export interface OdontogramActiveSummaryProps {
 
 export const OdontogramActiveSummary: React.FC<OdontogramActiveSummaryProps> = ({
   items,
+  teethCounterLabel = 'em tratamento',
   toothStatuses = {},
   highlightedTreatmentId,
   onSelectTooth,
@@ -37,8 +39,8 @@ export const OdontogramActiveSummary: React.FC<OdontogramActiveSummaryProps> = (
 }) => {
   const [expanded, setExpanded] = useState(false);
   const compactLabel = useMemo(
-    () => formatActiveTreatmentCounter(countActiveTreatmentsByScope(items)),
-    [items]
+    () => formatActiveTreatmentCounter(countActiveTreatmentsByScope(items), { teethLabel: teethCounterLabel }),
+    [items, teethCounterLabel]
   );
 
   if (!compactLabel || items.length === 0) return null;

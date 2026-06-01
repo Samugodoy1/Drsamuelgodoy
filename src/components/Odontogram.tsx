@@ -1,5 +1,12 @@
 import React from 'react';
 import { X } from '../icons';
+import {
+  type DentitionMode,
+  getAllTeethInMode,
+  getDentitionLayout,
+  isToothActionAllowed,
+  type QuadrantTeethLayout,
+} from '../constants/dentition';
 import { deriveToothFlagsPure } from '../utils/toothStatusDerivation';
 import { normalizeTreatmentItem, type QuadrantId } from '../utils/treatmentPlanScope';
 
@@ -61,14 +68,8 @@ interface OdontogramProps {
   highlightedToothNumber?: number | null;
   highlightedQuadrant?: QuadrantId | null;
   readOnly?: boolean;
+  dentitionMode?: DentitionMode;
 }
-
-const toothNumbers = {
-  upperRight: [18, 17, 16, 15, 14, 13, 12, 11],
-  upperLeft: [21, 22, 23, 24, 25, 26, 27, 28],
-  lowerLeft: [38, 37, 36, 35, 34, 33, 32, 31],
-  lowerRight: [41, 42, 43, 44, 45, 46, 47, 48],
-};
 
 // Conditions that represent PENDING treatment needs (feeds into intelligence)
 const PENDING_STATUSES: Set<ToothStatus> = new Set([
@@ -229,13 +230,30 @@ interface ToothProps {
   isUrgent: boolean;
   isPriority: boolean;
   disabled: boolean;
+  compact?: boolean;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onHover: (event: React.MouseEvent<HTMLButtonElement>, num: number) => void;
   onLeave: () => void;
   buttonRef?: (el: HTMLButtonElement | null) => void;
 }
 
-const Tooth: React.FC<ToothProps> = ({ number, status, selected, isInTreatment, hasDiagnosis, isCompleted, isPending, isUrgent, isPriority, disabled, onClick, onHover, onLeave, buttonRef }) => {
+const Tooth: React.FC<ToothProps> = ({
+  number,
+  status,
+  selected,
+  isInTreatment,
+  hasDiagnosis,
+  isCompleted,
+  isPending,
+  isUrgent,
+  isPriority,
+  disabled,
+  compact = false,
+  onClick,
+  onHover,
+  onLeave,
+  buttonRef,
+}) => {
   return (
     <div className="relative">
       <button
@@ -246,8 +264,9 @@ const Tooth: React.FC<ToothProps> = ({ number, status, selected, isInTreatment, 
         onMouseEnter={(event) => onHover(event, number)}
         onMouseLeave={onLeave}
         className={`
-          w-10 h-[3.6rem] sm:w-12 sm:h-[4.1rem] rounded-[16px] sm:rounded-[18px] border
-          flex items-center justify-center text-[10px] sm:text-[12px] font-semibold tracking-tight
+          ${compact ? 'w-8 h-[3rem] sm:w-9 sm:h-[3.35rem] rounded-[14px] text-[9px] sm:text-[10px]' : 'w-10 h-[3.6rem] sm:w-12 sm:h-[4.1rem] rounded-[16px] sm:rounded-[18px] text-[10px] sm:text-[12px]'}
+          border
+          flex items-center justify-center font-semibold tracking-tight
           transition-all duration-200
           ${statusColors[status]}
           ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
@@ -291,6 +310,7 @@ interface ActionMenuProps {
   onClose: () => void;
   onAction: (action: { label: string; status: ToothStatus; category: 'diagnosis' | 'procedure'; mode: 'initial' | 'continuity' }) => void;
   onReset?: () => void;
+  isActionAllowed?: (actionKey: string) => boolean;
 }
 
 const ActionMenu: React.FC<ActionMenuProps> = ({
@@ -305,6 +325,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   onClose,
   onAction,
   onReset,
+  isActionAllowed,
 }) => {
   const menuRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -334,7 +355,10 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 
   if (!open || selectedTooth === null) return null;
 
-  const actions = hasTreatment ? continuationActions : [...diagnosisActions, ...procedureActions];
+  const rawActions = hasTreatment ? continuationActions : [...diagnosisActions, ...procedureActions];
+  const actions = isActionAllowed
+    ? rawActions.filter((action) => isActionAllowed(action.key))
+    : rawActions;
   const recentHistory = toothHistory.slice(0, 4);
 
   if (mobile) {
@@ -506,8 +530,21 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   priorityToothNumber = null,
   highlightedToothNumber = null,
   highlightedQuadrant = null,
-  readOnly = false 
+  readOnly = false,
+  dentitionMode = 'permanent',
 }) => {
+  const dentitionLayout = React.useMemo(
+    () => getDentitionLayout(dentitionMode),
+    [dentitionMode]
+  );
+  const visibleTeeth = React.useMemo(
+    () => getAllTeethInMode(dentitionMode),
+    [dentitionMode]
+  );
+  const archSpineClass =
+    dentitionMode === 'mixed'
+      ? 'h-[7.4rem] sm:h-[8.6rem]'
+      : 'h-[4.1rem] sm:h-[5.2rem]';
   const [selectedTooth, setSelectedTooth] = React.useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
@@ -726,13 +763,14 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     }
   };
 
-  const renderTooth = (num: number) => {
+  const renderTooth = (num: number, compact = false) => {
     const toothStatus = getToothStatus(num);
     const flags = deriveToothFlags(num);
     return (
       <Tooth
         key={num}
         number={num}
+        compact={compact}
         status={toothStatus}
         selected={(selectedTooth === num && isMenuOpen) || highlightedToothNumber === num}
         isInTreatment={flags.isInTreatment}
@@ -760,13 +798,36 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     );
   };
 
-  const renderJawSection = (quadrant: QuadrantId, teeth: number[], reverse = false) => {
+  const renderToothRow = (teeth: number[], reverse: boolean, compact: boolean) => {
     const list = reverse ? [...teeth].reverse() : teeth;
     return (
+      <div className={`flex gap-1 ${compact ? 'justify-center' : 'gap-1.5'}`}>
+        {list.map((num) => renderTooth(num, compact))}
+      </div>
+    );
+  };
+
+  const renderQuadrantBlock = (
+    quadrant: QuadrantId,
+    block: QuadrantTeethLayout,
+    reverse = false
+  ) => {
+    const hasPermanent = Boolean(block.permanent?.length);
+    const hasDeciduous = Boolean(block.deciduous?.length);
+    const isMixedBlock = hasPermanent && hasDeciduous;
+
+    return (
       <div
-        className={`relative rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2.5 transition-all duration-300 ${getQuadrantJawClass(quadrant)}`}
+        className={`relative rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2 transition-all duration-300 ${getQuadrantJawClass(quadrant)} ${isMixedBlock ? 'min-w-[11.5rem] sm:min-w-[14rem]' : ''}`}
       >
-        <div className="flex gap-1.5">{list.map(renderTooth)}</div>
+        <div className="flex flex-col gap-1">
+          {hasPermanent && renderToothRow(block.permanent!, reverse, false)}
+          {hasDeciduous && (
+            <div className={isMixedBlock ? 'pt-0.5 border-t border-dashed border-slate-200/80' : ''}>
+              {renderToothRow(block.deciduous!, reverse, isMixedBlock || dentitionMode === 'deciduous')}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -778,11 +839,11 @@ export const Odontogram: React.FC<OdontogramProps> = ({
           {/* Upper Jaw */}
           <div className="rounded-[22px] sm:rounded-[24px] border border-slate-200/80 bg-white/80 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
             <div className="flex items-center justify-center gap-2 sm:gap-3">
-              {renderJawSection(1, toothNumbers.upperRight)}
-              <div className="flex h-[4.1rem] sm:h-[5.2rem] w-2.5 sm:w-4 items-center justify-center">
+              {renderQuadrantBlock(1, dentitionLayout.upper.right)}
+              <div className={`flex ${archSpineClass} w-2.5 sm:w-4 items-center justify-center`}>
                 <span className="h-full w-px bg-slate-200" />
               </div>
-              {renderJawSection(2, toothNumbers.upperLeft)}
+              {renderQuadrantBlock(2, dentitionLayout.upper.left)}
             </div>
           </div>
 
@@ -793,11 +854,11 @@ export const Odontogram: React.FC<OdontogramProps> = ({
           {/* Lower Jaw */}
           <div className="rounded-[22px] sm:rounded-[24px] border border-slate-200/80 bg-white/80 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
             <div className="flex items-center justify-center gap-2 sm:gap-3">
-              {renderJawSection(4, toothNumbers.lowerRight, true)}
-              <div className="flex h-[4.1rem] sm:h-[5.2rem] w-2.5 sm:w-4 items-center justify-center">
+              {renderQuadrantBlock(4, dentitionLayout.lower.right, true)}
+              <div className={`flex ${archSpineClass} w-2.5 sm:w-4 items-center justify-center`}>
                 <span className="h-full w-px bg-slate-200" />
               </div>
-              {renderJawSection(3, toothNumbers.lowerLeft, true)}
+              {renderQuadrantBlock(3, dentitionLayout.lower.left, true)}
             </div>
           </div>
         </div>
@@ -827,7 +888,7 @@ export const Odontogram: React.FC<OdontogramProps> = ({
 
       {/* Clinical insight summary */}
       {(() => {
-        const allTeeth = [...toothNumbers.upperRight, ...toothNumbers.upperLeft, ...toothNumbers.lowerLeft, ...toothNumbers.lowerRight];
+        const allTeeth = visibleTeeth;
         const urgentTeeth = allTeeth.filter(n => deriveToothFlags(n).isUrgent);
         const pendingTeeth = allTeeth.filter(n => deriveToothFlags(n).isPending);
         const completedTeeth = allTeeth.filter(n => deriveToothFlags(n).isCompleted);
@@ -862,6 +923,9 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         onClose={() => setIsMenuOpen(false)}
         onAction={handleAction}
         onReset={onResetTooth ? handleResetTooth : undefined}
+        isActionAllowed={(actionKey) =>
+          isToothActionAllowed(actionKey, selectedTooth, dentitionMode)
+        }
       />
 
       {!isMobile && hoveredTooth !== null && hoverRect && (

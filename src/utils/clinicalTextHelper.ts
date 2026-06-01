@@ -23,8 +23,8 @@ const clinicalDictionary: Record<string, string> = {
   'nucleo': 'Confecção de núcleo de preenchimento',
 };
 
-// Regex para identificar elementos dentários (11-48)
-const elementRegex = /\b([1-4][1-8])\b/g;
+// Elementos permanentes (11-48) e decíduos (51-85)
+const elementRegex = /\b([1-4][1-8]|[5-8][1-5])\b/g;
 
 // Regex para identificar cores de resina (A1, A2, etc)
 const colorRegex = /\b([A-D][1-4](?:\.5)?)\b/gi;
