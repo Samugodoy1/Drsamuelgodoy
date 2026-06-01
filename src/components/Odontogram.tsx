@@ -1,6 +1,11 @@
 import React from 'react';
 import { X } from '../icons';
+import {
+  PATIENT_SCOPE_PROCEDURES,
+  QUADRANT_SCOPE_PROCEDURES,
+} from '../constants/clinicalProcedures';
 import { deriveToothFlagsPure } from '../utils/toothStatusDerivation';
+import { normalizeTreatmentItem, type QuadrantId } from '../utils/treatmentPlanScope';
 
 export type ToothStatus = 
   | 'healthy' 
@@ -45,15 +50,27 @@ interface OdontogramProps {
     mode: 'initial' | 'continuity';
     status: ToothStatus;
   }) => void;
+  onSelectScopeProcedure?: (payload: {
+    procedureKey: string;
+    procedure: string;
+    scope: 'patient' | 'quadrant';
+    quadrant?: QuadrantId;
+  }) => void;
   treatments?: Array<{
     id: string;
     tooth_number?: number;
+    quadrant?: number;
     procedure?: string;
+    procedure_key?: string;
+    scope?: string;
     status?: string;
   }>;
   activeToothNumbers?: number[];
+  activeQuadrants?: QuadrantId[];
   priorityToothNumber?: number | null;
   highlightedToothNumber?: number | null;
+  highlightedQuadrant?: QuadrantId | null;
+  scopeProcedureWarning?: string | null;
   readOnly?: boolean;
 }
 
@@ -139,7 +156,7 @@ const legendItems: LegendItem[] = [
   },
   {
     key: 'in-progress',
-    label: 'Em curso',
+    label: 'Em andamento',
     swatchClass: 'bg-white border border-slate-300',
     markerClass: 'bg-emerald-500',
     markerPosition: 'top',
@@ -178,6 +195,8 @@ const continuationActions = [
   { key: 'crown', label: 'Coroa', status: 'crown' as ToothStatus, category: 'procedure' as const },
   { key: 'implant', label: 'Implante', status: 'implant' as ToothStatus, category: 'procedure' as const },
 ];
+
+const COMPACT_LEGEND_KEYS = new Set(['attention', 'in-progress', 'done']);
 
 const resolveHistoryTag = (procedure?: string, notes?: string) => {
   const text = `${procedure || ''} ${notes || ''}`.toLowerCase();
@@ -492,10 +511,14 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   onAddHistory,
   onResetTooth,
   onSelectProcedure,
+  onSelectScopeProcedure,
   treatments = [],
   activeToothNumbers = [],
+  activeQuadrants = [],
   priorityToothNumber = null,
   highlightedToothNumber = null,
+  highlightedQuadrant = null,
+  scopeProcedureWarning = null,
   readOnly = false 
 }) => {
   const [selectedTooth, setSelectedTooth] = React.useState<number | null>(null);
@@ -505,8 +528,21 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   const [hoveredTooth, setHoveredTooth] = React.useState<number | null>(null);
   const [hoverRect, setHoverRect] = React.useState<DOMRect | null>(null);
   const [optimisticHistory, setOptimisticHistory] = React.useState<ToothRecord[]>([]);
+  const [legendExpanded, setLegendExpanded] = React.useState(false);
+  const [pendingQuadrantProcedure, setPendingQuadrantProcedure] = React.useState<{
+    procedureKey: string;
+    procedure: string;
+  } | null>(null);
   const toothRefs = React.useRef<Record<number, HTMLButtonElement | null>>({});
   const activeToothSet = React.useMemo(() => new Set(activeToothNumbers), [activeToothNumbers]);
+  const activeQuadrantSet = React.useMemo(() => new Set(activeQuadrants), [activeQuadrants]);
+  const visibleLegendItems = React.useMemo(
+    () =>
+      legendExpanded
+        ? legendItems
+        : legendItems.filter((item) => COMPACT_LEGEND_KEYS.has(item.key)),
+    [legendExpanded]
+  );
 
   const getToothStatus = React.useCallback((num: number): ToothStatus => {
     return data[num]?.status || 'healthy';
@@ -515,7 +551,9 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   const treatmentsByTooth = React.useMemo(() => {
     const map = new Map<number, Array<{ id?: string; procedure?: string; status?: string }>>();
     treatments.forEach((item) => {
-      const toothNumber = Number(item.tooth_number);
+      const normalized = normalizeTreatmentItem(item);
+      if (normalized.scope !== 'tooth') return;
+      const toothNumber = Number(normalized.tooth_number);
       if (Number.isFinite(toothNumber) && toothNumber > 0) {
         const list = map.get(toothNumber) || [];
         list.push({ id: item.id, procedure: item.procedure, status: item.status });
@@ -524,6 +562,15 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     });
     return map;
   }, [treatments]);
+
+  const getQuadrantJawClass = (quadrant: QuadrantId) => {
+    const isActive = activeQuadrantSet.has(quadrant);
+    const isHighlighted = highlightedQuadrant === quadrant;
+    if (!isActive && !isHighlighted) return '';
+    return isHighlighted
+      ? 'ring-2 ring-indigo-400/70 bg-indigo-50/25 shadow-[0_0_0_1px_rgba(99,102,241,0.12)]'
+      : 'ring-2 ring-emerald-300/70 bg-emerald-50/20';
+  };
 
   const deriveToothFlags = React.useCallback(
     (num: number) => {
@@ -547,7 +594,9 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     const map = new Map<number, ToothRecord[]>();
     const treatmentHistory: ToothRecord[] = (treatments || [])
       .map((item) => {
-        const tooth = Number(item.tooth_number);
+        const normalized = normalizeTreatmentItem(item);
+        if (normalized.scope !== 'tooth') return null;
+        const tooth = Number(normalized.tooth_number);
         if (!Number.isFinite(tooth) || tooth <= 0 || !item.procedure) return null;
 
         return {
@@ -728,28 +777,108 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     );
   };
 
+  const renderJawSection = (quadrant: QuadrantId, teeth: number[], reverse = false) => {
+    const list = reverse ? [...teeth].reverse() : teeth;
+    return (
+      <div
+        className={`relative rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2.5 transition-all duration-300 ${getQuadrantJawClass(quadrant)}`}
+      >
+        <div className="flex gap-1.5">{list.map(renderTooth)}</div>
+      </div>
+    );
+  };
+
+  const handleQuadrantPick = (quadrant: QuadrantId) => {
+    if (!pendingQuadrantProcedure || !onSelectScopeProcedure) return;
+    onSelectScopeProcedure({
+      procedureKey: pendingQuadrantProcedure.procedureKey,
+      procedure: pendingQuadrantProcedure.procedure,
+      scope: 'quadrant',
+      quadrant,
+    });
+    setPendingQuadrantProcedure(null);
+  };
+
   return (
     <div className="space-y-5 p-1 sm:p-2 bg-transparent rounded-none shadow-none border-none">
+      {!readOnly && onSelectScopeProcedure && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {PATIENT_SCOPE_PROCEDURES.map((proc) => (
+              <button
+                key={proc.key}
+                type="button"
+                onClick={() =>
+                  onSelectScopeProcedure({
+                    procedureKey: proc.key,
+                    procedure: proc.label,
+                    scope: 'patient',
+                  })
+                }
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 transition-all hover:border-slate-300 hover:text-slate-800 hover:shadow-sm active:scale-[0.98]"
+              >
+                {proc.label}
+              </button>
+            ))}
+            {QUADRANT_SCOPE_PROCEDURES.map((proc) => (
+              <button
+                key={proc.key}
+                type="button"
+                onClick={() =>
+                  setPendingQuadrantProcedure((current) =>
+                    current?.procedureKey === proc.key ? null : { procedureKey: proc.key, procedure: proc.label }
+                  )
+                }
+                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all active:scale-[0.98] ${
+                  pendingQuadrantProcedure?.procedureKey === proc.key
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 hover:shadow-sm'
+                }`}
+              >
+                {proc.label}
+              </button>
+            ))}
+          </div>
+          {scopeProcedureWarning && (
+            <p className="text-[11px] font-medium text-amber-700 bg-amber-50/80 border border-amber-200/80 rounded-xl px-3 py-2">
+              {scopeProcedureWarning}
+            </p>
+          )}
+          {pendingQuadrantProcedure && (
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2.5">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500 mb-2">
+                Selecione o quadrante — {pendingQuadrantProcedure.procedure}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {([1, 2, 3, 4] as QuadrantId[]).map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => handleQuadrantPick(q)}
+                    className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-slate-700 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-[0.98]"
+                  >
+                    Q{q}
+                    <span className="block text-[9px] font-medium text-slate-400 mt-0.5">
+                      {q === 1 ? '18–11' : q === 2 ? '21–28' : q === 3 ? '31–38' : '48–41'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="overflow-x-auto pb-2">
         <div className="mx-auto min-w-max space-y-5">
           {/* Upper Jaw */}
           <div className="rounded-[22px] sm:rounded-[24px] border border-slate-200/80 bg-white/80 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
             <div className="flex items-center justify-center gap-2 sm:gap-3">
-              <div className="rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2.5">
-                <div className="flex gap-1.5">
-                  {toothNumbers.upperRight.map(renderTooth)}
-                </div>
-              </div>
-
+              {renderJawSection(1, toothNumbers.upperRight)}
               <div className="flex h-[4.1rem] sm:h-[5.2rem] w-2.5 sm:w-4 items-center justify-center">
                 <span className="h-full w-px bg-slate-200" />
               </div>
-
-              <div className="rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2.5">
-                <div className="flex gap-1.5">
-                  {toothNumbers.upperLeft.map(renderTooth)}
-                </div>
-              </div>
+              {renderJawSection(2, toothNumbers.upperLeft)}
             </div>
           </div>
 
@@ -760,39 +889,38 @@ export const Odontogram: React.FC<OdontogramProps> = ({
           {/* Lower Jaw */}
           <div className="rounded-[22px] sm:rounded-[24px] border border-slate-200/80 bg-white/80 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
             <div className="flex items-center justify-center gap-2 sm:gap-3">
-              <div className="rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2.5">
-                <div className="flex gap-1.5">
-                  {[...toothNumbers.lowerRight].reverse().map(renderTooth)}
-                </div>
-              </div>
-
+              {renderJawSection(4, toothNumbers.lowerRight, true)}
               <div className="flex h-[4.1rem] sm:h-[5.2rem] w-2.5 sm:w-4 items-center justify-center">
                 <span className="h-full w-px bg-slate-200" />
               </div>
-
-              <div className="rounded-xl sm:rounded-2xl border border-slate-200/70 bg-slate-50/60 p-1.5 sm:p-2.5">
-                <div className="flex gap-1.5">
-                  {[...toothNumbers.lowerLeft].reverse().map(renderTooth)}
-                </div>
-              </div>
+              {renderJawSection(3, toothNumbers.lowerLeft, true)}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-200/80">
-        {legendItems.map((item) => (
-          <div key={item.key} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-            <span className={`relative h-3 w-3 rounded-[4px] ${item.swatchClass}`}>
-              {item.markerClass && (
-                <span
-                  className={`absolute ${item.markerPosition === 'top' ? '-top-1 -right-1' : '-bottom-1 -right-1'} h-2 w-2 rounded-full border border-white ${item.markerClass}`}
-                />
-              )}
-            </span>
-            <span className="text-[11px] font-medium text-slate-500">{item.label}</span>
-          </div>
-        ))}
+      <div className="pt-3 border-t border-slate-200/80 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {visibleLegendItems.map((item) => (
+            <div key={item.key} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
+              <span className={`relative h-3 w-3 rounded-[4px] ${item.swatchClass}`}>
+                {item.markerClass && (
+                  <span
+                    className={`absolute ${item.markerPosition === 'top' ? '-top-1 -right-1' : '-bottom-1 -right-1'} h-2 w-2 rounded-full border border-white ${item.markerClass}`}
+                  />
+                )}
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setLegendExpanded((prev) => !prev)}
+          className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+        >
+          {legendExpanded ? 'Ocultar legenda completa' : 'Mostrar legenda completa'}
+        </button>
       </div>
 
       {/* Clinical insight summary */}
