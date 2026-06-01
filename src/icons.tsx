@@ -34,6 +34,7 @@ import {
   CurrencyDollar as PhCurrencyDollar,
   DotsThree      as PhDotsThree,
   DownloadSimple as PhDownloadSimple,
+  DotsSixVertical as PhDotsSixVertical,
   Envelope       as PhEnvelope,
   FileText       as PhFileText,
   Flask          as PhFlask,
@@ -190,3 +191,5 @@ export const Zap           = fill(PhLightning);
 
 /** Spinner — use with Tailwind `animate-spin` class */
 export const Loader2 = bold(PhCircleNotch);
+
+export const GripVertical = bold(PhDotsSixVertical);

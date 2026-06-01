@@ -13,6 +13,7 @@ import {
   Clock3,
   CreditCard,
   FileText,
+  GripVertical,
   Info,
   Lock,
   Loader2,
@@ -234,9 +235,17 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [isUploadingClinicalImage, setIsUploadingClinicalImage] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [reorderItems, setReorderItems] = useState<any[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   const selectedActionRef = useRef<HTMLDivElement | null>(null);
   const paymentModalRef = useRef<HTMLDivElement | null>(null);
+  const reorderPointerIdRef = useRef<number | null>(null);
+  const reorderDragIdxRef = useRef<number | null>(null);
+  const reorderHandleRef = useRef<HTMLElement | null>(null);
 
   // Auto-dismiss upload feedback
   useEffect(() => {
@@ -349,6 +358,112 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       ),
     [mergedTreatmentPlan]
   );
+
+  const moveReorderItem = (fromIndex: number, toIndex: number) => {
+    setReorderItems((current) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= current.length ||
+        toIndex >= current.length
+      ) {
+        return current;
+      }
+
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const moveReorderItemByStep = (index: number, step: -1 | 1) => {
+    const targetIndex = index + step;
+    if (targetIndex < 0 || targetIndex >= reorderItems.length) return;
+    moveReorderItem(index, targetIndex);
+    setDragIdx(null);
+    setDragOverIdx(targetIndex);
+  };
+
+  const endPointerReorder = () => {
+    if (reorderHandleRef.current && reorderPointerIdRef.current !== null) {
+      try {
+        reorderHandleRef.current.releasePointerCapture(reorderPointerIdRef.current);
+      } catch {
+        // The browser can release capture itself after pointer cancellation.
+      }
+    }
+
+    reorderPointerIdRef.current = null;
+    reorderDragIdxRef.current = null;
+    reorderHandleRef.current = null;
+    setDragIdx(null);
+    setDragOverIdx(null);
+    document.body.style.userSelect = '';
+  };
+
+  useEffect(() => {
+    if (!isReorderMode) {
+      endPointerReorder();
+    }
+  }, [isReorderMode]);
+
+  useEffect(() => {
+    return () => endPointerReorder();
+  }, []);
+
+  const startPointerReorder = (event: React.PointerEvent<HTMLButtonElement>, index: number) => {
+    if (!isReorderMode || isSavingOrder || event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    reorderPointerIdRef.current = event.pointerId;
+    reorderDragIdxRef.current = index;
+    reorderHandleRef.current = event.currentTarget;
+    setDragIdx(index);
+    setDragOverIdx(index);
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    if (!isReorderMode) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (reorderPointerIdRef.current !== event.pointerId || reorderDragIdxRef.current === null) return;
+
+      event.preventDefault();
+      const target = document.elementFromPoint(event.clientX, event.clientY);
+      const row = target?.closest('[data-reorder-index]');
+      if (!row) return;
+
+      const overIndex = Number((row as HTMLElement).dataset.reorderIndex);
+      const fromIndex = reorderDragIdxRef.current;
+      if (!Number.isFinite(overIndex) || overIndex === fromIndex) return;
+
+      moveReorderItem(fromIndex, overIndex);
+      reorderDragIdxRef.current = overIndex;
+      setDragIdx(overIndex);
+      setDragOverIdx(overIndex);
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (reorderPointerIdRef.current !== event.pointerId) return;
+      endPointerReorder();
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
+    };
+  }, [isReorderMode]);
 
   const timelineItems = useMemo(() => {
     const mergedEvolutions = [
@@ -1392,39 +1507,106 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     <p className="text-xs text-slate-500 mt-0.5">Nenhum procedimento ativo</p>
                   )}
                 </div>
-                {treatmentInProgress.length > 0 && (() => {
-                  const activeUnpaid = treatmentInProgress.filter((item: any) => !item.prepayment_confirmed);
-                  const allActive = activeUnpaid.length > 0 && activeUnpaid.every((item: any) => item.requires_prepayment);
-                  const allPaid = treatmentInProgress.every((item: any) => item.requires_prepayment && item.prepayment_confirmed);
-                  return (
+                <div className="flex items-center gap-2">
+                  {treatmentInProgress.length > 1 && !isReorderMode && (
                     <button
                       type="button"
-                      onClick={togglePrepaymentAll}
-                      disabled={allPaid}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
-                        allPaid
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                          : allActive
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                            : 'bg-slate-50 text-slate-400 border border-slate-200 hover:text-slate-600 hover:border-slate-300'
-                      }`}
-                      title={allPaid ? 'Orçamento quitado' : allActive ? 'Cobrar antes de executar (ativo)' : 'Exigir pagamento antes de executar'}
+                      onClick={() => {
+                        setReorderItems([...treatmentInProgress]);
+                        setIsReorderMode(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold text-slate-500 border border-slate-200 bg-white transition-all duration-200 hover:text-slate-700 hover:border-slate-300 hover:shadow-sm"
                     >
-                      {allPaid ? (
-                        <><Check size={11} /> Quitado</>
-                      ) : allActive ? (
-                        <><Lock size={11} /> Cobrar antes</>
-                      ) : (
-                        <><Shield size={11} /> Cobrar antes</>
-                      )}
+                      <GripVertical size={12} />
+                      Reordenar
                     </button>
-                  );
-                })()}
+                  )}
+                  {treatmentInProgress.length > 0 && (() => {
+                    const activeUnpaid = treatmentInProgress.filter((item: any) => !item.prepayment_confirmed);
+                    const allActive = activeUnpaid.length > 0 && activeUnpaid.every((item: any) => item.requires_prepayment);
+                    const allPaid = treatmentInProgress.every((item: any) => item.requires_prepayment && item.prepayment_confirmed);
+                    const prepaymentDisabled = allPaid || isReorderMode;
+                    return (
+                      <button
+                        type="button"
+                        onClick={togglePrepaymentAll}
+                        disabled={prepaymentDisabled}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
+                          prepaymentDisabled
+                            ? allPaid
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                              : 'bg-slate-50 text-slate-300 border border-slate-200 cursor-not-allowed opacity-60'
+                            : allActive
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                              : 'bg-slate-50 text-slate-400 border border-slate-200 hover:text-slate-600 hover:border-slate-300'
+                        }`}
+                        title={
+                          isReorderMode
+                            ? 'Salve ou cancele a reordenação para alterar cobrança antecipada'
+                            : allPaid
+                              ? 'Orçamento quitado'
+                              : allActive
+                                ? 'Cobrar antes de executar (ativo)'
+                                : 'Exigir pagamento antes de executar'
+                        }
+                      >
+                        {allPaid ? (
+                          <><Check size={11} /> Quitado</>
+                        ) : allActive ? (
+                          <><Lock size={11} /> Cobrar antes</>
+                        ) : (
+                          <><Shield size={11} /> Cobrar antes</>
+                        )}
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
 
               <div className="space-y-3">
-                {treatmentInProgress.length > 0 ? (
-                  treatmentInProgress.map((item: any, idx: number) => {
+                {isReorderMode && (
+                  <div className="flex items-center gap-2.5 mb-2 p-1.5 rounded-[18px] bg-slate-50/80 border border-slate-200/60 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                    <button
+                      type="button"
+                      disabled={isSavingOrder}
+                      onClick={async () => {
+                        setIsSavingOrder(true);
+                        try {
+                          const reorderedIds = new Set(reorderItems.map((i: any) => i.id));
+                          const completedItems = mergedTreatmentPlan.filter(
+                            (item: any) => !reorderedIds.has(item.id)
+                          );
+                          const nextPlan = [...reorderItems, ...completedItems];
+                          await onUpdatePatient({ ...patient, treatmentPlan: nextPlan });
+                          await onRefreshPatient?.();
+                        } catch (error) {
+                          console.error('Error saving reorder:', error);
+                        } finally {
+                          setIsSavingOrder(false);
+                          setIsReorderMode(false);
+                          setReorderItems([]);
+                        }
+                      }}
+                      className="flex-1 rounded-2xl bg-slate-950 text-white text-[13px] font-bold py-2.5 transition-all hover:bg-slate-800 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
+                    >
+                      {isSavingOrder ? <Loader2 size={14} className="animate-spin" /> : <Check size={13} />}
+                      Salvar nova ordem
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsReorderMode(false);
+                        setReorderItems([]);
+                      }}
+                      className="rounded-2xl border border-slate-200/80 bg-white text-slate-600 text-[13px] font-bold px-4 py-2.5 transition-all hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] shadow-sm"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+
+                {(isReorderMode ? reorderItems : treatmentInProgress).length > 0 ? (
+                  (isReorderMode ? reorderItems : treatmentInProgress).map((item: any, idx: number) => {
                     const isPriority = idx === 0;
                     const rawStatus = String(item.status || '').toUpperCase();
                     const isPrepaid = item.requires_prepayment && item.prepayment_confirmed;
@@ -1438,19 +1620,62 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     return (
                       <div
                         key={item.id}
-                        className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all duration-300 ease-out sm:flex-row sm:items-center sm:justify-between ios-hover-lift ${
-                          isPrepaid
-                            ? 'border-emerald-200/80 bg-gradient-to-r from-emerald-50/30 to-emerald-50/10 shadow-[0_4px_14px_rgba(16,185,129,0.05)]'
-                            : isPriority
-                              ? 'border-slate-200/80 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)]'
-                              : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'
+                        data-reorder-index={idx}
+                        className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all duration-300 ease-out sm:flex-row sm:items-center sm:justify-between ${
+                          isReorderMode
+                            ? 'select-none'
+                            : 'ios-hover-lift'
                         } ${
-                          highlightedTreatmentId === item.id
+                          isReorderMode && dragIdx === idx
+                            ? 'opacity-40 scale-[0.98] border-slate-300 bg-slate-50'
+                            : isReorderMode && dragOverIdx === idx
+                              ? 'border-indigo-300/60 bg-indigo-50/[0.35] shadow-[0_0_0_1px_rgba(99,102,241,0.15)]'
+                              : isPrepaid
+                                ? 'border-emerald-200/80 bg-gradient-to-r from-emerald-50/30 to-emerald-50/10 shadow-[0_4px_14px_rgba(16,185,129,0.05)]'
+                                : isPriority
+                                  ? 'border-slate-200/80 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)]'
+                                  : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'
+                        } ${
+                          !isReorderMode && highlightedTreatmentId === item.id
                             ? 'ring-2 ring-indigo-200/70 shadow-[0_6px_20px_rgba(99,102,241,0.1)] animate-glow-pulse'
                             : ''
                         }`}
                         style={{ animationDelay: `${idx * 50}ms` }}
                       >
+                        {isReorderMode && (
+                          <div className="flex shrink-0 items-center gap-1.5 sm:pr-2">
+                            <button
+                              type="button"
+                              onPointerDown={(event) => startPointerReorder(event, idx)}
+                              disabled={isSavingOrder}
+                              aria-label={`Arrastar ${item.procedure}`}
+                              title="Arrastar"
+                              className="h-10 w-10 shrink-0 touch-none rounded-xl border border-slate-200 bg-white text-slate-400 transition-all hover:border-slate-300 hover:text-slate-600 active:scale-[0.97] disabled:opacity-50 cursor-grab active:cursor-grabbing flex items-center justify-center"
+                            >
+                              <GripVertical size={20} />
+                            </button>
+                            <div className="flex shrink-0 items-center gap-1 sm:hidden">
+                              <button
+                                type="button"
+                                onClick={() => moveReorderItemByStep(idx, -1)}
+                                disabled={idx === 0 || isSavingOrder}
+                                aria-label={`Subir ${item.procedure}`}
+                                className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-400 transition-all active:scale-[0.96] disabled:opacity-30 disabled:active:scale-100 flex items-center justify-center"
+                              >
+                                <ChevronDown size={14} className="rotate-180" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveReorderItemByStep(idx, 1)}
+                                disabled={idx === reorderItems.length - 1 || isSavingOrder}
+                                aria-label={`Descer ${item.procedure}`}
+                                className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-400 transition-all active:scale-[0.96] disabled:opacity-30 disabled:active:scale-100 flex items-center justify-center"
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           {/* row 1: procedure name */}
                           <div className="flex items-start justify-between gap-2">
@@ -1519,16 +1744,18 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => setSelectedTreatmentAction(item)}
-                          className={`w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 ios-press ${
-                            isPriority
-                              ? 'bg-slate-950 text-white hover:bg-slate-800 shadow-[0_2px_8px_rgba(15,23,42,0.15)]'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
-                          }`}
-                        >
-                          Continuar
-                        </button>
+                        {!isReorderMode && (
+                          <button
+                            onClick={() => setSelectedTreatmentAction(item)}
+                            className={`w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 ios-press ${
+                              isPriority
+                                ? 'bg-slate-950 text-white hover:bg-slate-800 shadow-[0_2px_8px_rgba(15,23,42,0.15)]'
+                                : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
+                            }`}
+                          >
+                            Continuar
+                          </button>
+                        )}
                       </div>
                     );
                   })
