@@ -31,11 +31,11 @@ import { CLINICAL_PROCEDURES, getProcedureDefinition, resolveProcedureValue } fr
 import { NovaEvolucao } from './NovaEvolucao';
 import { Odontogram } from './Odontogram';
 import { OdontogramActiveSummary } from './OdontogramActiveSummary';
+import { ScopeProcedureMenu } from './ScopeProcedureMenu';
 import { formatDate } from '../utils/dateUtils';
 import {
   TREATMENT_SCOPES,
   countActiveTreatmentsByScope,
-  formatActiveTreatmentCounter,
   formatTreatmentAnchor,
   isActiveTreatmentStatus,
   normalizeTreatmentItem,
@@ -743,7 +743,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       }).length;
       if (duplicateCount > 0) {
         setScopeProcedureWarning(
-          `Já existe ${duplicateCount} ${procedure} ativo(s). Um novo registro será adicionado.`
+          `Já existe outro ${procedure} ativo. Será adicionado um novo registro.`
         );
         window.setTimeout(() => setScopeProcedureWarning(null), 4500);
       }
@@ -1195,6 +1195,43 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     window.setTimeout(() => setHighlightedTimelineId(null), 2200);
   };
 
+  const handleRemoveScopeTreatment = async (treatment: any) => {
+    const normalized = normalizeTreatmentItem(treatment);
+    if (
+      normalized.scope !== TREATMENT_SCOPES.PATIENT &&
+      normalized.scope !== TREATMENT_SCOPES.QUADRANT
+    ) {
+      return;
+    }
+
+    const status = String(treatment.status || '').toUpperCase();
+    const needsConfirm =
+      status === 'APROVADO' ||
+      Boolean(treatment.prepayment_confirmed) ||
+      status === 'REALIZADO';
+
+    if (
+      needsConfirm &&
+      !window.confirm(
+        `Remover ${treatment.procedure} (${formatTreatmentAnchor(treatment)}) do plano de tratamento?`
+      )
+    ) {
+      return;
+    }
+
+    const nextPlan = (mergedTreatmentPlan || []).filter((item: any) => item.id !== treatment.id);
+    setOptimisticTreatments((prev) => prev.filter((item: any) => item.id !== treatment.id));
+
+    try {
+      await onUpdatePatient({ ...patient, treatmentPlan: nextPlan });
+      if (highlightedTreatmentId === treatment.id) {
+        setHighlightedTreatmentId(null);
+      }
+    } catch (error) {
+      console.error('Error removing scope treatment:', error);
+    }
+  };
+
   const handleAddToothHistory = async (record: { tooth_number: number; procedure: string; notes: string; date: string }) => {
     try {
       const res = await apiFetch(`/api/patients/${patient.id}/tooth-history`, {
@@ -1409,11 +1446,6 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     [treatmentInProgress]
   );
 
-  const activeTreatmentCounterLabel = useMemo(
-    () => formatActiveTreatmentCounter(activeTreatmentCounts),
-    [activeTreatmentCounts]
-  );
-
   const activeQuadrants = useMemo(
     () => [...activeTreatmentCounts.quadrantSet],
     [activeTreatmentCounts]
@@ -1625,17 +1657,12 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-6">
 
         <section ref={odontogramRef} className="rounded-[30px] p-4 sm:p-5 border border-slate-200/60 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-500 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-[24px] sm:text-[28px] font-semibold tracking-[-0.02em] text-slate-950">Odontograma</h2>
-              {activeTreatmentCounterLabel && (
-                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-breathe" />
-                  {activeTreatmentCounterLabel}
-                </p>
-              )}
-            </div>
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 bg-slate-50/80 px-2.5 py-1.5 rounded-full border border-slate-200/60 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">Interativo</span>
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <h2 className="text-[24px] sm:text-[28px] font-semibold tracking-[-0.02em] text-slate-950">Odontograma</h2>
+            <ScopeProcedureMenu
+              onSelect={handleScopeProcedureSelect}
+              hint={scopeProcedureWarning}
+            />
           </div>
 
           <OdontogramActiveSummary
@@ -1645,9 +1672,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             onSelectTooth={flashToothHighlight}
             onSelectQuadrant={flashQuadrantHighlight}
             onSelectPatientItem={flashTreatmentHighlight}
+            onRemoveTreatment={handleRemoveScopeTreatment}
           />
 
-          <div className="rounded-[26px] p-1.5 sm:p-2 bg-slate-50/70 ring-1 ring-slate-100/80">
+          <div className="rounded-[26px] p-1 sm:p-1.5 bg-slate-50/50 ring-1 ring-slate-100/60">
             <Odontogram
               data={mergedOdontogram}
               history={patient?.toothHistory || []}
@@ -1655,14 +1683,12 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               onAddHistory={handleAddToothHistory}
               onResetTooth={handleResetTooth}
               onSelectProcedure={handleOdontoProcedureSelect}
-              onSelectScopeProcedure={handleScopeProcedureSelect}
               treatments={mergedTreatmentPlan}
               activeToothNumbers={activeToothNumbers}
               activeQuadrants={activeQuadrants}
               priorityToothNumber={priorityToothNumber}
               highlightedToothNumber={highlightedToothNumber}
               highlightedQuadrant={highlightedQuadrant}
-              scopeProcedureWarning={scopeProcedureWarning}
             />
           </div>
         </section>
@@ -1867,9 +1893,31 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                                 {item.procedure}
                               </p>
                             </div>
-                            <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                              {formatTreatmentAnchor(item)}
-                            </span>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                {formatTreatmentAnchor(item)}
+                              </span>
+                              {!isReorderMode && (() => {
+                                const itemScope = normalizeTreatmentItem(item);
+                                if (
+                                  itemScope.scope !== TREATMENT_SCOPES.PATIENT &&
+                                  itemScope.scope !== TREATMENT_SCOPES.QUADRANT
+                                ) {
+                                  return null;
+                                }
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveScopeTreatment(item)}
+                                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                                    aria-label={`Remover ${item.procedure}`}
+                                    title="Remover"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                );
+                              })()}
+                            </div>
                           </div>
 
                           {/* row 2: status + value */}

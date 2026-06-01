@@ -1,9 +1,5 @@
 import React from 'react';
 import { X } from '../icons';
-import {
-  PATIENT_SCOPE_PROCEDURES,
-  QUADRANT_SCOPE_PROCEDURES,
-} from '../constants/clinicalProcedures';
 import { deriveToothFlagsPure } from '../utils/toothStatusDerivation';
 import { normalizeTreatmentItem, type QuadrantId } from '../utils/treatmentPlanScope';
 
@@ -50,12 +46,6 @@ interface OdontogramProps {
     mode: 'initial' | 'continuity';
     status: ToothStatus;
   }) => void;
-  onSelectScopeProcedure?: (payload: {
-    procedureKey: string;
-    procedure: string;
-    scope: 'patient' | 'quadrant';
-    quadrant?: QuadrantId;
-  }) => void;
   treatments?: Array<{
     id: string;
     tooth_number?: number;
@@ -70,7 +60,6 @@ interface OdontogramProps {
   priorityToothNumber?: number | null;
   highlightedToothNumber?: number | null;
   highlightedQuadrant?: QuadrantId | null;
-  scopeProcedureWarning?: string | null;
   readOnly?: boolean;
 }
 
@@ -511,14 +500,12 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   onAddHistory,
   onResetTooth,
   onSelectProcedure,
-  onSelectScopeProcedure,
   treatments = [],
   activeToothNumbers = [],
   activeQuadrants = [],
   priorityToothNumber = null,
   highlightedToothNumber = null,
   highlightedQuadrant = null,
-  scopeProcedureWarning = null,
   readOnly = false 
 }) => {
   const [selectedTooth, setSelectedTooth] = React.useState<number | null>(null);
@@ -529,10 +516,6 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   const [hoverRect, setHoverRect] = React.useState<DOMRect | null>(null);
   const [optimisticHistory, setOptimisticHistory] = React.useState<ToothRecord[]>([]);
   const [legendExpanded, setLegendExpanded] = React.useState(false);
-  const [pendingQuadrantProcedure, setPendingQuadrantProcedure] = React.useState<{
-    procedureKey: string;
-    procedure: string;
-  } | null>(null);
   const toothRefs = React.useRef<Record<number, HTMLButtonElement | null>>({});
   const activeToothSet = React.useMemo(() => new Set(activeToothNumbers), [activeToothNumbers]);
   const activeQuadrantSet = React.useMemo(() => new Set(activeQuadrants), [activeQuadrants]);
@@ -788,87 +771,8 @@ export const Odontogram: React.FC<OdontogramProps> = ({
     );
   };
 
-  const handleQuadrantPick = (quadrant: QuadrantId) => {
-    if (!pendingQuadrantProcedure || !onSelectScopeProcedure) return;
-    onSelectScopeProcedure({
-      procedureKey: pendingQuadrantProcedure.procedureKey,
-      procedure: pendingQuadrantProcedure.procedure,
-      scope: 'quadrant',
-      quadrant,
-    });
-    setPendingQuadrantProcedure(null);
-  };
-
   return (
-    <div className="space-y-5 p-1 sm:p-2 bg-transparent rounded-none shadow-none border-none">
-      {!readOnly && onSelectScopeProcedure && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {PATIENT_SCOPE_PROCEDURES.map((proc) => (
-              <button
-                key={proc.key}
-                type="button"
-                onClick={() =>
-                  onSelectScopeProcedure({
-                    procedureKey: proc.key,
-                    procedure: proc.label,
-                    scope: 'patient',
-                  })
-                }
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 transition-all hover:border-slate-300 hover:text-slate-800 hover:shadow-sm active:scale-[0.98]"
-              >
-                {proc.label}
-              </button>
-            ))}
-            {QUADRANT_SCOPE_PROCEDURES.map((proc) => (
-              <button
-                key={proc.key}
-                type="button"
-                onClick={() =>
-                  setPendingQuadrantProcedure((current) =>
-                    current?.procedureKey === proc.key ? null : { procedureKey: proc.key, procedure: proc.label }
-                  )
-                }
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all active:scale-[0.98] ${
-                  pendingQuadrantProcedure?.procedureKey === proc.key
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 hover:shadow-sm'
-                }`}
-              >
-                {proc.label}
-              </button>
-            ))}
-          </div>
-          {scopeProcedureWarning && (
-            <p className="text-[11px] font-medium text-amber-700 bg-amber-50/80 border border-amber-200/80 rounded-xl px-3 py-2">
-              {scopeProcedureWarning}
-            </p>
-          )}
-          {pendingQuadrantProcedure && (
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500 mb-2">
-                Selecione o quadrante — {pendingQuadrantProcedure.procedure}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {([1, 2, 3, 4] as QuadrantId[]).map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => handleQuadrantPick(q)}
-                    className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-slate-700 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-[0.98]"
-                  >
-                    Q{q}
-                    <span className="block text-[9px] font-medium text-slate-400 mt-0.5">
-                      {q === 1 ? '18–11' : q === 2 ? '21–28' : q === 3 ? '31–38' : '48–41'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
+    <div className="space-y-4 p-1 sm:p-2 bg-transparent rounded-none shadow-none border-none">
       <div className="overflow-x-auto pb-2">
         <div className="mx-auto min-w-max space-y-5">
           {/* Upper Jaw */}
@@ -899,27 +803,25 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         </div>
       </div>
 
-      <div className="pt-3 border-t border-slate-200/80 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {visibleLegendItems.map((item) => (
-            <div key={item.key} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-              <span className={`relative h-3 w-3 rounded-[4px] ${item.swatchClass}`}>
-                {item.markerClass && (
-                  <span
-                    className={`absolute ${item.markerPosition === 'top' ? '-top-1 -right-1' : '-bottom-1 -right-1'} h-2 w-2 rounded-full border border-white ${item.markerClass}`}
-                  />
-                )}
-              </span>
-              <span className="text-[11px] font-medium text-slate-500">{item.label}</span>
-            </div>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 border-t border-slate-100">
+        {visibleLegendItems.map((item) => (
+          <div key={item.key} className="inline-flex items-center gap-1.5 py-0.5">
+            <span className={`relative h-2.5 w-2.5 rounded-[3px] ${item.swatchClass}`}>
+              {item.markerClass && (
+                <span
+                  className={`absolute ${item.markerPosition === 'top' ? '-top-0.5 -right-0.5' : '-bottom-0.5 -right-0.5'} h-1.5 w-1.5 rounded-full border border-white ${item.markerClass}`}
+                />
+              )}
+            </span>
+            <span className="text-[10px] font-medium text-slate-400">{item.label}</span>
+          </div>
+        ))}
         <button
           type="button"
           onClick={() => setLegendExpanded((prev) => !prev)}
-          className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+          className="text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors"
         >
-          {legendExpanded ? 'Ocultar legenda completa' : 'Mostrar legenda completa'}
+          {legendExpanded ? 'Menos' : 'Legenda'}
         </button>
       </div>
 
@@ -930,33 +832,21 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         const pendingTeeth = allTeeth.filter(n => deriveToothFlags(n).isPending);
         const completedTeeth = allTeeth.filter(n => deriveToothFlags(n).isCompleted);
         if (pendingTeeth.length === 0 && urgentTeeth.length === 0 && completedTeeth.length === 0) return null;
+        const insightParts: string[] = [];
+        if (urgentTeeth.length > 0) {
+          insightParts.push(
+            `${urgentTeeth.length} urgente${urgentTeeth.length > 1 ? 's' : ''} (${urgentTeeth.slice(0, 4).join(', ')}${urgentTeeth.length > 4 ? '…' : ''})`
+          );
+        }
+        if (pendingTeeth.length > urgentTeeth.length) {
+          const n = pendingTeeth.length - urgentTeeth.length;
+          insightParts.push(`${n} pendente${n > 1 ? 's' : ''}`);
+        }
+        if (completedTeeth.length > 0) {
+          insightParts.push(`${completedTeeth.length} concluído${completedTeeth.length > 1 ? 's' : ''}`);
+        }
         return (
-          <div className="flex flex-wrap items-center gap-3 px-1">
-            {urgentTeeth.length > 0 && (
-              <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                <span className="text-[11px] font-bold text-rose-700">
-                  {urgentTeeth.length} urgente{urgentTeeth.length > 1 ? 's' : ''}: {urgentTeeth.slice(0, 4).join(', ')}{urgentTeeth.length > 4 ? '…' : ''}
-                </span>
-              </div>
-            )}
-            {pendingTeeth.length > urgentTeeth.length && (
-              <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                <span className="text-[11px] font-bold text-amber-700">
-                  {pendingTeeth.length - urgentTeeth.length} pendente{(pendingTeeth.length - urgentTeeth.length) > 1 ? 's' : ''}
-                </span>
-              </div>
-            )}
-            {completedTeeth.length > 0 && (
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-[11px] font-bold text-emerald-700">
-                  {completedTeeth.length} concluído{completedTeeth.length > 1 ? 's' : ''}
-                </span>
-              </div>
-            )}
-          </div>
+          <p className="px-0.5 text-[11px] font-medium text-slate-400">{insightParts.join(' • ')}</p>
         );
       })()}
 

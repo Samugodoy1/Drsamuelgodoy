@@ -195,15 +195,15 @@ export function formatActiveTreatmentCounter(counts: ReturnType<typeof countActi
     parts.push(`${counts.teeth} dente${counts.teeth !== 1 ? 's' : ''} em tratamento`);
   }
   if (counts.quadrants > 0) {
-    parts.push(`+${counts.quadrants} quadrante${counts.quadrants !== 1 ? 's' : ''}`);
+    parts.push(`${counts.quadrants} quadrante${counts.quadrants !== 1 ? 's' : ''}`);
   }
   if (counts.patientGlobal > 0) {
     parts.push(
-      `+${counts.patientGlobal} procedimento${counts.patientGlobal !== 1 ? 's' : ''} global${counts.patientGlobal !== 1 ? 'is' : ''}`
+      `${counts.patientGlobal} procedimento${counts.patientGlobal !== 1 ? 's' : ''} global${counts.patientGlobal !== 1 ? 'is' : ''}`
     );
   }
   if (parts.length === 0) return null;
-  return parts.join(' · ');
+  return parts.join(' • ');
 }
 
 export function getTeethForScope(item: TreatmentPlanItemLike): number[] {

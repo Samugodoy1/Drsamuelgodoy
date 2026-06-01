@@ -28,7 +28,7 @@ describe('treatmentPlanScope', () => {
       { procedure: 'Clareamento', status: 'PLANEJADO' },
     ]);
     expect(formatActiveTreatmentCounter(counts)).toBe(
-      '2 dentes em tratamento · +1 quadrante · +1 procedimento global'
+      '2 dentes em tratamento • 1 quadrante • 1 procedimento global'
     );
   });
 
