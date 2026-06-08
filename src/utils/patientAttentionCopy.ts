@@ -225,6 +225,41 @@ function hasTreatmentGap(intel: PatientIntelLike | null): boolean {
   return Boolean(intel.pending_procedure || hasPendingTeeth || (intel.has_active_treatment && !intel.has_future_appointment));
 }
 
+function phraseForTreatmentGap(intel: PatientIntelLike | null): string | null {
+  if (!intel) return null;
+
+  if (intel.pending_procedure) {
+    const proc = intel.pending_procedure.trim();
+    const toothMatch = proc.match(/^(.+?)\s+dente\s+(\d+)$/i);
+    if (toothMatch) {
+      const treatment = toothMatch[1].charAt(0).toLowerCase() + toothMatch[1].slice(1);
+      return `Agende ${treatment} no dente ${toothMatch[2]}.`;
+    }
+    const normalized = proc.charAt(0).toLowerCase() + proc.slice(1);
+    return `Agende ${normalized}.`;
+  }
+
+  const teeth = (intel.urgent_teeth?.length ?? 0) > 0
+    ? intel.urgent_teeth!
+    : intel.pending_teeth ?? [];
+
+  if (teeth.length === 1) {
+    return `Agende tratamento no dente ${teeth[0]}.`;
+  }
+  if (teeth.length === 2) {
+    return `Agende tratamento nos dentes ${teeth[0]} e ${teeth[1]}.`;
+  }
+  if (teeth.length > 2) {
+    return `Agende tratamento em ${teeth.length} dentes pendentes.`;
+  }
+
+  if (intel.has_active_treatment && !intel.has_future_appointment) {
+    return 'Marque o retorno para continuar o tratamento.';
+  }
+
+  return null;
+}
+
 // ─── Filter-specific phrase strategies ───────────────────────────────────────
 
 function phraseForActionNeeded(ctx: PhraseContext): string {
@@ -238,20 +273,17 @@ function phraseForActionNeeded(ctx: PhraseContext): string {
     }
   }
 
-  if (hasTreatmentGap(intel)) {
-    return 'Possui pendência que pode interromper o tratamento.';
+  const treatmentPhrase = phraseForTreatmentGap(intel);
+  if (treatmentPhrase) {
+    return treatmentPhrase;
   }
 
   const days = getDaysSinceLastVisit(meta, intel);
   if (intel?.status === 'ABANDONO' && days != null) {
-    return formatSemRetorno(days);
+    return `Envie uma mensagem — sem retorno ${formatElapsedDays(days)}.`;
   }
 
-  if (intel?.has_active_treatment && !intel.has_future_appointment) {
-    return 'Tratamento em andamento sem próximo passo marcado.';
-  }
-
-  return 'Existe uma ação recomendada para este paciente.';
+  return 'Defina o próximo passo no prontuário.';
 }
 
 function phraseForNeedAttention(ctx: PhraseContext): string {
@@ -340,6 +372,62 @@ function phraseForAll(ctx: PhraseContext): string {
   }
 
   return 'Sem histórico de atendimentos.';
+}
+
+// ─── Urgency accent (dashboard palette) ──────────────────────────────────────
+
+export type PatientUrgencyAccent = 'rose' | 'amber' | 'emerald' | 'slate';
+
+export const PATIENT_URGENCY_STYLES: Record<PatientUrgencyAccent, {
+  dot: string;
+  avatarRing: string;
+  cardBorder: string;
+  phrase: string;
+}> = {
+  rose: {
+    dot: 'bg-rose-400',
+    avatarRing: 'ring-rose-200/80',
+    cardBorder: 'border-l-rose-400',
+    phrase: 'text-rose-700/90',
+  },
+  amber: {
+    dot: 'bg-amber-400',
+    avatarRing: 'ring-amber-200/80',
+    cardBorder: 'border-l-amber-400',
+    phrase: 'text-amber-800/90',
+  },
+  emerald: {
+    dot: 'bg-emerald-400',
+    avatarRing: 'ring-emerald-200/80',
+    cardBorder: 'border-l-emerald-400',
+    phrase: 'text-emerald-700/90',
+  },
+  slate: {
+    dot: 'bg-slate-300',
+    avatarRing: 'ring-slate-200/80',
+    cardBorder: 'border-l-transparent',
+    phrase: 'text-slate-500',
+  },
+};
+
+export function getPatientUrgencyAccent(
+  meta: PatientCardMetaLike,
+  intel: PatientIntelLike | null,
+  now: Date
+): PatientUrgencyAccent {
+  if (intel?.priority === 'HIGH') return 'rose';
+  if (meta.attentionStatus.key === 'overdue' || intel?.status === 'ABANDONO') return 'rose';
+  if (
+    intel?.priority === 'MEDIUM' ||
+    intel?.status === 'ATENCAO' ||
+    meta.attentionStatus.key === 'review' ||
+    meta.isLead
+  ) {
+    return 'amber';
+  }
+  if (meta.nextVisitDate && meta.nextVisitDate >= now) return 'emerald';
+  if (intel?.has_future_appointment) return 'emerald';
+  return 'slate';
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────

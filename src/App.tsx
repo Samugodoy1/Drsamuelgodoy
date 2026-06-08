@@ -71,6 +71,8 @@ import {
   computePatientFilterCounts,
   getPatientContextPhrase,
   getPatientFilterHeader,
+  getPatientUrgencyAccent,
+  PATIENT_URGENCY_STYLES,
   matchesPatientListFilter,
 } from './utils/patientAttentionCopy';
 
@@ -4737,22 +4739,29 @@ export default function App() {
                               ? { start_time: nextAppointment.start_time, status: nextAppointment.status, notes: nextAppointment.notes }
                               : null
                           );
+                          const urgency = getPatientUrgencyAccent(meta, intel, now);
+                          const urgencyStyle = PATIENT_URGENCY_STYLES[urgency];
 
                           return (
                             <div
                               key={patient.id}
-                              className="flex items-stretch bg-white rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all"
+                              className={`flex items-stretch bg-white rounded-2xl border border-slate-100 border-l-[3px] ${urgencyStyle.cardBorder} hover:border-slate-200 hover:shadow-sm transition-all`}
                             >
                               <div className="flex items-center gap-3.5 flex-1 min-w-0 px-4 py-3.5">
                                 <button
                                   type="button"
                                   onClick={() => openPatientRecord(patient.id)}
-                                  className="w-11 h-11 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm overflow-hidden border border-primary/20 shrink-0"
+                                  className="relative shrink-0"
                                 >
-                                  {patient.photo_url ? (
-                                    <img src={patient.photo_url} alt={patient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                  ) : (
-                                    (patient.name || '?').charAt(0)
+                                  <div className={`w-11 h-11 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm overflow-hidden border border-primary/20 ring-2 ${urgencyStyle.avatarRing}`}>
+                                    {patient.photo_url ? (
+                                      <img src={patient.photo_url} alt={patient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      (patient.name || '?').charAt(0)
+                                    )}
+                                  </div>
+                                  {urgency !== 'slate' && (
+                                    <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full ${urgencyStyle.dot} border-2 border-white`} />
                                   )}
                                 </button>
 
@@ -4764,7 +4773,7 @@ export default function App() {
                                   <p className="text-[15px] font-semibold text-slate-900 truncate leading-tight">
                                     {patient.name}
                                   </p>
-                                  <p className="text-[13px] text-slate-500 leading-snug mt-0.5 truncate">
+                                  <p className={`text-[13px] leading-snug mt-0.5 truncate ${urgencyStyle.phrase}`}>
                                     {contextPhrase}
                                   </p>
                                 </button>
