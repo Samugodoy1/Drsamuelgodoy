@@ -52,6 +52,10 @@ interface SchedulingSuggestion {
   };
 }
 
+interface OperationalInsight {
+  text: string;
+}
+
 interface ReminderAppointment {
   id: number;
   patient_id: number;
@@ -182,6 +186,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
+  const [operationalInsight, setOperationalInsight] = useState<OperationalInsight | null>(null);
   const [loading, setLoading] = useState(true);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -201,9 +206,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           headers['Authorization'] = `Bearer ${token}`;
           headers['x-auth-token'] = token;
         }
-        const [dashRes, schedRes] = await Promise.all([
+        const [dashRes, schedRes, operationalRes] = await Promise.all([
           fetch(`${API_URL}/api/intelligence/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
           fetch(`${API_URL}/api/intelligence/scheduling`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
+          fetch(`${API_URL}/api/intelligence/operational`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
         ]);
         if (dashRes.ok && !cancelled) {
           setIntelligence(await dashRes.json());
@@ -211,6 +217,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (schedRes.ok && !cancelled) {
           const data = await schedRes.json();
           if (Array.isArray(data)) setSchedulingSuggestions(data);
+        }
+        if (operationalRes.ok && !cancelled) {
+          const data = await operationalRes.json();
+          if (data?.text) setOperationalInsight(data);
         }
       } catch (e) {
         console.error('Dashboard intelligence fetch failed:', e);
@@ -394,7 +404,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
       };
     }
 
-    // 5 — Nenhum insight relevante
+    // 5 — Inteligência operacional (lembrança suave, sem afirmar estoque)
+    if (operationalInsight?.text) {
+      return {
+        text: operationalInsight.text,
+        icon: <Sparkles size={16} />,
+        accent: 'sky',
+      };
+    }
+
+    // 6 — Nenhum insight relevante
     return null;
   };
 
@@ -963,6 +982,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               insightCard.accent === 'violet' ? 'bg-violet-50/70' :
               insightCard.accent === 'rose' ? 'bg-rose-50/70' :
               insightCard.accent === 'amber' ? 'bg-amber-50/70' :
+              insightCard.accent === 'sky' ? 'bg-sky-50/60' :
               'bg-emerald-50/70'
             }`}
           >
@@ -970,6 +990,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               insightCard.accent === 'violet' ? 'text-violet-500' :
               insightCard.accent === 'rose' ? 'text-rose-500' :
               insightCard.accent === 'amber' ? 'text-amber-500' :
+              insightCard.accent === 'sky' ? 'text-sky-500' :
               'text-emerald-500'
             }`}>
               {insightCard.icon}
