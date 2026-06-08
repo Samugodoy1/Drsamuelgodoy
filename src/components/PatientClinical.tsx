@@ -336,6 +336,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isSavingAnamnese, setIsSavingAnamnese] = useState(false);
   const [showAnamneseExtra, setShowAnamneseExtra] = useState(false);
   const [showDadosExtra, setShowDadosExtra] = useState(false);
+  const [isEditingDados, setIsEditingDados] = useState(false);
+  const [dadosForm, setDadosForm] = useState({ name: '', cpf: '', phone: '', email: '', birth_date: '', address: '' });
+  const [isSavingDados, setIsSavingDados] = useState(false);
   const [patientFinancial, setPatientFinancial] = useState<{ transactions: any[]; paymentPlans: any[]; installments: any[] } | null>(null);
   const [isLoadingFinancial, setIsLoadingFinancial] = useState(false);
   const infoPanelRef = useRef<HTMLElement | null>(null);
@@ -1517,6 +1520,33 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     }
   };
 
+  const saveDados = async () => {
+    setIsSavingDados(true);
+    try {
+      const updatedPatient = {
+        ...patient,
+        name: dadosForm.name.trim(),
+        cpf: dadosForm.cpf.trim(),
+        phone: dadosForm.phone.trim(),
+        email: dadosForm.email.trim(),
+        birth_date: dadosForm.birth_date || null,
+        address: dadosForm.address.trim(),
+      };
+      const res = await apiFetch(`/api/patients/${patient.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updatedPatient),
+      });
+      if (!res.ok) throw new Error('Falha ao salvar dados');
+      await onUpdatePatient(updatedPatient);
+      await onRefreshPatient?.();
+      setIsEditingDados(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingDados(false);
+    }
+  };
+
   const activeToothNumbers = useMemo(() => {
     const toothSet = new Set<number>();
     treatmentInProgress.forEach((item: any) => {
@@ -2486,23 +2516,133 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             )}
 
             {infoTab === 'dados' && (
-              <div className="space-y-2 text-sm">
-                {[
-                  { label: 'CPF', value: patient?.cpf, icon: <UserRound size={13} /> },
-                  { label: 'Telefone', value: patient?.phone, icon: <Phone size={13} /> },
-                  { label: 'E-mail', value: patient?.email, icon: <Info size={13} /> },
-                  { label: 'Data de nascimento', value: patient?.birth_date ? formatDate(patient.birth_date) : null, icon: <Calendar size={13} /> },
-                ].map(({ label, value, icon }) => (
-                  <div key={label} className="flex items-center gap-3 px-3.5 py-3 rounded-[16px] bg-slate-50/80 border border-slate-200/60 transition-all duration-300 ease-out hover:bg-white hover:border-slate-300/70 hover:shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-                    <div className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                      {icon}
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between px-0.5">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">Dados pessoais</p>
+                  {!isEditingDados ? (
+                    <button
+                      onClick={() => {
+                        setDadosForm({
+                          name: patient?.name || '',
+                          cpf: patient?.cpf || '',
+                          phone: patient?.phone || '',
+                          email: patient?.email || '',
+                          birth_date: patient?.birth_date ? String(patient.birth_date).split('T')[0] : '',
+                          address: patient?.address || '',
+                        });
+                        setIsEditingDados(true);
+                      }}
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100"
+                    >
+                      Editar
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsEditingDados(false)}
+                      className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+
+                {isEditingDados ? (
+                  <>
+                    <div className="p-3.5 rounded-[18px] bg-slate-50 border border-slate-200/70 space-y-3">
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">Nome completo</p>
+                        <input
+                          type="text"
+                          value={dadosForm.name}
+                          onChange={(e) => setDadosForm((f) => ({ ...f, name: e.target.value }))}
+                          placeholder="Nome completo"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">CPF</p>
+                        <input
+                          type="text"
+                          value={dadosForm.cpf}
+                          onChange={(e) => setDadosForm((f) => ({ ...f, cpf: e.target.value }))}
+                          placeholder="CPF (opcional)"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">Telefone</p>
+                        <input
+                          type="text"
+                          value={dadosForm.phone}
+                          onChange={(e) => setDadosForm((f) => ({ ...f, phone: e.target.value }))}
+                          placeholder="Telefone"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">E-mail</p>
+                        <input
+                          type="email"
+                          value={dadosForm.email}
+                          onChange={(e) => setDadosForm((f) => ({ ...f, email: e.target.value }))}
+                          placeholder="E-mail (opcional)"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">Data de nascimento</p>
+                        <input
+                          type="date"
+                          value={dadosForm.birth_date}
+                          onChange={(e) => setDadosForm((f) => ({ ...f, birth_date: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 focus:border-slate-400 focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-2">Endereço</p>
+                        <input
+                          type="text"
+                          value={dadosForm.address}
+                          onChange={(e) => setDadosForm((f) => ({ ...f, address: e.target.value }))}
+                          placeholder="Endereço (opcional)"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+                        />
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-extrabold uppercase tracking-[0.09em] text-slate-400">{label}</p>
-                      <p className="text-[13px] font-medium text-slate-800 truncate mt-0.5">{value || 'Não informado'}</p>
-                    </div>
-                  </div>
-                ))}
+
+                    <button
+                      onClick={saveDados}
+                      disabled={isSavingDados || !dadosForm.name.trim() || !dadosForm.phone.trim()}
+                      className="w-full py-2.5 rounded-xl bg-slate-950 text-white text-[13px] font-semibold hover:bg-slate-800 ios-press transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 shadow-[0_2px_8px_rgba(15,23,42,0.15)]"
+                    >
+                      {isSavingDados ? (
+                        <><Loader2 size={14} className="animate-spin" /> Salvando...</>
+                      ) : (
+                        <><Check size={14} /> Salvar dados</>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {[
+                      { label: 'CPF', value: patient?.cpf, icon: <UserRound size={13} /> },
+                      { label: 'Telefone', value: patient?.phone, icon: <Phone size={13} /> },
+                      { label: 'E-mail', value: patient?.email, icon: <Info size={13} /> },
+                      { label: 'Data de nascimento', value: patient?.birth_date ? formatDate(patient.birth_date) : null, icon: <Calendar size={13} /> },
+                      ...(patient?.address ? [{ label: 'Endereço', value: patient.address, icon: <Info size={13} /> }] : []),
+                    ].map(({ label, value, icon }) => (
+                      <div key={label} className="flex items-center gap-3 px-3.5 py-3 rounded-[16px] bg-slate-50/80 border border-slate-200/60 transition-all duration-300 ease-out hover:bg-white hover:border-slate-300/70 hover:shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+                        <div className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                          {icon}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-extrabold uppercase tracking-[0.09em] text-slate-400">{label}</p>
+                          <p className="text-[13px] font-medium text-slate-800 truncate mt-0.5">{value || 'Não informado'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
 
                 {/* Ver mais — dados do pré-atendimento */}
                 {(() => {

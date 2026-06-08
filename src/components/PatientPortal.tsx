@@ -759,7 +759,12 @@ export function PatientPortal() {
         {/* Saudação */}
         <div className="mb-10">
           <h1 className="text-[32px] font-bold text-[#0F172A] leading-tight tracking-tight">
-            Olá, {patient.name.split(' ')[0]} {patient.name.split(' ')[1] ? patient.name.split(' ')[1].slice(0, 3) + '.' : ''}
+            Olá, {(() => {
+              const parts = patient.name.trim().split(/\s+/);
+              const firstName = parts[0] || '';
+              const firstSurname = parts[1] || '';
+              return firstSurname ? `${firstName} ${firstSurname}` : firstName;
+            })()}
           </h1>
           {futureAppointments.length > 0 ? (
             (() => {
