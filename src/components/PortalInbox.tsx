@@ -53,7 +53,7 @@ interface IntakeForm {
 
 interface PortalInboxProps {
   apiFetch: (url: string, options?: any) => Promise<Response>;
-  onSchedulePatient?: (patientId: number, patientName: string, preferredDate: string) => void;
+  onSchedulePatient?: (patientId: number, patientName: string, preferredDate: string, preferredTime?: string | null) => void;
   onOpenPatient?: (patientId: number) => void;
 }
 
@@ -206,7 +206,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
                       onClick={() => {
                         handleUpdateRequest(req.id, 'APPROVED');
                         if (onSchedulePatient) {
-                          onSchedulePatient(req.patient_id, req.patient_name, req.preferred_date);
+                          onSchedulePatient(req.patient_id, req.patient_name, req.preferred_date, req.preferred_time);
                         }
                       }}
                       disabled={updatingId === req.id}

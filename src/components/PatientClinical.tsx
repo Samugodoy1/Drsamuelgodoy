@@ -295,7 +295,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       if (e.key === 'Tab') {
         const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
         if (!focusable || focusable.length === 0) return;
-        const nodes = Array.from(focusable);
+        const nodes = Array.from(focusable) as HTMLElement[];
         const idx = nodes.indexOf(document.activeElement as HTMLElement);
         if (e.shiftKey) {
           if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }
@@ -319,7 +319,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       if (e.key === 'Tab') {
         const focusable = el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
         if (!focusable || focusable.length === 0) return;
-        const nodes = Array.from(focusable);
+        const nodes = Array.from(focusable) as HTMLElement[];
         const idx = nodes.indexOf(document.activeElement as HTMLElement);
         if (e.shiftKey) {
           if (idx === 0) { nodes[nodes.length - 1].focus(); e.preventDefault(); }

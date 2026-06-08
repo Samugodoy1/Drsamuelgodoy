@@ -753,6 +753,54 @@ export default function App() {
     return filtered.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [appointments, statusFilter, agendaSearchTerm, agendaViewMode, selectedDate]);
   const [agendaFocusMode, setAgendaFocusMode] = useState(true);
+
+  // ─── Smart agenda default view ────────────────────────────────────────
+  const hasUpcomingToday = useMemo(() => {
+    const todayStr = now.toDateString();
+    return appointments.some(a =>
+      new Date(a.start_time).toDateString() === todayStr &&
+      new Date(a.start_time) > now &&
+      a.status !== 'FINISHED' && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW'
+    );
+  }, [appointments, now]);
+
+  const hasTodayAppointments = useMemo(() => {
+    const todayStr = now.toDateString();
+    return appointments.some(a =>
+      new Date(a.start_time).toDateString() === todayStr &&
+      a.status !== 'CANCELLED'
+    );
+  }, [appointments, now]);
+
+  // Auto-select best view when opening agenda tab
+  const agendaAutoAppliedRef = useRef(false);
+  useEffect(() => {
+    if (activeTab !== 'agenda') {
+      agendaAutoAppliedRef.current = false;
+      return;
+    }
+    if (loading || agendaAutoAppliedRef.current) return;
+    agendaAutoAppliedRef.current = true;
+
+    if (hasUpcomingToday) {
+      setAgendaFocusMode(true);
+      setAgendaViewMode('day');
+    } else if (hasTodayAppointments) {
+      setAgendaFocusMode(false);
+      setAgendaViewMode('day');
+    } else {
+      setAgendaFocusMode(false);
+      setAgendaViewMode('week');
+    }
+  }, [activeTab, loading, hasUpcomingToday, hasTodayAppointments]);
+
+  // If focus mode is active but no upcoming appointments remain, auto-switch to day view
+  useEffect(() => {
+    if (activeTab === 'agenda' && agendaFocusMode && !hasUpcomingToday) {
+      setAgendaFocusMode(false);
+    }
+  }, [activeTab, agendaFocusMode, hasUpcomingToday]);
+
   const [academyView, setAcademyView] = useState<'home' | 'pacientes' | 'agenda' | 'estudos' | 'checklist'>('home');
 
   const getCurrentProduct = useCallback((): Product => {
@@ -3142,6 +3190,7 @@ export default function App() {
                   {/* View Mode Controls */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="flex bg-slate-100 p-1 rounded-full">
+                      {hasUpcomingToday && (
                       <button 
                         onClick={() => { setAgendaFocusMode(true); setAgendaViewMode('day'); }}
                         className={`px-5 py-2 text-[13px] font-bold rounded-full transition-all flex items-center gap-2 min-h-[40px] ${agendaFocusMode ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
@@ -3150,6 +3199,7 @@ export default function App() {
                         <Activity size={16} />
                         Próximos
                       </button>
+                      )}
                       <button 
                         onClick={() => { setAgendaFocusMode(false); setAgendaViewMode('day'); }}
                         className={`px-5 py-2 text-[13px] font-bold rounded-full transition-all min-h-[40px] ${!agendaFocusMode && agendaViewMode === 'day' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}

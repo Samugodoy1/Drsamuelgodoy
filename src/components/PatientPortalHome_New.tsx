@@ -137,6 +137,14 @@ export function PatientPortalHome({
       )
     : 0;
 
+  const hoursUntilAppointment = nextAppointment
+    ? Math.ceil(
+        (new Date(nextAppointment.start_time).getTime() -
+          new Date().getTime()) /
+          (1000 * 60 * 60)
+      )
+    : 0;
+
   return (
     <>
       <div className="space-y-6">
@@ -220,7 +228,7 @@ export function PatientPortalHome({
                     daysUntilAppointment
                   )}`}
                 >
-                  {getCountdownLabel(daysUntilAppointment)}
+                  {getCountdownLabel(daysUntilAppointment, hoursUntilAppointment)}
                 </span>
               </div>
 

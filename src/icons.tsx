@@ -80,6 +80,11 @@ import {
   Warning        as PhWarning,
   WarningCircle  as PhWarningCircle,
   X              as PhX,
+  Copy           as PhCopy,
+  Eye            as PhEye,
+  EyeSlash       as PhEyeSlash,
+  Syringe        as PhSyringe,
+  Tooth          as PhTooth,
 } from '@phosphor-icons/react';
 
 // ─── Prop types ──────────────────────────────────────────────────────────────
@@ -188,6 +193,11 @@ export const LinkIcon      = fill(PhLink);
 export const Palette       = fill(PhPalette);
 export const FlaskConical  = fill(PhFlask);
 export const Zap           = fill(PhLightning);
+export const Eye           = fill(PhEye);
+export const EyeOff        = fill(PhEyeSlash);
+export const Syringe       = fill(PhSyringe);
+export const Tooth         = fill(PhTooth);
+export const Copy          = bold(PhCopy);
 
 /** Spinner — use with Tailwind `animate-spin` class */
 export const Loader2 = bold(PhCircleNotch);

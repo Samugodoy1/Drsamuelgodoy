@@ -821,13 +821,13 @@ export function PatientPortal() {
                   <div className="w-5 h-5 border-[2px] border-white/25 border-t-white rounded-full animate-spin" />
                 ) : isConfirmed ? (
                   <>
-                    <CheckCircle2 size={22} className="text-[#34C759]" weight="bold" />
+                    <CheckCircle2 size={22} className="text-[#34C759]" />
                     Presença confirmada
                   </>
                 ) : (
                   <>
                     <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-white flex items-center justify-center">
-                      <CheckCircle2 size={14} className="text-white" weight="bold" />
+                      <CheckCircle2 size={14} className="text-white" />
                     </div>
                     Confirmar minha ida
                   </>

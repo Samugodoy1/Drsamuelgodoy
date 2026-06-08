@@ -93,7 +93,7 @@ export function PaymentModal({
 
         if (!focusable || focusable.length === 0) return;
 
-        const nodes = Array.from(focusable);
+        const nodes = Array.from(focusable) as HTMLElement[];
         const currentIndex = nodes.indexOf(document.activeElement as HTMLElement);
 
         if (e.shiftKey) {
