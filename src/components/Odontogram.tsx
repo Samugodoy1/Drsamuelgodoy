@@ -817,7 +817,7 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         : block.permanent
       : [];
     const deciduous = block.deciduous
-      ? reversePermanent
+      ? (reversePermanent && dentitionMode !== 'deciduous')
         ? [...block.deciduous].reverse()
         : block.deciduous
       : [];
