@@ -109,6 +109,10 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
     load();
   }, [fetchSubscription, fetchPlans]);
 
+  const redirectToCheckout = (initPoint: string) => {
+    window.location.href = initPoint;
+  };
+
   const handleCreateSubscription = async (planId: number) => {
     setCreateLoading(true);
     setError(null);
@@ -119,12 +123,33 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
       });
       const data = await res.json();
       if (res.ok && data.init_point) {
-        window.location.href = data.init_point;
+        redirectToCheckout(data.init_point);
       } else {
         setError(data.error || 'Erro ao criar assinatura');
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao criar assinatura');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setCreateLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch('/api/subscriptions/resume', {
+        method: 'POST',
+        body: JSON.stringify({ product }),
+      });
+      const data = await res.json();
+      if (res.ok && data.init_point) {
+        redirectToCheckout(data.init_point);
+      } else {
+        setError(data.error || 'Erro ao retomar assinatura');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao retomar assinatura');
     } finally {
       setCreateLoading(false);
     }
@@ -164,29 +189,32 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
   }
 
   const isFree = currentPlan === 'free';
-  const hasActiveSubscription = subscription && ['authorized', 'pending', 'paused'].includes(subscription.status);
+  const isProActive = subscription?.status === 'authorized' || subscription?.status === 'paused';
+  const isPending = subscription?.status === 'pending';
+  const hasSubscriptionCard = isProActive || isPending;
   const paidPlan = plans.find(p => p.plan !== 'free');
   const statusInfo = subscription ? STATUS_MAP[subscription.status] || STATUS_MAP.pending : null;
+  const subscribeCtaLabel = product === 'academy' ? `Assinar ${paidPlan?.name || 'agora'}` : 'Assinar OdontoHub Pro';
 
   return (
     <div className="space-y-4">
       {/* Subscription Card */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         {/* Header gradient */}
-        <div className={`px-6 py-4 ${hasActiveSubscription ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-r from-slate-50 to-transparent'}`}>
+        <div className={`px-6 py-4 ${isProActive ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent' : isPending ? 'bg-gradient-to-r from-amber-50/80 to-transparent' : 'bg-gradient-to-r from-slate-50 to-transparent'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${hasActiveSubscription ? 'bg-primary/15 text-primary' : 'bg-slate-100 text-slate-400'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isProActive ? 'bg-primary/15 text-primary' : isPending ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
                 <CreditCard size={20} />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Minha Assinatura</h3>
                 <p className="text-[11px] text-slate-400">
-                  {product === 'academy' ? 'Academy' : 'OdontoHub'} — {isFree && !hasActiveSubscription ? 'Plano Free' : subscription?.plan_name || 'Free'}
+                  {product === 'academy' ? 'Academy' : 'OdontoHub'} — {isProActive ? subscription?.plan_name || 'Pro' : 'Plano Free'}
                 </p>
               </div>
             </div>
-            {statusInfo && hasActiveSubscription && (
+            {statusInfo && hasSubscriptionCard && (
               <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${statusInfo.color} ${statusInfo.bg}`}>
                 {statusInfo.label}
               </span>
@@ -195,8 +223,8 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Active subscription details */}
-          {hasActiveSubscription && subscription && (
+          {/* Pro active — subscription details */}
+          {isProActive && subscription && (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 rounded-xl p-3">
@@ -226,13 +254,6 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
                 </div>
               )}
 
-              {subscription.status === 'pending' && (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2">
-                  <AlertCircle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-700">Aguardando confirmação de pagamento. Você permanece no plano Free até a aprovação.</p>
-                </div>
-              )}
-
               {subscription.grace_expires_at && subscription.status === 'authorized' && (
                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 flex items-start gap-2">
                   <AlertCircle size={14} className="text-orange-500 mt-0.5 shrink-0" />
@@ -240,20 +261,53 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
                 </div>
               )}
 
-              {/* Cancel button */}
-              {['authorized', 'paused'].includes(subscription.status) && (
-                <button
-                  onClick={() => setShowCancelConfirm(true)}
-                  className="w-full p-3 border border-slate-200 rounded-xl text-xs font-medium text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
-                >
-                  Cancelar assinatura
-                </button>
-              )}
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                className="w-full p-3 border border-slate-200 rounded-xl text-xs font-medium text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+              >
+                Cancelar assinatura
+              </button>
             </>
           )}
 
+          {/* Pending — resume checkout CTA */}
+          {isPending && subscription && paidPlan && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Plano</p>
+                  <p className="text-sm font-bold text-slate-800">{subscription.plan_name}</p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Valor</p>
+                  <p className="text-sm font-bold text-slate-800">{formatCurrency(subscription.amount)}/mês</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2">
+                <AlertCircle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700">
+                  A assinatura ainda não foi concluída. Você pode continuar de onde parou a qualquer momento.
+                </p>
+              </div>
+
+              <button
+                onClick={handleResumeSubscription}
+                disabled={createLoading}
+                className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {createLoading ? 'Processando...' : 'Continuar assinatura'}
+              </button>
+
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <Shield size={12} className="shrink-0" />
+                <span>Pagamento seguro via Mercado Pago. Cancele quando quiser.</span>
+              </div>
+            </div>
+          )}
+
           {/* Free plan — upgrade CTA */}
-          {isFree && !hasActiveSubscription && paidPlan && (
+          {isFree && !isPending && !isProActive && paidPlan && (
             <div className="space-y-3">
               <div className="bg-slate-50 rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-3">
@@ -273,7 +327,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
                   disabled={createLoading}
                   className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
                 >
-                  {createLoading ? 'Processando...' : 'Assinar agora'}
+                  {createLoading ? 'Processando...' : subscribeCtaLabel}
                 </button>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-400">
