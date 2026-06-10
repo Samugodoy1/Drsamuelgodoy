@@ -61,6 +61,7 @@ import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
 import { MLInsights } from './components/MLInsights';
 import { SubscriptionManagement } from './components/SubscriptionManagement';
+import AdminEngagement from './components/AdminEngagement';
 import { SubscriptionCallback } from './components/SubscriptionCallback';
 import { Academy, AcademyPatients, AcademyAgenda, AcademyStudy, AcademyChecklist } from './components/Academy';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
@@ -75,6 +76,7 @@ import {
   PATIENT_URGENCY_STYLES,
   matchesPatientListFilter,
 } from './utils/patientAttentionCopy';
+import { formatAllergieLabel, formatMedicationLabel, hasRecordedAllergie } from './utils/anamnesisUtils';
 
 // Types
 interface Patient {
@@ -4919,8 +4921,13 @@ export default function App() {
               <div className="max-w-screen-xl mx-auto space-y-8">
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Administração</h2>
-                  <p className="text-sm text-slate-500">Gestão de dentistas e aprovações</p>
+                  <p className="text-sm text-slate-500">Gestão de dentistas, aprovações e engajamento</p>
                 </div>
+
+                <div className="bg-white p-4 md:p-8 rounded-3xl border border-slate-100 shadow-sm">
+                  <AdminEngagement apiFetch={apiFetch} product={ODONTOHUB_PRODUCT} />
+                </div>
+
                 {/* Painel de Aprovação */}
                 {adminUsers.filter(u => u.status === 'pending').length > 0 && (
                   <div className="bg-amber-50 p-4 md:p-8 rounded-3xl border border-amber-100 shadow-sm">
@@ -7617,11 +7624,13 @@ function PrintDocument({ profile, patients, apiFetch, appointments, transactions
                       </div>
                       <div>
                         <p className="font-bold text-slate-500 text-[10px] uppercase">Alergias:</p>
-                        <p className="text-rose-600 font-bold">{patient?.anamnesis?.allergies || 'Nenhuma alergia informada.'}</p>
+                        <p className={hasRecordedAllergie(patient?.anamnesis?.allergies) ? 'text-rose-600 font-bold' : ''}>
+                          {formatAllergieLabel(patient?.anamnesis?.allergies)}
+                        </p>
                       </div>
                       <div>
                         <p className="font-bold text-slate-500 text-[10px] uppercase">Medicações em Uso:</p>
-                        <p>{patient?.anamnesis?.medications || 'Nenhuma medicação informada.'}</p>
+                        <p>{formatMedicationLabel(patient?.anamnesis?.medications)}</p>
                       </div>
                     </div>
                   </div>

@@ -18,6 +18,7 @@ import {
 } from '../icons';
 
 import { Odontogram } from './Odontogram';
+import { formatAllergieLabel, formatMedicationLabel, hasRecordedAllergie } from '../utils/anamnesisUtils';
 
 interface Patient {
   id: number;
@@ -344,11 +345,13 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                         </div>
                         <div>
                           <p className="font-bold text-[#64748B] text-[10px] uppercase">Alergias:</p>
-                          <p className="text-rose-600 font-bold">{selectedPatient?.anamnesis?.allergies || 'Nenhuma alergia informada.'}</p>
+                          <p className={hasRecordedAllergie(selectedPatient?.anamnesis?.allergies) ? 'text-rose-600 font-bold' : ''}>
+                            {formatAllergieLabel(selectedPatient?.anamnesis?.allergies)}
+                          </p>
                         </div>
                         <div>
                           <p className="font-bold text-[#64748B] text-[10px] uppercase">Medicações em Uso:</p>
-                          <p>{selectedPatient?.anamnesis?.medications || 'Nenhuma medicação informada.'}</p>
+                          <p>{formatMedicationLabel(selectedPatient?.anamnesis?.medications)}</p>
                         </div>
                       </div>
                     </div>
