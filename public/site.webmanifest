@@ -4,8 +4,8 @@
   "description": "Software de gestão odontológica para dentistas e clínicas.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0f172a",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
   "lang": "pt-BR",
   "icons": [
     {
