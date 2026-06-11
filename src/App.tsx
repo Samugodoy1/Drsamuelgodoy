@@ -359,7 +359,7 @@ const StatusBadge = ({ app, now }: { app: Appointment; now: Date }) => {
   );
 };
 
-const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpdateAnamnesis, onAddEvolution, onAddTransaction, onOpenSidebar, apiFetch, setAppActiveTab, navigate }: any) => {
+const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpdateAnamnesis, onAddEvolution, onAddTransaction, onOpenSidebar, apiFetch, setAppActiveTab, navigate, registerClinicalRefresh, onDataMutated }: any) => {
   const { id } = useParams();
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -392,6 +392,11 @@ const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpda
     loadPatient(true);
   }, [loadPatient]);
 
+  useEffect(() => {
+    registerClinicalRefresh?.(() => loadPatient(false));
+    return () => registerClinicalRefresh?.(null);
+  }, [loadPatient, registerClinicalRefresh]);
+
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-slate-50">
       <div className="flex flex-col items-center gap-4">
@@ -416,6 +421,7 @@ const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpda
         onAddEvolution(data);
       }}
       onRefreshPatient={() => loadPatient(false)}
+      onDataMutated={onDataMutated}
       apiFetch={apiFetch}
       setAppActiveTab={setAppActiveTab}
       navigate={navigate}
@@ -924,7 +930,7 @@ export default function App() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
-  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error', celebration?: boolean, onUndo?: () => void } | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error', celebration?: boolean, onUndo?: () => void, actionLabel?: string, onAction?: () => void } | null>(null);
   const [confirmation, setConfirmation] = useState<{ message: string, onConfirm: () => void } | null>(null);
   const [guideDismissedUntil, setGuideDismissedUntil] = useState<string | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -937,11 +943,21 @@ export default function App() {
   const dataFetchedRef = useRef(false);
   const profileFetchingRef = useRef(false);
   const adminFetchedRef = useRef(false);
+  const dataFetchingRef = useRef(false);
+  const dataRefreshPendingRef = useRef(false);
+  const refreshClinicalPatientRef = useRef<(() => Promise<void>) | null>(null);
+  const refreshAppDataRef = useRef<(explicitToken?: string) => Promise<void>>(async () => {});
+  const lastVisibilityRefreshRef = useRef(0);
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
 
-  const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false, onUndo?: () => void) => {
+  const registerClinicalRefresh = useCallback((fn: (() => Promise<void>) | null) => {
+    refreshClinicalPatientRef.current = fn;
+  }, []);
+
+  const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false, onUndo?: () => void, actionLabel?: string, onAction?: () => void) => {
     if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-    setNotification({ message, type, celebration, onUndo });
-    notificationTimerRef.current = setTimeout(() => setNotification(null), onUndo ? 5000 : celebration ? 4500 : 3000);
+    setNotification({ message, type, celebration, onUndo, actionLabel, onAction });
+    notificationTimerRef.current = setTimeout(() => setNotification(null), onUndo || onAction ? 8000 : celebration ? 5500 : 3000);
   };
 
   // ─── Implicit Onboarding: milestone tracking ─────────────────────────
@@ -971,10 +987,12 @@ export default function App() {
     const recordOpened = user?.record_opened || hasMilestone('recordOpened');
     if (!recordOpened) {
       if (activeTab === 'prontuario') return null;
+      const firstId = patients[0]?.id;
       return {
-        message: 'Explore o prontuário de um paciente — tudo fica reunido ali',
-        action: 'Ver Pacientes',
+        message: 'Último passo: abra o prontuário — odontograma, evolução e histórico ficam ali',
+        action: firstId ? 'Abrir prontuário' : 'Ver Pacientes',
         tab: 'pacientes',
+        onClick: firstId ? () => openPatientRecord(firstId) : undefined,
       };
     }
     return null;
@@ -1014,7 +1032,7 @@ export default function App() {
     if (!user?.id) { dataFetchedRef.current = false; adminFetchedRef.current = false; return; }
     if (dataFetchedRef.current) return;
     dataFetchedRef.current = true;
-    fetchData();
+    void refreshAppData();
     fetchProfile();
     if (user.role?.toUpperCase() === 'ADMIN' && !adminFetchedRef.current) {
       adminFetchedRef.current = true;
@@ -1152,7 +1170,7 @@ export default function App() {
       if (res.ok) {
         // Refresh patient data
         openPatientRecord(selectedPatient.id);
-        fetchData(); // Refresh list
+        void refreshAppData();
         showNotification('Foto do paciente atualizada!');
       } else {
         showNotification('Erro ao carregar foto do paciente.', 'error');
@@ -1164,7 +1182,7 @@ export default function App() {
   };
 
   const fetchData = async (explicitToken?: string) => {
-    if (!user && !explicitToken) return;
+    if (!userRef.current && !explicitToken) return;
     try {
       const [pRes, aRes, fRes, sRes, plRes, iRes] = await Promise.all([
         apiFetch('/api/patients', { explicitToken }),
@@ -1211,6 +1229,43 @@ export default function App() {
     }
   };
 
+  const refreshAppData = async (explicitToken?: string) => {
+    if (dataFetchingRef.current) {
+      dataRefreshPendingRef.current = true;
+      return;
+    }
+    dataFetchingRef.current = true;
+    try {
+      await fetchData(explicitToken);
+      setDataRefreshKey((key) => key + 1);
+      try {
+        await refreshClinicalPatientRef.current?.();
+      } catch (error) {
+        console.error('Error refreshing clinical patient:', error);
+      }
+    } finally {
+      dataFetchingRef.current = false;
+      if (dataRefreshPendingRef.current) {
+        dataRefreshPendingRef.current = false;
+        void refreshAppData(explicitToken);
+      }
+    }
+  };
+
+  refreshAppDataRef.current = refreshAppData;
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible' || !userRef.current) return;
+      const now = Date.now();
+      if (now - lastVisibilityRefreshRef.current < 5000) return;
+      lastVisibilityRefreshRef.current = now;
+      void refreshAppDataRef.current();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   const handleCreatePaymentPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -1238,7 +1293,7 @@ export default function App() {
           installments_count: '1',
           first_due_date: new Date().toLocaleDateString('en-CA')
         });
-        fetchData();
+        await refreshAppData();
         if (selectedPatient) {
           fetchPatientFinancialHistory(selectedPatient.id);
         }
@@ -1265,7 +1320,7 @@ export default function App() {
         const data = await res.json();
         setIsReceiveInstallmentModalOpen(false);
         setIsViewInstallmentsModalOpen(false);
-        fetchData();
+        await refreshAppData();
         if (selectedPatient) {
           fetchPatientFinancialHistory(selectedPatient.id);
           // Update journey status
@@ -1363,7 +1418,7 @@ export default function App() {
           procedure: '',
           notes: ''
         });
-        fetchData();
+        await refreshAppData();
       } else {
         const data = await res.json();
         showNotification(data.error || 'Erro ao salvar transação', 'error');
@@ -1383,7 +1438,7 @@ export default function App() {
             method: 'DELETE'
           });
           if (res.ok) {
-            fetchData();
+            await refreshAppData();
             showNotification('Transação excluída com sucesso!');
           }
         } catch (error) {
@@ -1441,7 +1496,7 @@ export default function App() {
         dataFetchedRef.current = true; // prevent duplicate fetch from useEffect
         adminFetchedRef.current = false;
         setUser(data.user);
-        fetchData(data.token);
+        void refreshAppData(data.token);
         fetchProfile();
         if (data.user.role?.toUpperCase() === 'ADMIN') {
           adminFetchedRef.current = true;
@@ -1475,6 +1530,31 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
+        // Auto-login após cadastro para reduzir fricção no onboarding
+        const loginRes = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: API_URL ? 'include' as const : 'same-origin' as const,
+          body: JSON.stringify({
+            email: registerData.email,
+            password: registerData.password,
+            rememberMe: true,
+            product: getCurrentProduct(),
+          }),
+        });
+        const loginData = await loginRes.json();
+        if (loginRes.ok) {
+          localStorage.setItem('token', loginData.token);
+          localStorage.setItem('user', JSON.stringify(loginData.user));
+          dataFetchedRef.current = true;
+          adminFetchedRef.current = false;
+          setUser(loginData.user);
+          setIsRegistering(false);
+          setRegisterMessage('');
+          void refreshAppData(loginData.token);
+          fetchProfile();
+          return;
+        }
         setRegisterMessage(data.message);
         setIsRegistering(false);
       } else {
@@ -1650,15 +1730,15 @@ export default function App() {
     return response;
   }, []);  // stable — reads volatile values via refs
 
-  const openAppointmentModal = () => {
+  const openAppointmentModal = (prefill?: { patientId: number; patientName: string }) => {
     const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
 
     setAppointmentModalMode('schedule');
     setEditingAppointmentId(null);
     setSuggestedSlot(null);
     setNewAppointment({
-      patient_id: '',
-      patient_name: '',
+      patient_id: prefill ? String(prefill.patientId) : '',
+      patient_name: prefill?.patientName || '',
       dentist_id: dentist_id || '',
       date: selectedDate.toLocaleDateString('en-CA'),
       time: '',
@@ -2220,15 +2300,29 @@ export default function App() {
         setEditingAppointmentId(null);
         setAppointmentFormError(null);
         setAppointmentConflict(null);
-        fetchData();
+        await refreshAppData();
 
         setNewAppointment({ patient_id: '', patient_name: '', dentist_id: '', date: '', time: '', duration: '', notes: '' });
         const isFirstAppointment = appointments.length === 0 && !isReschedule;
-        showNotification(
-          isReschedule ? 'Reagendamento salvo com sucesso!' : isFirstAppointment ? '🎉 Primeira consulta agendada! Sua agenda está ativa.' : 'Agendamento realizado com sucesso!',
-          'success',
-          isFirstAppointment
-        );
+        if (isFirstAppointment) {
+          setActiveTab('dashboard');
+          navigate('/');
+          const firstPatientId = newAppointment.patient_id ? Number(newAppointment.patient_id) : patients[0]?.id;
+          showNotification(
+            '🎉 Primeira consulta agendada! Agora abra o prontuário.',
+            'success',
+            true,
+            undefined,
+            firstPatientId ? 'Abrir prontuário' : undefined,
+            firstPatientId ? () => openPatientRecord(firstPatientId) : undefined
+          );
+        } else {
+          showNotification(
+            isReschedule ? 'Reagendamento salvo com sucesso!' : 'Agendamento realizado com sucesso!',
+            'success',
+            false
+          );
+        }
       } else {
         setAppointmentFormError(data.error || 'Erro ao realizar agendamento.');
       }
@@ -2249,15 +2343,25 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setIsPatientModalOpen(false);
-        fetchData();
+        await refreshAppData();
         
+        const createdName = newPatient.name;
         setNewPatient({ name: '', cpf: '', birth_date: '', phone: '', email: '', address: '' });
         const isFirst = patients.length === 0;
-        showNotification(
-          isFirst ? '🎉 Primeiro paciente cadastrado! Agora agende uma consulta.' : 'Paciente cadastrado com sucesso!',
-          'success',
-          isFirst
-        );
+        if (isFirst) {
+          setActiveTab('dashboard');
+          navigate('/');
+          showNotification(
+            '🎉 Primeiro paciente cadastrado! Próximo passo: agendar consulta.',
+            'success',
+            true,
+            undefined,
+            'Agendar consulta',
+            () => openAppointmentModal({ patientId: data.id, patientName: createdName })
+          );
+        } else {
+          showNotification('Paciente cadastrado com sucesso!', 'success', false);
+        }
       } else {
         const data = await res.json();
       
@@ -2389,7 +2493,7 @@ export default function App() {
           } : undefined;
           showNotification(`Status alterado para ${statusLabels[status] || status}`, 'success', false, undoFn);
         }
-        fetchData();
+        await refreshAppData();
       }
     } catch (error) {
       console.error('Error updating status:', error);
@@ -2398,6 +2502,7 @@ export default function App() {
 
   const openPatientRecord = async (id: number) => {
     if (!user) return;
+    const wasFirstRecord = !(user.record_opened || hasMilestone('recordOpened'));
     try {
       const res = await apiFetch(`/api/patients/${id}`);
       const data = await res.json();
@@ -2415,6 +2520,16 @@ export default function App() {
         console.error('Error saving record opened state:', error);
       }
       navigate(`/prontuario/${id}`);
+      if (wasFirstRecord) {
+        showNotification(
+          '🎉 Prontuário aberto! Explore odontograma e evolução. Volte ao Início para concluir.',
+          'success',
+          true,
+          undefined,
+          'Ir para Início',
+          () => { setActiveTab('dashboard'); navigate('/'); }
+        );
+      }
     } catch (error) {
       console.error('Error fetching patient record:', error);
     }
@@ -2613,6 +2728,11 @@ export default function App() {
       });
       if (res.ok) {
         setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+        try {
+          await refreshClinicalPatientRef.current?.();
+        } catch (error) {
+          console.error('Error refreshing clinical patient after update:', error);
+        }
         showNotification('Dados do paciente atualizados!');
       } else {
         const data = await res.json();
@@ -2713,6 +2833,8 @@ export default function App() {
                 apiFetch={apiFetch}
                 setAppActiveTab={setActiveTab}
                 navigate={navigate}
+                registerClinicalRefresh={registerClinicalRefresh}
+                onDataMutated={() => void refreshAppData()}
               />
             </main>
           </div>
@@ -2757,7 +2879,7 @@ export default function App() {
                 transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
               >
                 <h1 className="text-[26px] font-semibold text-[#0F1211] tracking-[-0.4px] leading-[1.2] mb-2.5">
-                  {isRegistering ? 'Solicite seu acesso' : (() => {
+                  {isRegistering ? 'Crie sua conta gratuita' : (() => {
                     const h = new Date().getHours();
                     if (h >= 5 && h < 12) return 'Bom dia ☀️ Vamos organizar sua clínica?';
                     if (h >= 12 && h < 18) return 'Boa tarde 👋🏻 Pronto para mais um turno?';
@@ -3134,6 +3256,7 @@ export default function App() {
                 tomorrowUnconfirmedAppointments={tomorrowUnconfirmedAppointments}
                 openPatientRecord={openPatientRecord}
                 setIsModalOpen={setIsModalOpen}
+                setIsPatientModalOpen={setIsPatientModalOpen}
                 setActiveTab={setActiveTab}
                 sendReminder={sendReminder}
                 onReschedule={openRescheduleAppointment}
@@ -3143,6 +3266,7 @@ export default function App() {
                 product={getCurrentProduct()}
                 portalPendingCount={portalPendingCount}
                 onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
+                dataRefreshKey={dataRefreshKey}
               />
             )}
 
@@ -4621,6 +4745,7 @@ export default function App() {
                       {patientsSubView === 'portal' ? (
                         <PortalInbox
                           apiFetch={apiFetch}
+                          onDataMutated={() => void refreshAppData()}
                           onSchedulePatient={(patientId, _patientName, preferredDate, preferredTime) => {
                             const p = patientMap.get(patientId);
                             if (p) openPatientAppointmentModal(p, preferredDate, preferredTime);
@@ -6778,6 +6903,18 @@ export default function App() {
                   <CheckCircle size={22} className="text-primary" />
                 </div>
                 <span className="font-bold text-[15px] text-slate-800">{notification.message}</span>
+                {notification.onAction && notification.actionLabel && (
+                  <button
+                    onClick={() => {
+                      notification.onAction?.();
+                      setNotification(null);
+                      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+                    }}
+                    className="shrink-0 ml-1 px-4 py-2 bg-primary text-white text-[13px] font-bold rounded-xl hover:opacity-90 transition-all"
+                  >
+                    {notification.actionLabel}
+                  </button>
+                )}
               </>
             ) : (
               <>

@@ -70,6 +70,7 @@ interface PatientClinicalProps {
   onUpdatePatient: (updatedPatient: any) => Promise<void>;
   onAddEvolution: (evolutionData: any) => Promise<void>;
   onRefreshPatient?: () => Promise<void>;
+  onDataMutated?: () => void;
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   setAppActiveTab: (tab: any) => void;
   navigate: any;
@@ -248,6 +249,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   onUpdatePatient,
   onAddEvolution,
   onRefreshPatient,
+  onDataMutated,
   apiFetch,
   setAppActiveTab,
   navigate: appNavigate,
@@ -667,6 +669,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             procedure: procedureLabel,
             notes: 'Pagamento recebido antes da execução do procedimento.',
           }),
+        }).then(() => {
+          onDataMutated?.();
         }).catch((err) => {
           console.error('Error creating prepayment transaction:', err);
         });
@@ -720,6 +724,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             notes: `Pagamento integral: ${unpaid.length} procedimento(s).`,
           }),
         }).then(() => {
+          onDataMutated?.();
           if (infoTab === 'financeiro') {
             apiFetch(`/api/patients/${patient.id}/financial`)
               .then((r) => r.json())
@@ -752,6 +757,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
           const data = await res.json().catch(() => ({}));
           throw new Error(data?.error || 'Falha ao salvar odontograma');
         }
+        await onRefreshPatient?.();
       })
       .catch((error) => {
         console.error('Error updating odontogram tooth status:', error);
@@ -874,7 +880,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     persistEvolution({
       notes: evolutionNotes,
       procedure_performed: 'Início de tratamento',
-    }).catch((error) => {
+    }).then(() => onRefreshPatient?.()).catch((error) => {
       console.error('Error persisting scope evolution:', error);
     });
   };
@@ -1052,6 +1058,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               notes: `Gerado automaticamente ao concluir procedimento.`,
             }),
           }).then(() => {
+            onDataMutated?.();
             if (infoTab === 'financeiro') {
               apiFetch(`/api/patients/${patient.id}/financial`)
                 .then((r) => r.json())
@@ -1071,7 +1078,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       persistEvolution({
         notes: evolutionNotes,
         procedure_performed: evolutionProcedurePerformed,
-      }).catch((error) => {
+      }).then(() => onRefreshPatient?.()).catch((error) => {
         console.error('Error persisting evolution from odontogram action:', error);
       });
     }
@@ -1140,7 +1147,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             notes: `Gerado automaticamente ao concluir procedimento.`,
           }),
         }).then(() => {
-          // Atualizar dados financeiros se aba estiver aberta
+          onDataMutated?.();
           if (infoTab === 'financeiro') {
             apiFetch(`/api/patients/${patient.id}/financial`)
               .then((r) => r.json())
@@ -1158,7 +1165,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     persistEvolution({
       notes: evolutionEntry.notes,
       procedure_performed: evolutionEntry.procedure_performed,
-    }).catch((error) => {
+    }).then(() => onRefreshPatient?.()).catch((error) => {
       console.error('Error persisting completion evolution:', error);
     });
 
@@ -1239,7 +1246,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     persistEvolution({
       notes: evolutionEntry.notes,
       procedure_performed: evolutionEntry.procedure_performed,
-    }).catch((error) => {
+    }).then(() => onRefreshPatient?.()).catch((error) => {
       console.error('Error persisting conversion evolution:', error);
     });
 
@@ -1303,6 +1310,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || 'Falha ao salvar histórico dentário');
       }
+      await onRefreshPatient?.();
     } catch (error) {
       console.error('Error adding tooth history:', error);
     }

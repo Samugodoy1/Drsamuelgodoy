@@ -19,6 +19,7 @@ interface Overview {
   onboarding_incomplete: string;
   welcome_seen_count: string;
   record_opened_count: string;
+  activation_stuck: string;
 }
 
 interface EngagementUser {
@@ -67,6 +68,14 @@ function formatDate(dateStr: string | null) {
   return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function getFunnelStage(u: EngagementUser) {
+  if (u.record_opened) return { label: 'Ativado', color: 'bg-emerald-100 text-emerald-700' };
+  if (u.patient_count >= 1 && u.appointment_count >= 1) return { label: 'Sem prontuário', color: 'bg-rose-100 text-rose-700' };
+  if (u.patient_count >= 1) return { label: 'Sem consulta', color: 'bg-amber-100 text-amber-700' };
+  if (u.welcome_seen) return { label: 'Sem paciente', color: 'bg-slate-100 text-slate-600' };
+  return { label: 'Welcome pendente', color: 'bg-slate-100 text-slate-500' };
+}
+
 export default function AdminEngagement({ apiFetch, product }: AdminEngagementProps) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [users, setUsers] = useState<EngagementUser[]>([]);
@@ -106,6 +115,7 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
     { label: 'Nunca entraram', value: overview.never_logged_in, icon: Clock, color: 'text-slate-500' },
     { label: 'Abandonaram', value: overview.churned, icon: UserX, color: 'text-rose-600' },
     { label: 'Onboarding pendente', value: overview.onboarding_incomplete, icon: CheckCircle2, color: 'text-amber-600' },
+    { label: 'Travados (sem prontuário)', value: overview.activation_stuck, icon: UserX, color: 'text-rose-600' },
   ] : [];
 
   return (
@@ -143,7 +153,7 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
         <div className="text-center py-12 text-slate-400">Carregando métricas...</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {cards.map((card) => (
               <div key={card.label} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
@@ -160,7 +170,7 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
                 <p className="text-xs font-bold text-emerald-700 uppercase">Ativação do onboarding</p>
                 <p className="text-sm text-emerald-800 mt-1">
-                  {overview.welcome_seen_count} viram o welcome · {overview.record_opened_count} abriram prontuário
+                  {overview.welcome_seen_count} viram o welcome · {overview.record_opened_count} abriram prontuário · {overview.activation_stuck || '0'} travados no funil
                 </p>
               </div>
               <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
@@ -189,6 +199,7 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
                     <th className="px-4 py-3">Último acesso</th>
                     <th className="px-4 py-3">Último login</th>
                     <th className="px-4 py-3">Logins</th>
+                    <th className="px-4 py-3">Funil</th>
                     <th className="px-4 py-3">Pacientes</th>
                     <th className="px-4 py-3">Consultas</th>
                     <th className="px-4 py-3">Cadastro</th>
@@ -197,8 +208,9 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
                 <tbody className="divide-y divide-slate-100">
                   {users.map((u) => {
                     const status = STATUS_LABELS[u.engagement_status] || STATUS_LABELS.unknown;
+                    const funnel = getFunnelStage(u);
                     return (
-                      <tr key={`${u.id}-${u.product}`} className="hover:bg-slate-50">
+                      <tr key={`${u.id}-${u.product}`} className={`hover:bg-slate-50 ${funnel.label === 'Sem prontuário' ? 'bg-rose-50/40' : ''}`}>
                         <td className="px-4 py-3">
                           <p className="font-bold text-slate-800 text-sm">{u.name}</p>
                           <p className="text-xs text-slate-400">{u.email}</p>
@@ -214,6 +226,11 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-600">{formatRelative(u.product_last_login_at)}</td>
                         <td className="px-4 py-3 text-sm font-bold text-slate-700">{u.login_count || 0}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${funnel.color}`}>
+                            {funnel.label}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-sm text-slate-600">{u.patient_count}</td>
                         <td className="px-4 py-3 text-sm text-slate-600">{u.appointment_count}</td>
                         <td className="px-4 py-3 text-sm text-slate-500">{formatDate(u.created_at)}</td>
@@ -222,7 +239,7 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
                   })}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">Nenhum usuário encontrado</td>
+                      <td colSpan={10} className="px-4 py-8 text-center text-slate-400">Nenhum usuário encontrado</td>
                     </tr>
                   )}
                 </tbody>
@@ -246,6 +263,9 @@ export default function AdminEngagement({ apiFetch, product }: AdminEngagementPr
                     <p className="text-xs text-slate-500">{u.product} · {u.plan} · {u.login_count || 0} logins</p>
                     <p className="text-xs text-slate-500">Último acesso: {formatRelative(u.product_last_seen_at)}</p>
                     <p className="text-xs text-slate-500">{u.patient_count} pacientes · {u.appointment_count} consultas</p>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${getFunnelStage(u).color}`}>
+                      {getFunnelStage(u).label}
+                    </span>
                   </div>
                 );
               })}

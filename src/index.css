@@ -8,6 +8,11 @@
 }
 
 @layer base {
+  html {
+    background-color: #F2F2F7;
+    color-scheme: light;
+  }
+
   html,
   body,
   #root {
@@ -157,6 +162,10 @@
   /* iOS drag handle */
   .ios-drag-handle {
     @apply w-9 h-[5px] rounded-full bg-slate-300/60 mx-auto mb-4;
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
   }
 
   /* Refined card hover */

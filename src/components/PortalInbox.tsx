@@ -55,9 +55,10 @@ interface PortalInboxProps {
   apiFetch: (url: string, options?: any) => Promise<Response>;
   onSchedulePatient?: (patientId: number, patientName: string, preferredDate: string, preferredTime?: string | null) => void;
   onOpenPatient?: (patientId: number) => void;
+  onDataMutated?: () => void;
 }
 
-export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: PortalInboxProps) {
+export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onDataMutated }: PortalInboxProps) {
   const [activeSection, setActiveSection] = useState<'requests' | 'intake' | 'messages'>('requests');
   const [requests, setRequests] = useState<AppointmentRequest[]>([]);
   const [intakeForms, setIntakeForms] = useState<IntakeForm[]>([]);
@@ -126,6 +127,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
         body: JSON.stringify({ status })
       });
       setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      onDataMutated?.();
     } finally {
       setUpdatingId(null);
     }
@@ -134,6 +136,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient }: Port
   const handleReviewForm = async (id: number) => {
     await apiFetch(`/api/portal/intake-forms/${id}/review`, { method: 'PATCH' });
     setIntakeForms(prev => prev.map(f => f.id === id ? { ...f, status: 'REVIEWED' } : f));
+    onDataMutated?.();
     if (selectedForm?.id === id) setSelectedForm(prev => prev ? { ...prev, status: 'REVIEWED' } : null);
   };
 

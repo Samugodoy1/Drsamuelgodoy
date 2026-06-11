@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../config';
 import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -78,6 +78,7 @@ interface DashboardProps {
   todayRevenue: number;
   openPatientRecord: (id: number) => void;
   setIsModalOpen: (open: boolean) => void;
+  setIsPatientModalOpen: (open: boolean) => void;
   setActiveTab: (tab: any) => void;
   sendReminder: (appointment: any) => void;
   onReschedule?: (appointment: any) => void;
@@ -87,6 +88,7 @@ interface DashboardProps {
   product: string;
   portalPendingCount?: number;
   onOpenPortalInbox?: () => void;
+  dataRefreshKey?: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -174,6 +176,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   todayRevenue = 0,
   openPatientRecord,
   setIsModalOpen,
+  setIsPatientModalOpen,
   setActiveTab,
   sendReminder,
   onReschedule,
@@ -182,7 +185,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDismissWelcome,
   product,
   portalPendingCount = 0,
-  onOpenPortalInbox
+  onOpenPortalInbox,
+  dataRefreshKey = 0,
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
@@ -190,47 +194,61 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const intelligenceFetchingRef = useRef(false);
+  const skipRefreshKeyEffectRef = useRef(true);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchIntelligence = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const headers: Record<string, string> = { 'Accept': 'application/json', 'x-product': product };
-        if (token && token !== 'null') {
-          headers['Authorization'] = `Bearer ${token}`;
-          headers['x-auth-token'] = token;
-        }
-        const [dashRes, schedRes, operationalRes] = await Promise.all([
-          fetch(`${API_URL}/api/intelligence/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
-          fetch(`${API_URL}/api/intelligence/scheduling`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
-          fetch(`${API_URL}/api/intelligence/operational`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
-        ]);
-        if (dashRes.ok && !cancelled) {
-          setIntelligence(await dashRes.json());
-        }
-        if (schedRes.ok && !cancelled) {
-          const data = await schedRes.json();
-          if (Array.isArray(data)) setSchedulingSuggestions(data);
-        }
-        if (operationalRes.ok && !cancelled) {
-          const data = await operationalRes.json();
-          if (data?.text) setOperationalInsight(data);
-        }
-      } catch (e) {
-        console.error('Dashboard intelligence fetch failed:', e);
-      } finally {
-        if (!cancelled) setLoading(false);
+  const fetchIntelligence = useCallback(async () => {
+    if (intelligenceFetchingRef.current) return;
+    intelligenceFetchingRef.current = true;
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Accept': 'application/json', 'x-product': product };
+      if (token && token !== 'null') {
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['x-auth-token'] = token;
       }
-    };
-    fetchIntelligence();
-    return () => { cancelled = true; };
-  }, []);
+      const [dashRes, schedRes, operationalRes] = await Promise.all([
+        fetch(`${API_URL}/api/intelligence/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
+        fetch(`${API_URL}/api/intelligence/scheduling`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
+        fetch(`${API_URL}/api/intelligence/operational`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
+      ]);
+      if (dashRes.ok) {
+        setIntelligence(await dashRes.json());
+      }
+      if (schedRes.ok) {
+        const data = await schedRes.json();
+        if (Array.isArray(data)) setSchedulingSuggestions(data);
+      }
+      if (operationalRes.ok) {
+        const data = await operationalRes.json();
+        if (data?.text) setOperationalInsight(data);
+      }
+    } catch (e) {
+      console.error('Dashboard intelligence fetch failed:', e);
+    } finally {
+      setLoading(false);
+      intelligenceFetchingRef.current = false;
+    }
+  }, [product]);
+
+  useEffect(() => {
+    void fetchIntelligence();
+  }, [fetchIntelligence]);
+
+  useEffect(() => {
+    if (skipRefreshKeyEffectRef.current) {
+      skipRefreshKeyEffectRef.current = false;
+      return;
+    }
+    if (dataRefreshKey > 0) {
+      void fetchIntelligence();
+    }
+  }, [dataRefreshKey, fetchIntelligence]);
 
   const availableSchedulingSuggestions = schedulingSuggestions.filter(
     suggestion => !suggestionConflictsWithAppointments(suggestion, appointments)
@@ -508,18 +526,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // ─── Onboarding: welcome + guided setup ──────────────────────────────
   const hasPatients = patients.length > 0;
   const hasAppointments = totalAppointmentsCount > 0;
+  const recordOpened = user?.record_opened ?? false;
+  const activationComplete = hasPatients && hasAppointments && recordOpened;
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => user?.onboarding_done ?? false);
   const [welcomeSeen, setWelcomeSeen] = useState(() => user?.welcome_seen ?? false);
-  const wasInOnboarding = useRef(!hasPatients || !hasAppointments);
+  const wasInOnboarding = useRef(!activationComplete);
   const showOnboarding = !onboardingDismissed && (
-    !hasPatients || !hasAppointments || wasInOnboarding.current
+    !activationComplete || wasInOnboarding.current
   );
 
-  const completedSteps = (hasPatients ? 1 : 0) + (hasAppointments ? 1 : 0);
-  const step3Active = hasPatients && hasAppointments;
-  const totalSteps = 3;
+  const completedSteps =
+    (hasPatients ? 1 : 0) +
+    (hasAppointments ? 1 : 0) +
+    (recordOpened ? 1 : 0);
+  const step3Active = hasPatients && hasAppointments && !recordOpened;
+  const step4Active = activationComplete;
+  const totalSteps = 4;
+  const firstPatient = patients[0];
+  const step3Ref = useRef<HTMLElement>(null);
 
-  // ─── Welcome Screen (first contact — before onboarding) ────────────
+  useEffect(() => {
+    if (step3Active && step3Ref.current) {
+      step3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [step3Active]);
   if (!welcomeSeen && !hasPatients && !hasAppointments && !onboardingDismissed) {
     return (
       <div className="flex flex-col gap-10 pb-32 pt-8 px-2 max-w-2xl mx-auto">
@@ -659,6 +689,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const getOnboardingMessage = () => {
       if (!hasPatients) return 'Vamos configurar seu consultório. Comece cadastrando seu primeiro paciente.';
       if (!hasAppointments) return 'Ótimo! Agora agende a primeira consulta para ativar sua agenda.';
+      if (!recordOpened) return 'Quase lá! Abra o prontuário para ver odontograma, evolução e histórico.';
       return 'Tudo pronto! Seu consultório está configurado.';
     };
 
@@ -770,7 +801,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <motion.button
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => setActiveTab('pacientes')}
+                  onClick={() => setIsPatientModalOpen(true)}
                   className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
                 >
                   Cadastrar primeiro paciente
@@ -879,23 +910,118 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.div>
         </motion.section>
 
-        {/* ── Step 3: Intelligence ── */}
+        {/* ── Step 3: Open clinical record ── */}
         <motion.section
+          ref={step3Ref}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
           className="space-y-3"
         >
           <div className="px-2 flex items-center gap-2">
-            <div className={`w-5 h-5 rounded-full border-2 ${step3Active ? 'border-amber-500' : 'border-slate-200'}`} />
+            {recordOpened ? (
+              <div className="w-5 h-5 bg-sky-500 rounded-full flex items-center justify-center">
+                <Check size={12} className="text-white" strokeWidth={3} />
+              </div>
+            ) : (
+              <div className={`w-5 h-5 rounded-full border-2 ${step3Active ? 'border-sky-500' : 'border-slate-200'}`} />
+            )}
             <span className={`text-[11px] font-bold uppercase tracking-widest ${
-              step3Active ? 'text-amber-600' : 'text-slate-300'
+              step3Active || recordOpened ? 'text-sky-600' : 'text-slate-300'
             }`}>
               Passo 3
             </span>
+            {recordOpened && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-[11px] font-bold text-sky-400 ml-1"
+              >
+                Concluído
+              </motion.span>
+            )}
           </div>
           <motion.div
-            animate={{ opacity: step3Active ? 0.85 : hasPatients ? 0.5 : 0.35 }}
+            animate={{ opacity: recordOpened ? 0.55 : step3Active ? 1 : hasAppointments ? 0.5 : 0.35 }}
+            transition={{ duration: 0.25 }}
+            className={`bg-white rounded-[28px] border shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5 ${
+              recordOpened ? 'border-sky-200' : step3Active ? 'border-sky-100 ring-2 ring-sky-500/10' : 'border-slate-50'
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-sky-50 rounded-[18px] flex items-center justify-center shrink-0">
+                {recordOpened ? (
+                  <Check size={22} className="text-sky-500" />
+                ) : (
+                  <ClipboardList size={22} className="text-sky-500" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
+                  {recordOpened ? 'Prontuário explorado' : 'Abra o prontuário do paciente'}
+                </h3>
+                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
+                  {recordOpened
+                    ? 'Odontograma, evolução clínica e plano de tratamento ficam organizados no prontuário.'
+                    : step3Active
+                      ? `Clique abaixo para abrir o prontuário de ${firstPatient?.name?.split(' ')[0] || 'seu paciente'}. É aqui que você registra atendimentos de verdade.`
+                      : 'Após cadastrar paciente e agendar consulta, abra o prontuário para conhecer o coração do sistema.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {step3Active && firstPatient && (
+              <>
+                <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-xs">
+                      {(firstPatient.name || '?')[0]?.toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#1C1C1E]">{firstPatient.name}</p>
+                      <p className="text-[11px] text-[#8E8E93]">Prontuário · Odontograma · Evolução · Financeiro</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-sky-600 border border-sky-100">Anamnese</span>
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-sky-600 border border-sky-100">Odontograma</span>
+                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-sky-600 border border-sky-100">Evolução</span>
+                  </div>
+                </div>
+                <motion.button
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15, duration: 0.25 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => openPatientRecord(firstPatient.id)}
+                  className="flex items-center gap-2.5 bg-sky-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(2,132,199,0.2)] hover:bg-sky-700 transition-all"
+                >
+                  Abrir prontuário de {firstPatient.name?.split(' ')[0] || 'paciente'}
+                  <ArrowRight size={15} />
+                </motion.button>
+              </>
+            )}
+          </motion.div>
+        </motion.section>
+
+        {/* ── Step 4: Finish setup ── */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.35 }}
+          className="space-y-3"
+        >
+          <div className="px-2 flex items-center gap-2">
+            <div className={`w-5 h-5 rounded-full border-2 ${step4Active ? 'border-amber-500' : 'border-slate-200'}`} />
+            <span className={`text-[11px] font-bold uppercase tracking-widest ${
+              step4Active ? 'text-amber-600' : 'text-slate-300'
+            }`}>
+              Passo 4
+            </span>
+          </div>
+          <motion.div
+            animate={{ opacity: step4Active ? 1 : recordOpened ? 0.6 : 0.35 }}
             transition={{ duration: 0.25 }}
             className="bg-white rounded-[28px] border border-slate-50 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5"
           >
@@ -906,35 +1032,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="min-w-0 flex-1">
                 <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">Pronto! Explore seu painel</h3>
                 <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
-                  {step3Active
-                    ? 'Seu consultório está configurado. A tela de Início mostra seus próximos atendimentos, pacientes que precisam de atenção e sugestões inteligentes.'
-                    : 'Após configurar pacientes e agenda, esta tela mostrará tudo que você precisa saber no dia: próximos atendimentos, alertas e oportunidades.'
+                  {step4Active
+                    ? 'Seu consultório está configurado. A tela de Início mostra próximos atendimentos, alertas e sugestões inteligentes.'
+                    : 'Após explorar o prontuário, esta tela mostrará tudo que você precisa saber no dia a dia.'
                   }
                 </p>
               </div>
             </div>
 
-            {/* Preview: what intelligence looks like */}
             <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
               <div className="flex items-center gap-2.5 py-1">
                 <div className="w-2 h-2 bg-rose-400 rounded-full animate-pulse shrink-0" />
-                <p className="text-[12px] text-[#636366] font-medium">Você pode recuperar 3 pacientes que sumiram</p>
+                <p className="text-[12px] text-[#636366] font-medium">Pacientes que precisam de retorno</p>
               </div>
               <div className="flex items-center gap-2.5 py-1">
                 <div className="w-2 h-2 bg-violet-400 rounded-full shrink-0" />
-                <p className="text-[12px] text-[#636366] font-medium">Encaixe sugerido: João, terça às 14h</p>
+                <p className="text-[12px] text-[#636366] font-medium">Encaixes sugeridos na agenda</p>
               </div>
               <div className="flex items-center gap-2.5 py-1">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
-                <p className="text-[12px] text-[#636366] font-medium">Potencial da semana: R$ 4.200 em agenda</p>
+                <p className="text-[12px] text-[#636366] font-medium">Potencial financeiro da semana</p>
               </div>
             </div>
 
-            {step3Active && (
+            {step4Active && (
               <>
                 <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-3">
                   <Check size={18} className="text-emerald-600 shrink-0" />
-                  <p className="text-[13px] font-semibold text-emerald-700">Consultório configurado! Você já pode usar o sistema normalmente.</p>
+                  <p className="text-[13px] font-semibold text-emerald-700">Consultório ativado! Você já pode usar o sistema normalmente.</p>
                 </div>
                 <motion.button
                   initial={{ opacity: 0, y: 4 }}
@@ -973,6 +1098,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </h1>
 
         {/* Insight inteligente — fala humana do sistema */}
+        {!recordOpened && hasPatients && hasAppointments && onboardingDismissed && firstPatient && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="rounded-[24px] border border-sky-200 bg-gradient-to-br from-sky-50 to-white p-5 space-y-4 shadow-[0_4px_24px_rgba(2,132,199,0.08)]"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-sky-100 rounded-[14px] flex items-center justify-center shrink-0">
+                <ClipboardList size={20} className="text-sky-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-bold text-[#1C1C1E]">Falta um passo para ativar seu consultório</p>
+                <p className="text-[13px] text-[#636366] mt-1 leading-relaxed">
+                  Abra o prontuário de {firstPatient.name?.split(' ')[0]} para registrar evoluções, odontograma e plano de tratamento.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openPatientRecord(firstPatient.id)}
+              className="w-full flex items-center justify-center gap-2 bg-sky-600 text-white py-3.5 rounded-[16px] text-[14px] font-bold hover:bg-sky-700 transition-colors"
+            >
+              Abrir prontuário agora
+              <ArrowRight size={15} />
+            </button>
+          </motion.div>
+        )}
+
         {insightCard && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
