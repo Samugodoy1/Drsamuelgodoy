@@ -49,7 +49,6 @@ import {
   BookOpen
 } from './icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { PortalActivity } from './types/portal';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
 import { PatientClinical } from './components/PatientClinical';
@@ -713,10 +712,7 @@ export default function App() {
   const [patientActionsToday, setPatientActionsToday] = useState<Set<number>>(new Set());
   const [patientsInlineFeedback, setPatientsInlineFeedback] = useState('');
   const [patientsSubView, setPatientsSubView] = useState<'list' | 'portal'>('list');
-  const [portalActivity, setPortalActivity] = useState<PortalActivity | null>(null);
-  const portalPendingCount = portalActivity
-    ? portalActivity.requests.length + portalActivity.intakeForms.length + portalActivity.unreadThreads.length
-    : 0;
+  const [portalPendingCount, setPortalPendingCount] = useState(0);
   const [patientIntelligence, setPatientIntelligence] = useState<any[]>([]);
   const [patientIntelLoaded, setPatientIntelLoaded] = useState(false);
   const [dentistSearchTerm, setDentistSearchTerm] = useState('');
@@ -1185,37 +1181,6 @@ export default function App() {
     }
   };
 
-  const fetchPortalActivity = async (explicitToken?: string) => {
-    try {
-      const res = await apiFetch('/api/portal/activity', { explicitToken });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data && Array.isArray(data.requests)) {
-        setPortalActivity({
-          requests: data.requests,
-          intakeForms: Array.isArray(data.intakeForms) ? data.intakeForms : [],
-          unreadThreads: Array.isArray(data.unreadThreads) ? data.unreadThreads : [],
-          recentConfirmations: Array.isArray(data.recentConfirmations) ? data.recentConfirmations : [],
-        });
-      }
-    } catch {}
-  };
-
-  const fetchPortalActivityRef = useRef(fetchPortalActivity);
-  fetchPortalActivityRef.current = fetchPortalActivity;
-
-  // Polling leve: pacientes agem sozinhos no portal a qualquer momento,
-  // o dentista precisa ver isso sem depender de recarregar a página.
-  useEffect(() => {
-    if (!user?.id) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void fetchPortalActivityRef.current();
-      }
-    }, 60000);
-    return () => clearInterval(timer);
-  }, [user?.id]);
-
   const fetchData = async (explicitToken?: string) => {
     if (!userRef.current && !explicitToken) return;
     try {
@@ -1248,8 +1213,15 @@ export default function App() {
         .then(data => { if (Array.isArray(data)) { setPatientIntelligence(data); setPatientIntelLoaded(true); } })
         .catch(() => {});
 
-      // Fetch portal activity — tudo que pacientes iniciaram sozinhos (non-blocking)
-      void fetchPortalActivity(explicitToken);
+      // Fetch portal pending counts (non-blocking)
+      apiFetch('/api/portal/appointment-requests', { explicitToken })
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setPortalPendingCount(data.filter((r: any) => r.status === 'PENDING').length);
+          }
+        })
+        .catch(() => {});
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -3293,7 +3265,6 @@ export default function App() {
                 onDismissWelcome={() => updateUserOnboarding('welcome_seen')}
                 product={getCurrentProduct()}
                 portalPendingCount={portalPendingCount}
-                portalActivity={portalActivity}
                 onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
                 dataRefreshKey={dataRefreshKey}
               />
@@ -4733,7 +4704,7 @@ export default function App() {
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-[12px] font-semibold shrink-0"
                             >
                               <ClipboardList size={13} />
-                              {portalPendingCount} {portalPendingCount === 1 ? 'pendência do portal' : 'pendências do portal'}
+                              {portalPendingCount} {portalPendingCount === 1 ? 'solicitação' : 'solicitações'}
                             </button>
                           )}
                           {patientsSubView === 'portal' && (
