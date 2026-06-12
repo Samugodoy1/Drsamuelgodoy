@@ -66,6 +66,15 @@ import { SubscriptionCallback } from './components/SubscriptionCallback';
 import { Academy, AcademyPatients, AcademyAgenda, AcademyStudy, AcademyChecklist } from './components/Academy';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 import {
+  WEEK_HOUR_HEIGHT,
+  durationToWeekHeight,
+  getWeekHourRange,
+  getWeekMinutesFromClientY,
+  layoutWeekDayAppointments,
+  minutesToTimeString,
+  minutesToWeekTop,
+} from './utils/weekAgendaUtils';
+import {
   type PatientListFilter,
   PATIENT_FILTER_URGENCY,
   buildPatientFilterChips,
@@ -724,6 +733,9 @@ export default function App() {
   const [monthSheetSelectedDay, setMonthSheetSelectedDay] = useState<Date | null>(null);
   const [weekSheetSelectedAppointment, setWeekSheetSelectedAppointment] = useState<Appointment | null>(null);
   const [weekSuggestionSheet, setWeekSuggestionSheet] = useState<{ date: Date; start: string; end: string; duration: number; procedure: string } | null>(null);
+  const [weekDraggingId, setWeekDraggingId] = useState<number | null>(null);
+  const [weekDropPreview, setWeekDropPreview] = useState<{ dayIndex: number; top: number; height: number } | null>(null);
+  const weekDidDragRef = useRef(false);
 
   useEffect(() => {
     if (activeTab !== 'dashboard' && activeTab !== 'agenda') return;
@@ -1819,6 +1831,83 @@ export default function App() {
       notes: appointment.notes || ''
     });
     setIsModalOpen(true);
+  };
+
+  const openWeekCellAppointment = (day: Date, totalMinutes: number) => {
+    const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
+    setAppointmentModalMode('schedule');
+    setEditingAppointmentId(null);
+    setSuggestedSlot(null);
+    setNewAppointment({
+      patient_id: '',
+      patient_name: '',
+      dentist_id: dentist_id || '',
+      date: day.toLocaleDateString('en-CA'),
+      time: minutesToTimeString(totalMinutes),
+      duration: '30',
+      notes: ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleWeekDragReschedule = async (appointmentId: number, targetDay: Date, totalMinutes: number) => {
+    const appointment = appointments.find(a => a.id === appointmentId);
+    if (!appointment) return;
+
+    const startDate = new Date(appointment.start_time);
+    const endDate = new Date(appointment.end_time);
+    const durationMinutes = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const newStart = new Date(targetDay);
+    newStart.setHours(hours, minutes, 0, 0);
+    const newEnd = new Date(newStart.getTime() + durationMinutes * 60000);
+
+    const conflicting = appointments.find(a => {
+      if (a.id === appointmentId) return false;
+      if (a.status === 'CANCELLED' || a.status === 'NO_SHOW') return false;
+      const aStart = new Date(a.start_time).getTime();
+      const aEnd = new Date(a.end_time).getTime();
+      return newStart.getTime() < aEnd && newEnd.getTime() > aStart;
+    });
+
+    if (conflicting) {
+      showNotification(
+        `Conflito com ${conflicting.patient_name} (${new Date(conflicting.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–${new Date(conflicting.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`,
+        'error'
+      );
+      return;
+    }
+
+    try {
+      const body = {
+        patient_id: appointment.patient_id.toString(),
+        patient_name: appointment.patient_name || '',
+        dentist_id: appointment.dentist_id?.toString() || (user?.id ? user.id.toString() : ''),
+        date: targetDay.toLocaleDateString('en-CA'),
+        time: minutesToTimeString(totalMinutes),
+        duration: durationMinutes.toString(),
+        notes: appointment.notes || '',
+        start_time: newStart.toISOString(),
+        end_time: newEnd.toISOString()
+      };
+
+      const res = await apiFetch(`/api/appointments/${appointmentId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        await refreshAppData();
+        showNotification('Consulta reagendada!', 'success');
+      } else {
+        const data = await res.json();
+        showNotification(data.error || 'Erro ao reagendar consulta.', 'error');
+      }
+    } catch {
+      showNotification('Erro de conexão ao reagendar consulta.', 'error');
+    }
   };
 
   const contactPatientOnWhatsApp = (patient: Patient) => {
@@ -3619,25 +3708,13 @@ export default function App() {
                           weekDays.push(day);
                         }
 
-                        // Keep weekly grid broad enough to always include suggestion hours
-                        let earliestHour = 8;
-                        let latestHour = 18;
-                        
-                        if (filtered.length > 0) {
-                          const hours = filtered.map(a => new Date(a.start_time).getHours());
-                          earliestHour = Math.min(...hours);
-                          latestHour = Math.max(...hours);
-                          
-                          // Add one hour buffer before and after while always including 08:00-18:00
-                          earliestHour = Math.max(0, Math.min(8, earliestHour - 1));
-                          latestHour = Math.min(23, Math.max(18, latestHour + 1));
-                        }
-
-                        const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-                        const timeSlots = [];
+                        const { earliestHour, latestHour } = getWeekHourRange(filtered);
+                        const timeSlots: number[] = [];
                         for (let h = earliestHour; h <= latestHour; h++) {
                           timeSlots.push(h);
                         }
+                        const weekGridHeight = timeSlots.length * WEEK_HOUR_HEIGHT;
+                        const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
                         const timeToMinutes = (time: string) => {
                           const [h, m] = time.split(':').map(Number);
@@ -3888,71 +3965,224 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                {/* Time slots grid */}
-                                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                  {timeSlots.map(hour => (
-                                    <div key={hour} className="grid grid-cols-[80px_repeat(7,1fr)] gap-0 border-b border-slate-200 last:border-b-0 min-h-[60px] divide-x divide-slate-200">
-                                      {/* Time label */}
-                                      <div className="bg-slate-50 p-2 flex items-center justify-center border-b border-slate-200">
-                                        <span className="text-[10px] font-bold text-slate-400">
-                                          {String(hour).padStart(2, '0')}:00
-                                        </span>
-                                      </div>
-  
-                                      {/* Day columns */}
-                                      {weekDays.map((day, dayIdx) => {
-                                        const dayAppointments = filtered.filter(a => {
-                                          const appDate = new Date(a.start_time);
-                                          const appHour = appDate.getHours();
-                                          // Show appointment if it starts in this hour
-                                          return appDate.toDateString() === day.toDateString() && appHour === hour;
-                                        }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-                                        const isToday = day.toDateString() === new Date().toDateString();
-                                        return (
-                                          <div 
-                                            key={dayIdx}
-                                            className={`p-1.5 relative ${
-                                              isToday ? 'bg-primary/5' : 'bg-white'
-                                            } hover:bg-slate-50 transition-colors`}
-                                          >
-                                            <div className="space-y-1">
-                                              {dayAppointments.slice(0, 3).map(app => {
-                                                const firstName = (app.patient_name || '').split(' ')[0] || app.patient_name;
-                                                const colors = app.status === 'FINISHED'
-                                                  ? { bg: '#e2e8f0', hover: '#cbd5e1' }
-                                                  : getProcedureColor(app.notes || '');
-                                                const textColor = app.status === 'FINISHED' ? 'text-slate-600' : 'text-white';
-                                                return (
-                                                  <div
-                                                    key={app.id}
-                                                    style={{
-                                                      backgroundColor: colors.bg,
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.hover}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = colors.bg}
-                                                    className={`${textColor} rounded-lg text-[11px] px-1.5 py-1 font-semibold cursor-pointer transition-colors min-h-7 flex flex-col justify-center overflow-hidden`}
-                                                    title={`${app.patient_name} - ${new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
-                                                    onClick={() => setWeekSheetSelectedAppointment(app)}
-                                                  >
-                                                    <div className="truncate leading-tight">{firstName}</div>
-                                                    <div className="text-[10px] opacity-80 leading-tight">
-                                                      {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                  </div>
-                                                );
-                                              })}
-                                              {dayAppointments.length > 3 && (
-                                                <div className="text-[10px] text-primary font-bold px-1 py-0.5">
-                                                  +{dayAppointments.length - 3}
-                                                </div>
-                                              )}
-                                            </div>
+                                {/* Time grid with proportional appointment blocks */}
+                                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm max-h-[calc(100vh-260px)] overflow-y-auto">
+                                  <div
+                                    className="grid grid-cols-[80px_repeat(7,1fr)] divide-x divide-slate-200"
+                                    style={{ height: weekGridHeight }}
+                                  >
+                                    {/* Time labels column */}
+                                    <div className="relative bg-slate-50">
+                                      {timeSlots.map(hour => (
+                                        <div
+                                          key={hour}
+                                          className="absolute left-0 right-0 border-b border-slate-200 flex items-start justify-center pt-1"
+                                          style={{
+                                            top: (hour - earliestHour) * WEEK_HOUR_HEIGHT,
+                                            height: WEEK_HOUR_HEIGHT,
+                                          }}
+                                        >
+                                          <span className="text-[10px] font-bold text-slate-400">
+                                            {String(hour).padStart(2, '0')}:00
+                                          </span>
                                         </div>
-                                        );
-                                      })}
+                                      ))}
                                     </div>
-                                  ))}
+
+                                    {/* Day columns */}
+                                    {weekDays.map((day, dayIdx) => {
+                                      const dayAppointments = filtered.filter(a => {
+                                        const appDate = new Date(a.start_time);
+                                        return appDate.toDateString() === day.toDateString();
+                                      });
+                                      const layoutItems = layoutWeekDayAppointments(dayAppointments, earliestHour);
+                                      const isToday = day.toDateString() === new Date().toDateString();
+                                      const draggingAppointment = weekDraggingId
+                                        ? appointments.find(a => a.id === weekDraggingId)
+                                        : null;
+                                      const dragDurationMinutes = draggingAppointment
+                                        ? Math.max(1, Math.round(
+                                            (new Date(draggingAppointment.end_time).getTime() -
+                                              new Date(draggingAppointment.start_time).getTime()) / 60000
+                                          ))
+                                        : 30;
+
+                                      return (
+                                        <div
+                                          key={dayIdx}
+                                          className={`relative cursor-pointer group/col ${
+                                            isToday ? 'bg-primary/5' : 'bg-white'
+                                          }`}
+                                          onClick={(e) => {
+                                            if ((e.target as HTMLElement).closest('[data-appointment-card]')) return;
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const minutes = getWeekMinutesFromClientY(
+                                              e.clientY,
+                                              rect.top,
+                                              earliestHour,
+                                              latestHour
+                                            );
+                                            openWeekCellAppointment(day, minutes);
+                                          }}
+                                          onDragOver={(e) => {
+                                            if (!weekDraggingId) return;
+                                            e.preventDefault();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const minutes = getWeekMinutesFromClientY(
+                                              e.clientY,
+                                              rect.top,
+                                              earliestHour,
+                                              latestHour
+                                            );
+                                            setWeekDropPreview({
+                                              dayIndex: dayIdx,
+                                              top: minutesToWeekTop(minutes, earliestHour),
+                                              height: durationToWeekHeight(dragDurationMinutes),
+                                            });
+                                          }}
+                                          onDragLeave={(e) => {
+                                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                              setWeekDropPreview(prev => (prev?.dayIndex === dayIdx ? null : prev));
+                                            }
+                                          }}
+                                          onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (!weekDraggingId) return;
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const minutes = getWeekMinutesFromClientY(
+                                              e.clientY,
+                                              rect.top,
+                                              earliestHour,
+                                              latestHour
+                                            );
+                                            void handleWeekDragReschedule(weekDraggingId, day, minutes);
+                                            setWeekDraggingId(null);
+                                            setWeekDropPreview(null);
+                                          }}
+                                        >
+                                          {/* Hour grid lines */}
+                                          {timeSlots.map(hour => (
+                                            <div
+                                              key={hour}
+                                              className="absolute left-0 right-0 border-b border-slate-100 pointer-events-none"
+                                              style={{
+                                                top: (hour - earliestHour) * WEEK_HOUR_HEIGHT,
+                                                height: WEEK_HOUR_HEIGHT,
+                                              }}
+                                            />
+                                          ))}
+
+                                          {/* Half-hour guides */}
+                                          {timeSlots.map(hour => (
+                                            <div
+                                              key={`half-${hour}`}
+                                              className="absolute left-0 right-0 border-b border-dashed border-slate-50 pointer-events-none"
+                                              style={{
+                                                top: (hour - earliestHour) * WEEK_HOUR_HEIGHT + WEEK_HOUR_HEIGHT / 2,
+                                              }}
+                                            />
+                                          ))}
+
+                                          {/* Hover hint for empty slots */}
+                                          <div className="absolute inset-0 opacity-0 group-hover/col:opacity-100 bg-slate-50/40 pointer-events-none transition-opacity" />
+
+                                          {/* Drop preview */}
+                                          {weekDropPreview?.dayIndex === dayIdx && (
+                                            <div
+                                              className="absolute left-1 right-1 rounded-lg border-2 border-dashed border-primary/60 bg-primary/10 pointer-events-none z-20"
+                                              style={{
+                                                top: weekDropPreview.top,
+                                                height: weekDropPreview.height,
+                                              }}
+                                            />
+                                          )}
+
+                                          {/* Appointment blocks */}
+                                          {layoutItems.map(({ app, top, height, column, totalColumns }) => {
+                                            const firstName = (app.patient_name || '').split(' ')[0] || app.patient_name;
+                                            const colors = app.status === 'FINISHED'
+                                              ? { bg: '#e2e8f0', hover: '#cbd5e1' }
+                                              : getProcedureColor(app.notes || '');
+                                            const textColor = app.status === 'FINISHED' ? 'text-slate-600' : 'text-white';
+                                            const startLabel = new Date(app.start_time).toLocaleTimeString('pt-BR', {
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            });
+                                            const endLabel = new Date(app.end_time).toLocaleTimeString('pt-BR', {
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            });
+                                            const widthPercent = 100 / totalColumns;
+                                            const leftPercent = column * widthPercent;
+                                            const canDrag = app.status !== 'FINISHED' && app.status !== 'CANCELLED';
+
+                                            return (
+                                              <div
+                                                key={app.id}
+                                                data-appointment-card
+                                                draggable={canDrag}
+                                                onDragStart={(e) => {
+                                                  if (!canDrag) {
+                                                    e.preventDefault();
+                                                    return;
+                                                  }
+                                                  weekDidDragRef.current = false;
+                                                  e.dataTransfer.effectAllowed = 'move';
+                                                  e.dataTransfer.setData('text/plain', String(app.id));
+                                                  setWeekDraggingId(app.id);
+                                                }}
+                                                onDrag={() => {
+                                                  weekDidDragRef.current = true;
+                                                }}
+                                                onDragEnd={() => {
+                                                  setWeekDraggingId(null);
+                                                  setWeekDropPreview(null);
+                                                }}
+                                                style={{
+                                                  top,
+                                                  height,
+                                                  left: `calc(${leftPercent}% + 2px)`,
+                                                  width: `calc(${widthPercent}% - 4px)`,
+                                                  backgroundColor: colors.bg,
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.backgroundColor = colors.hover;
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.backgroundColor = colors.bg;
+                                                }}
+                                                className={`absolute z-10 ${textColor} rounded-lg text-[11px] px-1.5 py-1 font-semibold overflow-hidden shadow-sm border border-white/20 ${
+                                                  canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                                                } ${weekDraggingId === app.id ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
+                                                title={`${app.patient_name} • ${startLabel}–${endLabel}`}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (weekDidDragRef.current) {
+                                                    weekDidDragRef.current = false;
+                                                    return;
+                                                  }
+                                                  setWeekSheetSelectedAppointment(app);
+                                                }}
+                                              >
+                                                <div className="truncate leading-tight font-bold">{firstName}</div>
+                                                {height >= 36 && (
+                                                  <div className="text-[10px] opacity-80 leading-tight truncate">
+                                                    {startLabel}–{endLabel}
+                                                  </div>
+                                                )}
+                                                {height >= 52 && app.notes && (
+                                                  <div className="text-[10px] opacity-70 leading-tight truncate mt-0.5">
+                                                    {app.notes}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
                             </div>
