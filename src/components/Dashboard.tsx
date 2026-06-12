@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../config';
 import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { PortalActivity, PortalAppointmentRequest } from '../types/portal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ interface DashboardProps {
   onDismissWelcome: () => void;
   product: string;
   portalPendingCount?: number;
+  portalActivity?: PortalActivity | null;
   onOpenPortalInbox?: () => void;
   dataRefreshKey?: number;
 }
@@ -127,6 +129,104 @@ function openWhatsApp(phone: string, name: string) {
   const message = `Olá ${firstName}, tudo bem? Notamos que faz um tempo desde sua última consulta. Gostaríamos de agendar um retorno.`;
   window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`, '_blank');
 }
+
+// ─── Atividade do portal (ações iniciadas pelo paciente) ────────────────────
+
+function timeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  if (Number.isNaN(diffMs) || diffMs < 0) return '';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'agora';
+  if (mins < 60) return `há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'ontem' : `há ${days} dias`;
+}
+
+function portalPeriodLabel(t: string | null): string {
+  if (!t) return '';
+  const map: Record<string, string> = { manha: 'de manhã', tarde: 'à tarde', noite: 'à noite' };
+  return map[t] || `às ${t}`;
+}
+
+function portalDateLabel(d: string | null): string {
+  if (!d) return '';
+  try {
+    const [y, m, day] = d.split('T')[0].split('-');
+    return `${day}/${m}/${y}`;
+  } catch { return d; }
+}
+
+interface PortalFeedItem {
+  key: string;
+  patientName: string;
+  description: string;
+  date: string;
+  accent: 'rose' | 'amber' | 'blue' | 'violet' | 'sky';
+  icon: React.ElementType;
+  badge: string;
+}
+
+function describeRequest(req: PortalAppointmentRequest): Omit<PortalFeedItem, 'key' | 'patientName' | 'date'> {
+  if (req.request_type === 'CANCEL') {
+    const when = req.appointment_start_time
+      ? ` de ${new Date(req.appointment_start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${new Date(req.appointment_start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+      : '';
+    return { description: `Quer cancelar a consulta${when}`, accent: 'rose', icon: UserX, badge: 'Cancelamento' };
+  }
+  if (req.request_type === 'RESCHEDULE') {
+    const pref = [portalDateLabel(req.preferred_date), portalPeriodLabel(req.preferred_time)].filter(Boolean).join(' ');
+    return { description: `Pediu para reagendar${pref ? ` para ${pref}` : ''}`, accent: 'amber', icon: Calendar, badge: 'Reagendamento' };
+  }
+  const pref = [portalDateLabel(req.preferred_date), portalPeriodLabel(req.preferred_time)].filter(Boolean).join(' ');
+  return { description: `Solicitou uma consulta${pref ? ` para ${pref}` : ''}`, accent: 'blue', icon: CalendarPlus, badge: 'Nova consulta' };
+}
+
+function buildPortalFeed(activity: PortalActivity): PortalFeedItem[] {
+  const items: PortalFeedItem[] = [];
+  for (const req of activity.requests) {
+    items.push({
+      key: `req-${req.id}`,
+      patientName: req.patient_name,
+      date: req.created_at,
+      ...describeRequest(req),
+    });
+  }
+  for (const form of activity.intakeForms) {
+    items.push({
+      key: `form-${form.id}`,
+      patientName: form.patient_name,
+      date: form.created_at,
+      description: 'Enviou a ficha de pré-atendimento para revisão',
+      accent: 'violet',
+      icon: ClipboardList,
+      badge: 'Ficha',
+    });
+  }
+  for (const thread of activity.unreadThreads) {
+    items.push({
+      key: `msg-${thread.patient_id}`,
+      patientName: thread.patient_name,
+      date: thread.last_message_at,
+      description: thread.unread_count === 1
+        ? 'Enviou 1 mensagem não lida'
+        : `Enviou ${thread.unread_count} mensagens não lidas`,
+      accent: 'sky',
+      icon: MessageCircle,
+      badge: 'Mensagem',
+    });
+  }
+  return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+const portalAccentStyles: Record<PortalFeedItem['accent'], { iconBg: string; iconText: string; badgeBg: string; badgeText: string }> = {
+  rose:   { iconBg: 'bg-rose-100',   iconText: 'text-rose-600',   badgeBg: 'bg-rose-50',   badgeText: 'text-rose-600' },
+  amber:  { iconBg: 'bg-amber-100',  iconText: 'text-amber-600',  badgeBg: 'bg-amber-50',  badgeText: 'text-amber-700' },
+  blue:   { iconBg: 'bg-blue-100',   iconText: 'text-blue-600',   badgeBg: 'bg-blue-50',   badgeText: 'text-blue-600' },
+  violet: { iconBg: 'bg-violet-100', iconText: 'text-violet-600', badgeBg: 'bg-violet-50', badgeText: 'text-violet-600' },
+  sky:    { iconBg: 'bg-sky-100',    iconText: 'text-sky-600',    badgeBg: 'bg-sky-50',    badgeText: 'text-sky-600' },
+};
 
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
@@ -184,7 +284,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDismissOnboarding,
   onDismissWelcome,
   product,
-  portalPendingCount = 0,
+  portalActivity = null,
   onOpenPortalInbox,
   dataRefreshKey = 0,
 }) => {
@@ -930,31 +1030,108 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.div>
         )}
 
-        {/* Portal banner */}
-        {portalPendingCount > 0 && (
-          <motion.button
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            onClick={() => onOpenPortalInbox?.()}
-            whileTap={{ scale: 0.98 }}
-            className="w-full flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-4 py-3.5 text-left transition-all"
-          >
-            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
-              <Calendar size={17} className="text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-bold text-slate-800">
-                {portalPendingCount === 1
-                  ? 'Você tem 1 solicitação de consulta'
-                  : `Você tem ${portalPendingCount} solicitações de consulta`}
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Toque para revisar</p>
-            </div>
-            <ChevronRight size={16} className="text-slate-300 shrink-0" />
-          </motion.button>
-        )}
       </div>
+
+      {/* ── ATIVIDADE DO PORTAL — pacientes agiram sozinhos e aguardam você ── */}
+      {portalActivity && (() => {
+        const feed = buildPortalFeed(portalActivity);
+        const confirmations = portalActivity.recentConfirmations;
+        if (feed.length === 0 && confirmations.length === 0) return null;
+
+        const visibleFeed = feed.slice(0, 5);
+        const hiddenCount = feed.length - visibleFeed.length;
+
+        return (
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="-mt-4"
+          >
+            <div className={`overflow-hidden rounded-[24px] bg-white shadow-[0_8px_32px_rgba(0,0,0,0.06)] border ${
+              feed.length > 0 ? 'border-blue-200' : 'border-emerald-100'
+            }`}>
+              {feed.length > 0 && (
+                <>
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+                      </span>
+                      <p className="text-[13px] font-bold text-[#1C1C1E] uppercase tracking-wider">
+                        Pacientes aguardando você
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-blue-600 text-white text-[11px] font-bold rounded-full">
+                      {feed.length}
+                    </span>
+                  </div>
+
+                  {/* Feed de ações iniciadas pelos pacientes */}
+                  <div className="divide-y divide-slate-50">
+                    {visibleFeed.map((item) => {
+                      const style = portalAccentStyles[item.accent];
+                      const Icon = item.icon;
+                      return (
+                        <motion.button
+                          key={item.key}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => onOpenPortalInbox?.()}
+                          className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50/70 transition-colors"
+                        >
+                          <div className={`w-10 h-10 ${style.iconBg} rounded-[14px] flex items-center justify-center shrink-0`}>
+                            <Icon size={18} className={style.iconText} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-[14px] font-bold text-[#1C1C1E] truncate">{item.patientName}</p>
+                              <span className={`px-2 py-0.5 ${style.badgeBg} ${style.badgeText} text-[10px] font-bold rounded-full uppercase tracking-wide shrink-0`}>
+                                {item.badge}
+                              </span>
+                            </div>
+                            <p className="text-[12.5px] text-[#636366] mt-0.5 leading-snug">{item.description}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[11px] text-[#8E8E93] font-medium">{timeAgo(item.date)}</span>
+                            <ChevronRight size={14} className="text-slate-300" />
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer de ação */}
+                  <button
+                    onClick={() => onOpenPortalInbox?.()}
+                    className="w-full flex items-center justify-center gap-1.5 py-3 bg-blue-50/60 text-blue-700 text-[13px] font-bold hover:bg-blue-100/60 transition-colors"
+                  >
+                    {hiddenCount > 0
+                      ? `Responder tudo (${feed.length} pendências)`
+                      : 'Abrir caixa de entrada do portal'}
+                    <ArrowRight size={14} />
+                  </button>
+                </>
+              )}
+
+              {/* Confirmações de presença vindas do paciente (informativo) */}
+              {confirmations.length > 0 && (
+                <div className={`flex items-center gap-2.5 px-5 py-3 bg-emerald-50/60 ${feed.length > 0 ? 'border-t border-emerald-100/70' : ''}`}>
+                  <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center shrink-0">
+                    <Check size={13} className="text-white" />
+                  </div>
+                  <p className="text-[12.5px] font-semibold text-emerald-800 leading-snug">
+                    {confirmations.length === 1
+                      ? `${confirmations[0].patient_name.split(' ')[0]} confirmou presença pelo portal nas últimas 24h`
+                      : `${confirmations.length} pacientes confirmaram presença pelo portal nas últimas 24h`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.section>
+        );
+      })()}
 
       {/* 2. HERO — PRÓXIMO ATENDIMENTO (protagonista absoluto) */}
       {nextPatient ? (() => {

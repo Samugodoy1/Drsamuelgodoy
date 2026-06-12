@@ -27,6 +27,9 @@ interface AppointmentRequest {
   preferred_time: string | null;
   notes: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  request_type?: 'NEW' | 'RESCHEDULE' | 'CANCEL';
+  appointment_id?: number | null;
+  appointment_start_time?: string | null;
   created_at: string;
 }
 
@@ -59,7 +62,6 @@ interface PortalInboxProps {
 }
 
 export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onDataMutated }: PortalInboxProps) {
-  const [activeSection, setActiveSection] = useState<'requests' | 'intake' | 'messages'>('requests');
   const [requests, setRequests] = useState<AppointmentRequest[]>([]);
   const [intakeForms, setIntakeForms] = useState<IntakeForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +135,27 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
     }
   };
 
+  // Cancelamento pedido pelo paciente: aprova a solicitação e cancela a consulta na agenda
+  const handleConfirmCancellation = async (req: AppointmentRequest) => {
+    setUpdatingId(req.id);
+    try {
+      if (req.appointment_id) {
+        await apiFetch(`/api/appointments/${req.appointment_id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'CANCELLED' })
+        });
+      }
+      await apiFetch(`/api/portal/appointment-requests/${req.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'APPROVED' })
+      });
+      setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'APPROVED' } : r));
+      onDataMutated?.();
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const handleReviewForm = async (id: number) => {
     await apiFetch(`/api/portal/intake-forms/${id}/review`, { method: 'PATCH' });
     setIntakeForms(prev => prev.map(f => f.id === id ? { ...f, status: 'REVIEWED' } : f));
@@ -143,10 +166,14 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
   const pendingRequests = requests.filter(r => r.status === 'PENDING');
   const pendingForms = intakeForms.filter(f => f.status === 'SUBMITTED');
 
-  const totalPending = pendingRequests.length + pendingForms.length + unreadThreads.length;
-
   const formatDateBR = (d: string) => {
     try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
+  };
+
+  const requestTypeBadge = (type?: string) => {
+    if (type === 'CANCEL') return { label: 'Cancelamento', className: 'bg-rose-100 text-rose-700' };
+    if (type === 'RESCHEDULE') return { label: 'Reagendamento', className: 'bg-amber-100 text-amber-700' };
+    return { label: 'Nova consulta', className: 'bg-blue-100 text-blue-700' };
   };
 
   const timeLabel = (t: string | null) => {
@@ -185,13 +212,35 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
                       <p className="text-xs text-slate-400">{req.patient_phone}</p>
                     </div>
                   </div>
-                  <StatusBadgeReq status={req.status} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(() => {
+                      const badge = requestTypeBadge(req.request_type);
+                      return (
+                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      );
+                    })()}
+                    <StatusBadgeReq status={req.status} />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <InfoChip icon={Calendar} label="Data preferida" value={formatDateBR(req.preferred_date)} />
-                  <InfoChip icon={Clock} label="Horário" value={timeLabel(req.preferred_time)} />
-                </div>
+                {req.request_type === 'CANCEL' ? (
+                  req.appointment_start_time && (
+                    <div className="mb-3">
+                      <InfoChip
+                        icon={Calendar}
+                        label="Consulta a cancelar"
+                        value={new Date(req.appointment_start_time).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      />
+                    </div>
+                  )
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <InfoChip icon={Calendar} label="Data preferida" value={formatDateBR(req.preferred_date)} />
+                    <InfoChip icon={Clock} label="Horário" value={timeLabel(req.preferred_time)} />
+                  </div>
+                )}
 
                 {req.notes && (
                   <p className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 mb-3 italic">
@@ -205,6 +254,15 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
 
                 {req.status === 'PENDING' && (
                   <div className="flex gap-2">
+                    {req.request_type === 'CANCEL' ? (
+                      <button
+                        onClick={() => handleConfirmCancellation(req)}
+                        disabled={updatingId === req.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors disabled:opacity-50"
+                      >
+                        <X size={13} /> Confirmar cancelamento
+                      </button>
+                    ) : (
                     <button
                       onClick={() => {
                         handleUpdateRequest(req.id, 'APPROVED');
@@ -215,8 +273,9 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
                       disabled={updatingId === req.id}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                     >
-                      <Check size={13} /> Aprovar e Agendar
+                      <Check size={13} /> {req.request_type === 'RESCHEDULE' ? 'Aprovar e Reagendar' : 'Aprovar e Agendar'}
                     </button>
+                    )}
                     <button
                       onClick={() => handleUpdateRequest(req.id, 'REJECTED')}
                       disabled={updatingId === req.id}
@@ -248,6 +307,135 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
             ))
           )}
         </div>
+
+      {/* ── Fichas de Pré-atendimento enviadas pelos pacientes ── */}
+      {pendingForms.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <ClipboardList size={14} className="text-violet-500" />
+            Fichas de Pré-atendimento
+            <span className="px-2 py-0.5 bg-violet-500 text-white text-[10px] font-bold rounded-full">{pendingForms.length}</span>
+          </h3>
+
+          {pendingForms.map(form => (
+            <div key={form.id} className="bg-white rounded-2xl border border-violet-100 bg-violet-50/20 p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 bg-violet-500/10 text-violet-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                    {form.patient_name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-800 text-sm">{form.patient_name}</p>
+                    <p className="text-xs text-slate-400">Enviada em {formatDateBR(form.created_at)}</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-violet-100 text-violet-700 text-[10px] font-bold rounded-full shrink-0 flex items-center gap-1">
+                  <FileText size={10} /> Aguardando revisão
+                </span>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => setSelectedForm(form)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-violet-600 text-white rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors"
+                >
+                  <FileText size={13} /> Revisar ficha
+                </button>
+                {onOpenPatient && (
+                  <button
+                    onClick={() => onOpenPatient(form.patient_id)}
+                    className="px-3 py-2.5 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
+                    title="Ver prontuário"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Modal de revisão da ficha ── */}
+      <AnimatePresence>
+        {selectedForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-6"
+            onClick={() => setSelectedForm(null)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full sm:max-w-lg max-h-[85vh] rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 bg-violet-500/10 text-violet-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                    {selectedForm.patient_name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-800 text-sm truncate">{selectedForm.patient_name}</p>
+                    <p className="text-[11px] text-slate-400">Ficha enviada em {formatDateBR(selectedForm.created_at)}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedForm(null)}
+                  className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0"
+                >
+                  <X size={15} className="text-slate-500" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-4 space-y-2.5 flex-1">
+                <FormSection icon={Stethoscope} label="Queixa principal" value={selectedForm.form_data.chief_complaint} highlight="rose" />
+                <FormSection icon={Heart} label="Alergias" value={selectedForm.form_data.allergies} highlight="rose" />
+                <FormSection icon={Pill} label="Medicamentos em uso" value={selectedForm.form_data.medications} />
+                <FormSection icon={FileText} label="Histórico médico" value={selectedForm.form_data.medical_history} />
+                <FormSection icon={User} label="Hábitos" value={selectedForm.form_data.habits} />
+                <FormSection icon={Heart} label="Histórico familiar" value={selectedForm.form_data.family_history} />
+                <FormSection icon={Phone} label="Contato de emergência" value={
+                  selectedForm.form_data.emergency_contact_name
+                    ? `${selectedForm.form_data.emergency_contact_name}${selectedForm.form_data.emergency_contact_phone ? ` — ${selectedForm.form_data.emergency_contact_phone}` : ''}`
+                    : undefined
+                } />
+                <FormSection icon={FileText} label="Convênio" value={
+                  selectedForm.form_data.health_insurance
+                    ? `${selectedForm.form_data.health_insurance}${selectedForm.form_data.health_insurance_number ? ` — nº ${selectedForm.form_data.health_insurance_number}` : ''}`
+                    : undefined
+                } />
+              </div>
+
+              <div className="p-4 border-t border-slate-100 flex gap-2 shrink-0">
+                {selectedForm.status === 'SUBMITTED' ? (
+                  <button
+                    onClick={() => handleReviewForm(selectedForm.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-3 bg-violet-600 text-white rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors"
+                  >
+                    <CheckCircle2 size={14} /> Marcar como revisada
+                  </button>
+                ) : (
+                  <span className="flex-1 flex items-center justify-center gap-1.5 py-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold">
+                    <CheckCircle2 size={14} /> Ficha revisada
+                  </span>
+                )}
+                {onOpenPatient && (
+                  <button
+                    onClick={() => { onOpenPatient(selectedForm.patient_id); setSelectedForm(null); }}
+                    className="px-4 py-3 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
+                  >
+                    Ver prontuário
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Mensagens dos Pacientes ── */}
       {(unreadThreads.length > 0 || openThread) && (
