@@ -56,6 +56,7 @@ import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
 import { Dashboard } from './components/Dashboard';
 import { Finance } from './components/Finance';
+import FillAgendaModal, { computeTodayFreeSlotTimes } from './components/FillAgendaModal';
 import { PreAtendimento } from './components/PreAtendimento';
 import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
@@ -710,6 +711,7 @@ export default function App() {
   const [isAnamnesisEditing, setIsAnamnesisEditing] = useState(false);
   const [showTreatmentPlanSummary, setShowTreatmentPlanSummary] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFillAgendaOpen, setIsFillAgendaOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isDentistModalOpen, setIsDentistModalOpen] = useState(false);
   const [isEditDentistModalOpen, setIsEditDentistModalOpen] = useState(false);
@@ -939,6 +941,7 @@ export default function App() {
   });
 
   const [profile, setProfile] = useState<Dentist | null>(null);
+  const [profileDraft, setProfileDraft] = useState<Dentist | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profilePassword, setProfilePassword] = useState('');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
@@ -1076,6 +1079,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
+        setProfileDraft(prev => (isProfileEditing ? prev : data));
         setUser(prev => {
           if (!prev) return prev;
           const currentAccess = data.product_accesses?.find((access: ProductAccess) => access.product === getCurrentProductRef.current());
@@ -1114,19 +1118,37 @@ export default function App() {
     }
   };
 
+  const buildProfilePayload = (source: Dentist, password: string) => ({
+    name: source.name,
+    email: source.email,
+    phone: source.phone,
+    cro: source.cro,
+    specialty: source.specialty,
+    bio: source.bio,
+    photo_url: source.photo_url,
+    clinic_name: source.clinic_name,
+    clinic_address: source.clinic_address,
+    password,
+  });
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profileDraft) return;
+    if (!profileDraft.name?.trim() || !profileDraft.email?.trim()) {
+      showNotification('Nome e e-mail sao obrigatorios.', 'error');
+      return;
+    }
     setIsSavingProfile(true);
     try {
       const res = await apiFetch('/api/profile', {
         method: 'POST',
-        body: JSON.stringify({ ...profile, password: profilePassword })
+        body: JSON.stringify(buildProfilePayload(profileDraft, profilePassword))
       });
       if (res.ok) {
         showNotification('Perfil atualizado com sucesso!');
         setProfilePassword('');
         setIsProfileEditing(false);
+        setProfile(profileDraft);
         fetchProfile();
       } else {
         const data = await res.json();
@@ -1138,6 +1160,15 @@ export default function App() {
     } finally {
       setIsSavingProfile(false);
     }
+  };
+
+  const startProfileEditing = () => {
+    setProfileDraft(profile ? { ...profile } : null);
+    setIsProfileEditing(true);
+  };
+
+  const updateProfileDraft = (patch: Partial<Dentist>) => {
+    setProfileDraft(prev => prev ? { ...prev, ...patch } : prev);
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1664,6 +1695,7 @@ export default function App() {
     .slice(0, 5);
 
   const todayAppointmentsTotalCount = appointments.filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString()).length;
+  const todayFreeSlotsCount = computeTodayFreeSlotTimes(appointments, dashboardNow).length;
   const todayAppointmentsRemainingCount = appointments.filter(a => 
     new Date(a.start_time).toDateString() === dashboardNow.toDateString() &&
     a.status !== 'FINISHED' &&
@@ -5243,6 +5275,7 @@ export default function App() {
                 financialSummary={financialSummary}
                 patients={patients}
                 todayAppointmentsCount={todayAppointmentsTotalCount}
+                todayFreeSlots={todayFreeSlotsCount}
                 apiFetch={apiFetch}
                 onOpenTransactionModal={(type) => {
                   setTransactionType(type);
@@ -5267,7 +5300,7 @@ export default function App() {
                 openPatientRecord={openPatientRecord}
                 formatDate={formatDate}
                 setActiveTab={setActiveTab}
-                setIsModalOpen={setIsModalOpen}
+                onFillAgenda={() => setIsFillAgendaOpen(true)}
                 profile={profile}
               />
             )}
@@ -5575,7 +5608,7 @@ export default function App() {
 
                     {!isProfileEditing && (
                       <button
-                        onClick={() => setIsProfileEditing(true)}
+                        onClick={startProfileEditing}
                         className="mt-5 flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
                       >
                         <Pencil size={14} />
@@ -5680,7 +5713,7 @@ export default function App() {
                 )}
 
                 {/* ── EDIT MODE ── */}
-                {isProfileEditing && (
+                {isProfileEditing && profileDraft && (
                   <form onSubmit={handleSaveProfile} className="space-y-6">
                     {/* Profile Fields */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
@@ -5688,8 +5721,8 @@ export default function App() {
                       <div className="space-y-4">
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Nome Completo</label>
-                          <input required type="text" value={profile.name}
-                            onChange={(e) => setProfile({...profile, name: e.target.value})}
+                          <input required type="text" value={profileDraft.name}
+                            onChange={(e) => updateProfileDraft({ name: e.target.value })}
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base" />
                         </div>
                         {user.role === 'DENTIST' && (
@@ -5697,23 +5730,23 @@ export default function App() {
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="text-[11px] text-slate-400 mb-1.5 block">CRO</label>
-                                <input type="text" value={profile.cro || ''}
-                                  onChange={(e) => setProfile({...profile, cro: e.target.value})}
+                                <input type="text" value={profileDraft.cro || ''}
+                                  onChange={(e) => updateProfileDraft({ cro: e.target.value })}
                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                                   placeholder="12345-SP" />
                               </div>
                               <div>
                                 <label className="text-[11px] text-slate-400 mb-1.5 block">Especialidade</label>
-                                <input type="text" value={profile.specialty || ''}
-                                  onChange={(e) => setProfile({...profile, specialty: e.target.value})}
+                                <input type="text" value={profileDraft.specialty || ''}
+                                  onChange={(e) => updateProfileDraft({ specialty: e.target.value })}
                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                                   placeholder="Ortodontia" />
                               </div>
                             </div>
                             <div>
                               <label className="text-[11px] text-slate-400 mb-1.5 block">Bio / Descrição Profissional</label>
-                              <textarea rows={3} value={profile.bio || ''}
-                                onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                              <textarea rows={3} value={profileDraft.bio || ''}
+                                onChange={(e) => updateProfileDraft({ bio: e.target.value })}
                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base resize-none"
                                 placeholder="Conte um pouco sobre sua trajetória..." />
                             </div>
@@ -5728,14 +5761,14 @@ export default function App() {
                       <div className="space-y-4">
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">E-mail</label>
-                          <input required type="email" value={profile.email}
-                            onChange={(e) => setProfile({...profile, email: e.target.value})}
+                          <input required type="email" value={profileDraft.email}
+                            onChange={(e) => updateProfileDraft({ email: e.target.value })}
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base" />
                         </div>
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Telefone</label>
-                          <input type="tel" inputMode="tel" value={profile.phone || ''}
-                            onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                          <input type="tel" inputMode="tel" value={profileDraft.phone || ''}
+                            onChange={(e) => updateProfileDraft({ phone: e.target.value })}
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                             placeholder="(00) 00000-0000" />
                         </div>
@@ -5749,15 +5782,15 @@ export default function App() {
                         <div className="space-y-4">
                           <div>
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Nome da Clínica</label>
-                            <input type="text" value={profile.clinic_name || ''}
-                              onChange={(e) => setProfile({...profile, clinic_name: e.target.value})}
+                            <input type="text" value={profileDraft.clinic_name || ''}
+                              onChange={(e) => updateProfileDraft({ clinic_name: e.target.value })}
                               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                               placeholder="Clínica Sorriso Perfeito" />
                           </div>
                           <div>
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Endereço</label>
-                            <input type="text" value={profile.clinic_address || ''}
-                              onChange={(e) => setProfile({...profile, clinic_address: e.target.value})}
+                            <input type="text" value={profileDraft.clinic_address || ''}
+                              onChange={(e) => updateProfileDraft({ clinic_address: e.target.value })}
                               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
                               placeholder="Rua Exemplo, 123 - Centro" />
                           </div>
@@ -5781,7 +5814,7 @@ export default function App() {
                     <div className="flex items-center gap-3 justify-end">
                       <button
                         type="button"
-                        onClick={() => { setIsProfileEditing(false); setProfilePassword(''); fetchProfile(); }}
+                        onClick={() => { setIsProfileEditing(false); setProfilePassword(''); setProfileDraft(null); fetchProfile(); }}
                         className="px-6 py-3 rounded-2xl font-semibold text-sm text-slate-500 hover:bg-slate-100 transition-all"
                       >
                         Cancelar
@@ -5970,6 +6003,37 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modal inteligente de preenchimento de agenda (CTA do Financeiro) */}
+      <FillAgendaModal
+        isOpen={isFillAgendaOpen}
+        onClose={() => setIsFillAgendaOpen(false)}
+        appointments={appointments}
+        patients={patients}
+        patientIntelligence={patientIntelligence}
+        installments={installments}
+        onSchedule={(patientId, patientName, time, procedure) => {
+          const dentistId = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
+          setAppointmentModalMode('schedule');
+          setEditingAppointmentId(null);
+          setSuggestedSlot(null);
+          setNewAppointment({
+            patient_id: patientId.toString(),
+            patient_name: patientName,
+            dentist_id: dentistId || '',
+            date: new Date().toLocaleDateString('en-CA'),
+            time,
+            duration: '30',
+            notes: procedure ? formatProcedure(procedure) : ''
+          });
+          setIsFillAgendaOpen(false);
+          setIsModalOpen(true);
+        }}
+        onOpenBlankSchedule={() => {
+          setIsFillAgendaOpen(false);
+          openAppointmentModal();
+        }}
+      />
 
       {/* Modal de Novo Agendamento — iOS Premium Minimalista */}
       <AnimatePresence>

@@ -225,7 +225,8 @@ interface FinanceProps {
   openPatientRecord: (id: number) => void;
   formatDate: (d: string) => string;
   setActiveTab: (tab: string) => void;
-  setIsModalOpen: (open: boolean) => void;
+  onFillAgenda: () => void;
+  todayFreeSlots?: number;
   profile?: { name?: string; cro?: string; clinic_name?: string; clinic_address?: string; phone?: string; email?: string } | null;
 }
 
@@ -254,7 +255,8 @@ export function Finance({
   openPatientRecord,
   formatDate,
   setActiveTab,
-  setIsModalOpen,
+  onFillAgenda,
+  todayFreeSlots,
   profile,
 }: FinanceProps) {
   void financialSummary;
@@ -670,7 +672,7 @@ export function Finance({
     const profitMargin = monthRevenue > 0 ? (netProfit / monthRevenue) * 100 : 0;
     const isStartOfMonth = dayOfMonth <= 5;
     const isEndOfMonth = dayOfMonth >= daysInMonth - 3;
-    const freeSlots = Math.max(8 - todayAppointmentsCount, 0);
+    const freeSlots = typeof todayFreeSlots === 'number' ? todayFreeSlots : Math.max(8 - todayAppointmentsCount, 0);
     const gap = prevMonthRevenue > 0 ? prevMonthRevenue - monthRevenue : 0;
 
     let headline = '';
@@ -776,7 +778,7 @@ export function Finance({
     }
 
     return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction };
-  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount]);
+  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount, todayFreeSlots]);
 
   const pendingItems = useMemo(() => insights?.pendingInstallments || [], [insights]);
 
@@ -1293,7 +1295,7 @@ export function Finance({
             {financeAnalysis.ctaAction && (
               <button
                 onClick={() => {
-                  if (financeAnalysis.ctaAction === 'schedule') setIsModalOpen(true);
+                  if (financeAnalysis.ctaAction === 'schedule') onFillAgenda();
                   else if (financeAnalysis.ctaAction === 'agenda') setActiveTab('agenda');
                   else if (financeAnalysis.ctaAction === 'patients') setActiveTab('pacientes');
                   else if (financeAnalysis.ctaAction === 'income') onOpenTransactionModal('INCOME');
@@ -1321,7 +1323,7 @@ export function Finance({
             {financeAnalysis.ctaAction && financeAnalysis.ctaLabel && (
               <button
                 onClick={() => {
-                  if (financeAnalysis.ctaAction === 'schedule') setIsModalOpen(true);
+                  if (financeAnalysis.ctaAction === 'schedule') onFillAgenda();
                   else if (financeAnalysis.ctaAction === 'agenda') setActiveTab('agenda');
                   else if (financeAnalysis.ctaAction === 'patients') setActiveTab('pacientes');
                   else if (financeAnalysis.ctaAction === 'income') onOpenTransactionModal('INCOME');
