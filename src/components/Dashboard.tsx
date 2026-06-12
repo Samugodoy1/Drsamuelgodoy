@@ -535,135 +535,110 @@ export const Dashboard: React.FC<DashboardProps> = ({
     !activationComplete || wasInOnboarding.current
   );
 
-  const completedSteps =
-    (hasPatients ? 1 : 0) +
-    (hasAppointments ? 1 : 0) +
-    (recordOpened ? 1 : 0);
-  const step3Active = hasPatients && hasAppointments && !recordOpened;
-  const step4Active = activationComplete;
-  const totalSteps = 4;
+  const totalSteps = 5;
   const firstPatient = patients[0];
-  const step3Ref = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    if (step3Active && step3Ref.current) {
-      step3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [step3Active]);
-  if (!welcomeSeen && !hasPatients && !hasAppointments && !onboardingDismissed) {
+  const getOnboardingStep = () => {
+    if (!welcomeSeen && !hasPatients && !hasAppointments && !recordOpened) return 1;
+    if (!hasPatients) return 2;
+    if (!hasAppointments) return 3;
+    if (!recordOpened) return 4;
+    return 5;
+  };
+
+  const currentOnboardingStep = getOnboardingStep();
+  const completedSteps = Math.max(0, currentOnboardingStep - 1);
+
+  if (showOnboarding && currentOnboardingStep === 1) {
     return (
-      <div className="flex flex-col gap-10 pb-32 pt-8 px-2 max-w-2xl mx-auto">
-        {/* Identity */}
+      <div className="flex flex-col gap-8 pb-32 pt-8 px-2 max-w-2xl mx-auto">
         <motion.header
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center space-y-4 pt-6"
+          className="space-y-3 px-2 pt-4"
         >
-          <div className="w-16 h-16 bg-primary rounded-[20px] flex items-center justify-center text-white shadow-lg shadow-primary/20 mx-auto">
-            <Stethoscope size={32} />
+          <div className="w-12 h-12 bg-primary/10 rounded-[16px] flex items-center justify-center">
+            <Sparkles size={24} className="text-primary" />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-[32px] font-bold tracking-tight text-[#1C1C1E]">
-              Bem-vindo ao OdontoHub
-            </h1>
-            <p className="text-[17px] text-[#8E8E93] leading-relaxed max-w-md mx-auto">
-              Seu consultório organizado em um só lugar: pacientes, agenda, prontuários e financeiro.
-            </p>
-          </div>
+          <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2]">
+            Seu consultório não precisa de mais dados. Precisa de menos decisões.
+          </h1>
+          <p className="text-[15px] text-[#8E8E93] leading-relaxed">
+            Veja como o OdontoHub organiza sua rotina — antes de cadastrar qualquer coisa.
+          </p>
         </motion.header>
 
-        {/* How it works — the mental model */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
-          className="space-y-4"
+          className="space-y-3"
         >
-          <h2 className="text-[13px] font-bold text-[#8E8E93] uppercase tracking-widest px-2">
-            Como funciona
-          </h2>
-          <div className="bg-white rounded-[24px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] divide-y divide-slate-50">
-            {[
-              {
-                icon: <UserPlus size={20} className="text-primary" />,
-                bg: 'bg-primary/10',
-                title: 'Cadastre seus pacientes',
-                desc: 'Prontuário, odontograma e histórico completo em um só lugar.',
-              },
-              {
-                icon: <Calendar size={20} className="text-violet-600" />,
-                bg: 'bg-violet-50',
-                title: 'Organize sua agenda',
-                desc: 'Agende consultas e o sistema envia lembretes automáticos.',
-              },
-              {
-                icon: <ClipboardList size={20} className="text-sky-600" />,
-                bg: 'bg-sky-50',
-                title: 'Atenda e registre',
-                desc: 'Evolução clínica, procedimentos e plano de tratamento.',
-              },
-              {
-                icon: <DollarSign size={20} className="text-emerald-600" />,
-                bg: 'bg-emerald-50',
-                title: 'Controle financeiro',
-                desc: 'Receitas, despesas e parcelamentos sem planilha.',
-              },
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-4 p-5">
-                <div className={`w-10 h-10 ${item.bg} rounded-[14px] flex items-center justify-center shrink-0`}>
-                  {item.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold text-[#1C1C1E]">{item.title}</p>
-                  <p className="text-[13px] text-[#8E8E93] mt-0.5">{item.desc}</p>
-                </div>
-                <div className="flex items-center justify-center w-6 h-6 bg-slate-50 rounded-full text-[11px] font-bold text-[#8E8E93] shrink-0 mt-1">
-                  {i + 1}
-                </div>
+          <p className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-widest px-2">
+            Prévia do seu painel
+          </p>
+
+          <div className="rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1E4430] via-[#264E36] to-[#3A6B4E] p-6 shadow-[0_16px_48px_rgba(30,68,48,0.2)]">
+            <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
+              Próximo atendimento
+            </span>
+            <div className="flex items-start justify-between gap-4 mt-2">
+              <div>
+                <p className="text-[28px] font-bold text-white leading-tight tracking-tight">Maria Silva</p>
+                <p className="text-[14px] text-white/70 mt-1">Limpeza · daqui a 45 min</p>
               </div>
-            ))}
+              <div className="w-12 h-12 rounded-[16px] bg-white/15 border border-white/20 flex items-center justify-center text-white font-bold text-lg shrink-0">
+                M
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 text-white">Confirmado</span>
+              <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-white text-[#1E4430]">09:00</span>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <div className="bg-white rounded-[20px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-4 flex items-center gap-4">
+              <div className="w-10 h-10 bg-rose-50 rounded-[14px] flex items-center justify-center shrink-0">
+                <UserX size={20} className="text-rose-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#1C1C1E]">Paciente sem retorno</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5">João Costa · 4 meses sem visita</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 shrink-0">Urgente</span>
+            </div>
+
+            <div className="bg-white rounded-[20px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-4 flex items-center gap-4">
+              <div className="w-10 h-10 bg-amber-50 rounded-[14px] flex items-center justify-center shrink-0">
+                <Calendar size={20} className="text-amber-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#1C1C1E]">Consulta sem confirmação</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5">Ana Souza · amanhã às 14:00</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 shrink-0">Pendente</span>
+            </div>
+
+            <div className="bg-white rounded-[20px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-4 flex items-center gap-4">
+              <div className="w-10 h-10 bg-emerald-50 rounded-[14px] flex items-center justify-center shrink-0">
+                <DollarSign size={20} className="text-emerald-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#1C1C1E]">Faturamento do dia</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5">3 consultas · 1 pendente</p>
+              </div>
+              <p className="text-[18px] font-bold text-emerald-600 shrink-0">R$ 850</p>
+            </div>
           </div>
         </motion.section>
 
-        {/* Navigation guide */}
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.4 }}
-          className="space-y-4"
-        >
-          <h2 className="text-[13px] font-bold text-[#8E8E93] uppercase tracking-widest px-2">
-            Onde encontrar cada coisa
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: <Users size={18} />, label: 'Pacientes', desc: 'Cadastro e prontuário', color: 'text-primary', bg: 'bg-primary/5 border-primary/10' },
-              { icon: <Calendar size={18} />, label: 'Agenda', desc: 'Consultas do dia', color: 'text-violet-600', bg: 'bg-violet-50/50 border-violet-100' },
-              { icon: <DollarSign size={18} />, label: 'Financeiro', desc: 'Receitas e despesas', color: 'text-emerald-600', bg: 'bg-emerald-50/50 border-emerald-100' },
-              { icon: <FileText size={18} />, label: 'Documentos', desc: 'Atestados e receitas', color: 'text-sky-600', bg: 'bg-sky-50/50 border-sky-100' },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.35 + i * 0.05 }}
-                className={`rounded-[18px] border p-4 space-y-2 ${item.bg}`}
-              >
-                <span className={item.color}>{item.icon}</span>
-                <p className="text-[14px] font-bold text-[#1C1C1E]">{item.label}</p>
-                <p className="text-[11px] text-[#8E8E93]">{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
-        {/* CTA */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="px-2 pt-4"
+          transition={{ delay: 0.35, duration: 0.4 }}
+          className="px-2 pt-2"
         >
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -673,39 +648,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
             }}
             className="w-full flex items-center justify-center gap-3 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all"
           >
-            Começar a usar o OdontoHub
+            Vamos começar
             <ArrowRight size={18} />
           </motion.button>
-          <p className="text-center text-[12px] text-[#8E8E93] mt-3">
-            Leva menos de 2 minutos para configurar
-          </p>
         </motion.div>
       </div>
     );
   }
 
-  // ─── Onboarding Steps (after welcome, before setup is complete) ────
+  // ─── Onboarding Steps 2–5 (one focused step at a time) ────
   if (showOnboarding) {
-    const getOnboardingMessage = () => {
-      if (!hasPatients) return 'Vamos configurar seu consultório. Comece cadastrando seu primeiro paciente.';
-      if (!hasAppointments) return 'Ótimo! Agora agende a primeira consulta para ativar sua agenda.';
-      if (!recordOpened) return 'Quase lá! Abra o prontuário para ver odontograma, evolução e histórico.';
-      return 'Tudo pronto! Seu consultório está configurado.';
+    const stepTitles: Record<number, string> = {
+      2: 'Para chegar lá, preciso conhecer pelo menos um paciente.',
+      3: 'Agora consigo acompanhar a jornada desse paciente.',
+      4: 'Aqui é onde a história clínica começa.',
+      5: 'Pronto. Agora o OdontoHub pode começar a trabalhar por você.',
     };
 
     return (
       <div className="flex flex-col gap-8 pb-32 pt-10 px-2 max-w-2xl mx-auto">
-        {/* Header */}
-        <header className="space-y-1.5 px-2">
-          <h1 className="text-[28px] font-bold tracking-tight text-[#1C1C1E]">
-            {timeGreeting.text}, {getGreetingName()} <span className="text-[14px] align-middle">{timeGreeting.emoji}</span>
-          </h1>
-          <p className="text-[17px] font-medium text-[#8E8E93]">
-            {getOnboardingMessage()}
-          </p>
-        </header>
-
-        {/* Progress indicator */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -725,359 +686,159 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </span>
         </motion.div>
 
-        {/* ── Step 1: Add patient ── */}
+        <motion.header
+          key={currentOnboardingStep}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="space-y-2 px-2"
+        >
+          <span className="text-[11px] font-bold text-primary uppercase tracking-widest">
+            Passo {currentOnboardingStep} de {totalSteps}
+          </span>
+          <h1 className="text-[24px] sm:text-[28px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2]">
+            {stepTitles[currentOnboardingStep]}
+          </h1>
+        </motion.header>
+
         <motion.section
+          key={`step-${currentOnboardingStep}`}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.35 }}
-          className="space-y-3"
+          className="bg-white rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5"
         >
-          <div className="px-2 flex items-center gap-2">
-            {hasPatients ? (
-              <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                <Check size={12} className="text-white" strokeWidth={3} />
-              </div>
-            ) : (
-              <div className="w-5 h-5 rounded-full border-2 border-primary" />
-            )}
-            <span className="text-[11px] font-bold text-primary uppercase tracking-widest">
-              Passo 1
-            </span>
-            {hasPatients && (
-              <motion.span
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-[11px] font-bold text-primary/60 ml-1"
-              >
-                Concluído
-              </motion.span>
-            )}
-          </div>
-          <motion.div
-            animate={{ opacity: hasPatients ? 0.55 : 1 }}
-            transition={{ duration: 0.25 }}
-            className={`bg-white rounded-[28px] border shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5 ${
-              hasPatients ? 'border-primary/20' : 'border-slate-100'
-            }`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-[18px] flex items-center justify-center shrink-0">
-                {hasPatients ? (
-                  <Check size={22} className="text-primary" />
-                ) : (
+          {currentOnboardingStep === 2 && (
+            <>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-[18px] flex items-center justify-center shrink-0">
                   <UserPlus size={22} className="text-primary" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
-                  {hasPatients ? 'Paciente cadastrado' : 'Cadastre seu primeiro paciente'}
-                </h3>
-                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
-                  {hasPatients
-                    ? `${patients.length} paciente${patients.length > 1 ? 's' : ''} no sistema. Clique em "Pacientes" no menu lateral para gerenciar.`
-                    : 'Clique no botão abaixo ou acesse "Pacientes" no menu lateral. Prontuário, odontograma e financeiro ficam organizados automaticamente.'
-                  }
+                </div>
+                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                  Com um paciente cadastrado, o painel que você viu passa a refletir a sua rotina real.
                 </p>
               </div>
-            </div>
-
-            {/* Preview: what a patient record looks like */}
-            {!hasPatients && (
-              <>
-                <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">M</div>
-                    <div>
-                      <p className="text-[13px] font-semibold text-[#1C1C1E]">Maria Silva</p>
-                      <p className="text-[11px] text-[#8E8E93]">Última visita: há 3 dias · Em tratamento</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Prontuário</span>
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Odontograma</span>
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Evolução</span>
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-slate-500 border border-slate-100">Financeiro</span>
+              <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">?</div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#1C1C1E]">Seu primeiro paciente</p>
+                    <p className="text-[11px] text-[#8E8E93]">Prontuário · Odontograma · Evolução · Financeiro</p>
                   </div>
                 </div>
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => setIsPatientModalOpen(true)}
-                  className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
-                >
-                  Cadastrar primeiro paciente
-                  <ArrowRight size={15} />
-                </motion.button>
-              </>
-            )}
-          </motion.div>
-        </motion.section>
-
-        {/* ── Step 2: Schedule first appointment ── */}
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.35 }}
-          className="space-y-3"
-        >
-          <div className="px-2 flex items-center gap-2">
-            {hasAppointments ? (
-              <div className="w-5 h-5 bg-violet-500 rounded-full flex items-center justify-center">
-                <Check size={12} className="text-white" strokeWidth={3} />
               </div>
-            ) : (
-              <div className={`w-5 h-5 rounded-full border-2 ${hasPatients ? 'border-violet-500' : 'border-slate-200'}`} />
-            )}
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${
-              hasPatients ? 'text-violet-600' : 'text-slate-300'
-            }`}>
-              Passo 2
-            </span>
-            {hasAppointments && (
-              <motion.span
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-[11px] font-bold text-violet-400 ml-1"
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsPatientModalOpen(true)}
+                className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
               >
-                Concluído
-              </motion.span>
-            )}
-          </div>
-          <motion.div
-            animate={{ opacity: hasAppointments ? 0.55 : hasPatients ? 1 : 0.45 }}
-            transition={{ duration: 0.25 }}
-            className={`bg-white rounded-[28px] border shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5 ${
-              hasAppointments ? 'border-violet-200' : hasPatients ? 'border-slate-100' : 'border-slate-50'
-            }`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-violet-50 rounded-[18px] flex items-center justify-center shrink-0">
-                {hasAppointments ? (
-                  <Check size={22} className="text-violet-500" />
-                ) : (
+                Cadastrar primeiro paciente
+                <ArrowRight size={15} />
+              </motion.button>
+            </>
+          )}
+
+          {currentOnboardingStep === 3 && (
+            <>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-violet-50 rounded-[18px] flex items-center justify-center shrink-0">
                   <Calendar size={22} className="text-violet-500" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
-                  {hasAppointments ? 'Agenda ativa' : 'Agende a primeira consulta'}
-                </h3>
-                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
-                  {hasAppointments
-                    ? 'Sua agenda está funcionando. Acesse "Agenda" no menu lateral para ver e gerenciar consultas.'
-                    : hasPatients
-                      ? 'Clique no botão abaixo ou acesse "Agenda" no menu lateral. O sistema envia lembretes automaticamente para seus pacientes.'
-                      : 'Primeiro cadastre um paciente (passo 1), depois você poderá agendar consultas aqui.'
-                  }
+                </div>
+                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                  {firstPatient
+                    ? `Agende a consulta de ${firstPatient.name?.split(' ')[0] || 'seu paciente'} e eu passo a acompanhar retornos, confirmações e alertas.`
+                    : 'Agende a primeira consulta e eu passo a acompanhar retornos, confirmações e alertas.'}
                 </p>
               </div>
-            </div>
-
-            {/* Preview: what the agenda looks like */}
-            {hasPatients && !hasAppointments && (
-              <>
-                <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2 border border-slate-100/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">Prévia da sua agenda</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {[
-                      { time: '09:00', name: patients[0]?.name?.split(' ')[0] || 'Paciente', proc: 'Avaliação', color: 'bg-primary/10 text-primary' },
-                      { time: '10:30', name: '—', proc: 'Horário livre', color: 'bg-slate-100 text-slate-400' },
-                      { time: '14:00', name: '—', proc: 'Horário livre', color: 'bg-slate-100 text-slate-400' },
-                    ].map((row, i) => (
-                      <div key={i} className="flex items-center gap-3 py-1.5">
-                        <span className="text-[12px] font-bold text-[#1C1C1E] w-10 shrink-0">{row.time}</span>
-                        <div className={`flex-1 px-3 py-2 rounded-xl text-[12px] font-medium ${row.color}`}>
-                          {row.name} · {row.proc}
-                        </div>
-                      </div>
-                    ))}
+              <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2 border border-slate-100/50">
+                <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">Próximo passo na agenda</span>
+                <div className="flex items-center gap-3 py-1.5">
+                  <span className="text-[12px] font-bold text-[#1C1C1E] w-10 shrink-0">—</span>
+                  <div className="flex-1 px-3 py-2 rounded-xl text-[12px] font-medium bg-primary/10 text-primary">
+                    {firstPatient?.name?.split(' ')[0] || 'Paciente'} · Primeira consulta
                   </div>
                 </div>
-                <motion.button
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15, duration: 0.25 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex items-center gap-2.5 bg-violet-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(109,40,217,0.15)] hover:bg-violet-700 transition-all"
-                >
-                  Agendar primeira consulta
-                  <ArrowRight size={15} />
-                </motion.button>
-              </>
-            )}
-          </motion.div>
-        </motion.section>
-
-        {/* ── Step 3: Open clinical record ── */}
-        <motion.section
-          ref={step3Ref}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.35 }}
-          className="space-y-3"
-        >
-          <div className="px-2 flex items-center gap-2">
-            {recordOpened ? (
-              <div className="w-5 h-5 bg-sky-500 rounded-full flex items-center justify-center">
-                <Check size={12} className="text-white" strokeWidth={3} />
               </div>
-            ) : (
-              <div className={`w-5 h-5 rounded-full border-2 ${step3Active ? 'border-sky-500' : 'border-slate-200'}`} />
-            )}
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${
-              step3Active || recordOpened ? 'text-sky-600' : 'text-slate-300'
-            }`}>
-              Passo 3
-            </span>
-            {recordOpened && (
-              <motion.span
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-[11px] font-bold text-sky-400 ml-1"
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2.5 bg-violet-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(109,40,217,0.15)] hover:bg-violet-700 transition-all"
               >
-                Concluído
-              </motion.span>
-            )}
-          </div>
-          <motion.div
-            animate={{ opacity: recordOpened ? 0.55 : step3Active ? 1 : hasAppointments ? 0.5 : 0.35 }}
-            transition={{ duration: 0.25 }}
-            className={`bg-white rounded-[28px] border shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5 ${
-              recordOpened ? 'border-sky-200' : step3Active ? 'border-sky-100 ring-2 ring-sky-500/10' : 'border-slate-50'
-            }`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-sky-50 rounded-[18px] flex items-center justify-center shrink-0">
-                {recordOpened ? (
-                  <Check size={22} className="text-sky-500" />
-                ) : (
+                Agendar primeira consulta
+                <ArrowRight size={15} />
+              </motion.button>
+            </>
+          )}
+
+          {currentOnboardingStep === 4 && firstPatient && (
+            <>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-sky-50 rounded-[18px] flex items-center justify-center shrink-0">
                   <ClipboardList size={22} className="text-sky-500" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">
-                  {recordOpened ? 'Prontuário explorado' : 'Abra o prontuário do paciente'}
-                </h3>
-                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
-                  {recordOpened
-                    ? 'Odontograma, evolução clínica e plano de tratamento ficam organizados no prontuário.'
-                    : step3Active
-                      ? `Clique abaixo para abrir o prontuário de ${firstPatient?.name?.split(' ')[0] || 'seu paciente'}. É aqui que você registra atendimentos de verdade.`
-                      : 'Após cadastrar paciente e agendar consulta, abra o prontuário para conhecer o coração do sistema.'
-                  }
+                </div>
+                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                  Odontograma, evolução clínica e plano de tratamento ficam organizados no prontuário de {firstPatient.name?.split(' ')[0]}.
                 </p>
               </div>
-            </div>
-
-            {step3Active && firstPatient && (
-              <>
-                <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-xs">
-                      {(firstPatient.name || '?')[0]?.toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-semibold text-[#1C1C1E]">{firstPatient.name}</p>
-                      <p className="text-[11px] text-[#8E8E93]">Prontuário · Odontograma · Evolução · Financeiro</p>
-                    </div>
+              <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-xs">
+                    {(firstPatient.name || '?')[0]?.toUpperCase()}
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-sky-600 border border-sky-100">Anamnese</span>
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-sky-600 border border-sky-100">Odontograma</span>
-                    <span className="px-2.5 py-1 bg-white rounded-lg text-[10px] font-bold text-sky-600 border border-sky-100">Evolução</span>
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#1C1C1E]">{firstPatient.name}</p>
+                    <p className="text-[11px] text-[#8E8E93]">Anamnese · Odontograma · Evolução</p>
                   </div>
                 </div>
-                <motion.button
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15, duration: 0.25 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => openPatientRecord(firstPatient.id)}
-                  className="flex items-center gap-2.5 bg-sky-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(2,132,199,0.2)] hover:bg-sky-700 transition-all"
-                >
-                  Abrir prontuário de {firstPatient.name?.split(' ')[0] || 'paciente'}
-                  <ArrowRight size={15} />
-                </motion.button>
-              </>
-            )}
-          </motion.div>
-        </motion.section>
-
-        {/* ── Step 4: Finish setup ── */}
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.35 }}
-          className="space-y-3"
-        >
-          <div className="px-2 flex items-center gap-2">
-            <div className={`w-5 h-5 rounded-full border-2 ${step4Active ? 'border-amber-500' : 'border-slate-200'}`} />
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${
-              step4Active ? 'text-amber-600' : 'text-slate-300'
-            }`}>
-              Passo 4
-            </span>
-          </div>
-          <motion.div
-            animate={{ opacity: step4Active ? 1 : recordOpened ? 0.6 : 0.35 }}
-            transition={{ duration: 0.25 }}
-            className="bg-white rounded-[28px] border border-slate-50 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-7 sm:p-8 space-y-5"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-amber-50 rounded-[18px] flex items-center justify-center shrink-0">
-                <Sparkles size={22} className="text-amber-500" />
               </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[18px] sm:text-[20px] font-bold text-[#1C1C1E] tracking-tight">Pronto! Explore seu painel</h3>
-                <p className="text-[14px] text-[#8E8E93] mt-1 leading-relaxed">
-                  {step4Active
-                    ? 'Seu consultório está configurado. A tela de Início mostra próximos atendimentos, alertas e sugestões inteligentes.'
-                    : 'Após explorar o prontuário, esta tela mostrará tudo que você precisa saber no dia a dia.'
-                  }
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => openPatientRecord(firstPatient.id)}
+                className="flex items-center gap-2.5 bg-sky-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(2,132,199,0.2)] hover:bg-sky-700 transition-all"
+              >
+                Abrir prontuário
+                <ArrowRight size={15} />
+              </motion.button>
+            </>
+          )}
+
+          {currentOnboardingStep === 5 && (
+            <>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-emerald-50 rounded-[18px] flex items-center justify-center shrink-0">
+                  <Sparkles size={22} className="text-emerald-500" />
+                </div>
+                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                  Próximos atendimentos, pacientes sem retorno, confirmações pendentes e faturamento — tudo no mesmo lugar.
                 </p>
               </div>
-            </div>
-
-            <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
-              <div className="flex items-center gap-2.5 py-1">
-                <div className="w-2 h-2 bg-rose-400 rounded-full animate-pulse shrink-0" />
-                <p className="text-[12px] text-[#636366] font-medium">Pacientes que precisam de retorno</p>
-              </div>
-              <div className="flex items-center gap-2.5 py-1">
-                <div className="w-2 h-2 bg-violet-400 rounded-full shrink-0" />
-                <p className="text-[12px] text-[#636366] font-medium">Encaixes sugeridos na agenda</p>
-              </div>
-              <div className="flex items-center gap-2.5 py-1">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
-                <p className="text-[12px] text-[#636366] font-medium">Potencial financeiro da semana</p>
-              </div>
-            </div>
-
-            {step4Active && (
-              <>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-3">
-                  <Check size={18} className="text-emerald-600 shrink-0" />
-                  <p className="text-[13px] font-semibold text-emerald-700">Consultório ativado! Você já pode usar o sistema normalmente.</p>
+              <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
+                <div className="flex items-center gap-2.5 py-1">
+                  <div className="w-2 h-2 bg-primary rounded-full shrink-0" />
+                  <p className="text-[12px] text-[#636366] font-medium">Próximo atendimento do dia</p>
                 </div>
-                <motion.button
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.3 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => {
-                    setOnboardingDismissed(true);
-                    onDismissOnboarding();
-                  }}
-                  className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
-                >
-                  Ir para o painel principal
-                  <ArrowRight size={15} />
-                </motion.button>
-              </>
-            )}
-          </motion.div>
+                <div className="flex items-center gap-2.5 py-1">
+                  <div className="w-2 h-2 bg-rose-400 rounded-full shrink-0" />
+                  <p className="text-[12px] text-[#636366] font-medium">Pacientes que precisam de retorno</p>
+                </div>
+                <div className="flex items-center gap-2.5 py-1">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
+                  <p className="text-[12px] text-[#636366] font-medium">Faturamento e alertas do dia</p>
+                </div>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  setOnboardingDismissed(true);
+                  onDismissOnboarding();
+                }}
+                className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
+              >
+                Ir para minha rotina
+                <ArrowRight size={15} />
+              </motion.button>
+            </>
+          )}
         </motion.section>
       </div>
     );
