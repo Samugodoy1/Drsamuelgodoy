@@ -24,6 +24,27 @@ interface ClinicInfo {
   dentist_photo: string;
 }
 
+// ─── CPF: máscara e validação ───
+const formatCpf = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+};
+
+const isValidCpf = (value: string) => {
+  const cpf = value.replace(/\D/g, '');
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const calc = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += parseInt(cpf[i]) * (len + 1 - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+  return calc(9) === parseInt(cpf[9]) && calc(10) === parseInt(cpf[10]);
+};
+
 interface PatientInfo {
   id: number;
   name: string;
@@ -68,10 +89,16 @@ export function PreAtendimento() {
     GENERAL_TERMS: false
   });
 
+  // Validação por passo (mensagem amigável, sem bloquear o que não é essencial)
+  const [stepError, setStepError] = useState<string | null>(null);
+
   // Signature pad
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  // Alternativa acessível: digitar o nome em vez de desenhar
+  const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw');
+  const [typedSignature, setTypedSignature] = useState('');
 
   // File upload
   const [files, setFiles] = useState<File[]>([]);
@@ -123,7 +150,9 @@ export function PreAtendimento() {
       if (!formRes.ok) throw new Error('Erro ao enviar ficha');
 
       // 2. Sign consents
-      const signatureData = canvasRef.current?.toDataURL('image/png') || 'accepted-digitally';
+      const signatureData = signatureMode === 'type' && typedSignature.trim()
+        ? `typed:${typedSignature.trim()}`
+        : canvasRef.current?.toDataURL('image/png') || 'accepted-digitally';
 
       for (const [type, accepted] of Object.entries(consentsAccepted)) {
         if (accepted) {
@@ -354,14 +383,14 @@ export function PreAtendimento() {
                 />
                 <FormField
                   label="Hábitos"
-                  placeholder="Tabagismo, bruxismo, ranger dentes, morder objetos..."
+                  placeholder="Fumar, ranger os dentes, roer unhas, morder objetos..."
                   value={form.habits}
                   onChange={(v) => setForm({ ...form, habits: v })}
                   multiline
                 />
                 <FormField
                   label="Histórico Familiar"
-                  placeholder="Doenças na família: diabetes, hipertensão, cardiopatias..."
+                  placeholder="Doenças na família: diabetes, pressão alta, problemas de coração..."
                   value={form.family_history}
                   onChange={(v) => setForm({ ...form, family_history: v })}
                   multiline
@@ -376,20 +405,27 @@ export function PreAtendimento() {
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados do Paciente</p>
                     <p className="text-sm text-slate-500 mt-1">Complete as informações pessoais do paciente.</p>
                   </div>
-                  <FormField
-                    label="CPF"
-                    placeholder="000.000.000-00"
-                    type="text"
-                    inputMode="numeric"
-                    value={form.cpf}
-                    onChange={(v) => setForm({ ...form, cpf: v })}
-                  />
+                  <div>
+                    <FormField
+                      label="CPF"
+                      placeholder="000.000.000-00"
+                      type="text"
+                      inputMode="numeric"
+                      value={form.cpf}
+                      onChange={(v) => { setForm({ ...form, cpf: formatCpf(v) }); setStepError(null); }}
+                    />
+                    {form.cpf.replace(/\D/g, '').length === 11 && !isValidCpf(form.cpf) && (
+                      <p className="text-red-600 text-sm font-medium mt-1.5">
+                        Este CPF não parece correto. Confira os números, por favor.
+                      </p>
+                    )}
+                  </div>
                   <FormField
                     label="Data de Nascimento"
                     placeholder="Informe sua data de nascimento"
                     type="date"
                     value={form.birth_date}
-                    onChange={(v) => setForm({ ...form, birth_date: v })}
+                    onChange={(v) => { setForm({ ...form, birth_date: v }); setStepError(null); }}
                   />
                   <FormField
                     label="Documentos Pessoais"
@@ -513,37 +549,83 @@ export function PreAtendimento() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Pen size={16} className="text-slate-400" />
-                      <span className="text-sm font-semibold text-slate-700">Assinatura Digital</span>
+                      <Pen size={16} className="text-slate-500" />
+                      <span className="text-sm font-semibold text-slate-700">Assinatura</span>
                     </div>
-                    {hasSignature && (
+                    {signatureMode === 'draw' && hasSignature && (
                       <button
                         type="button"
                         onClick={clearSignature}
-                        className="text-xs text-red-500 hover:text-red-600 font-medium"
+                        className="text-sm text-red-500 hover:text-red-600 font-medium py-2 px-3 -my-2 -mx-3"
                       >
                         Limpar
                       </button>
                     )}
                   </div>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
-                    <canvas
-                      ref={canvasRef}
-                      width={500}
-                      height={150}
-                      className="w-full touch-none cursor-crosshair"
-                      onMouseDown={startDrawing}
-                      onMouseMove={draw}
-                      onMouseUp={stopDrawing}
-                      onMouseLeave={stopDrawing}
-                      onTouchStart={startDrawing}
-                      onTouchMove={draw}
-                      onTouchEnd={stopDrawing}
-                    />
+
+                  {/* Escolha do modo: desenhar ou digitar */}
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setSignatureMode('draw')}
+                      className={`flex-1 h-11 rounded-xl text-sm font-semibold transition-colors ${
+                        signatureMode === 'draw'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      Desenhar assinatura
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignatureMode('type')}
+                      className={`flex-1 h-11 rounded-xl text-sm font-semibold transition-colors ${
+                        signatureMode === 'type'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      Digitar meu nome
+                    </button>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 text-center">
-                    Desenhe sua assinatura acima com o dedo ou mouse
-                  </p>
+
+                  {signatureMode === 'draw' ? (
+                    <>
+                      <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                        <canvas
+                          ref={canvasRef}
+                          width={500}
+                          height={150}
+                          className="w-full touch-none cursor-crosshair"
+                          onMouseDown={startDrawing}
+                          onMouseMove={draw}
+                          onMouseUp={stopDrawing}
+                          onMouseLeave={stopDrawing}
+                          onTouchStart={startDrawing}
+                          onTouchMove={draw}
+                          onTouchEnd={stopDrawing}
+                        />
+                      </div>
+                      <p className="text-sm text-slate-500 mt-2 text-center">
+                        Desenhe sua assinatura acima com o dedo ou mouse.
+                        Se preferir, toque em "Digitar meu nome".
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={typedSignature}
+                        onChange={(e) => setTypedSignature(e.target.value)}
+                        placeholder="Digite seu nome completo"
+                        className="w-full px-4 py-3 h-[52px] bg-white border border-slate-200 rounded-xl text-lg text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                        style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive" }}
+                      />
+                      <p className="text-sm text-slate-500 mt-2 text-center">
+                        Seu nome digitado vale como assinatura.
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {error && (
@@ -560,11 +642,26 @@ export function PreAtendimento() {
 
       {/* Bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-4 z-50">
+        {stepError && (
+          <div className="max-w-2xl mx-auto mb-3">
+            <p role="alert" className="bg-red-50 text-red-600 text-sm font-medium p-3 rounded-xl flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0" />
+              {stepError}
+            </p>
+          </div>
+        )}
+        {step === 4 && (!Object.values(consentsAccepted).every(Boolean) || (signatureMode === 'draw' ? !hasSignature : !typedSignature.trim())) && (
+          <div className="max-w-2xl mx-auto mb-3">
+            <p className="text-slate-500 text-sm text-center">
+              Para enviar, aceite os três termos e faça sua assinatura.
+            </p>
+          </div>
+        )}
         <div className="max-w-2xl mx-auto flex gap-3">
           {step > 0 && (
             <button
               type="button"
-              onClick={() => setStep(step - 1)}
+              onClick={() => { setStepError(null); setStep(step - 1); }}
               className="flex items-center gap-2 px-5 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
             >
               <ChevronLeft size={16} /> Voltar
@@ -574,12 +671,31 @@ export function PreAtendimento() {
             type="button"
             onClick={() => {
               if (step < steps.length - 1) {
+                // Dados essenciais do passo "Informações Pessoais"
+                if (step === 2) {
+                  const cpfDigits = form.cpf.replace(/\D/g, '');
+                  if (cpfDigits.length > 0 && !isValidCpf(form.cpf)) {
+                    setStepError('O CPF informado não parece correto. Confira os números antes de continuar.');
+                    return;
+                  }
+                  if (cpfDigits.length === 0 || !form.birth_date) {
+                    setStepError('Para continuar, preencha o CPF e a data de nascimento.');
+                    return;
+                  }
+                }
+                setStepError(null);
                 setStep(step + 1);
               } else {
                 handleSubmitForm();
               }
             }}
-            disabled={submitting || (step === 4 && !Object.values(consentsAccepted).some(Boolean))}
+            disabled={
+              submitting ||
+              (step === 4 && (
+                !Object.values(consentsAccepted).every(Boolean) ||
+                (signatureMode === 'draw' ? !hasSignature : !typedSignature.trim())
+              ))
+            }
             className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all ${
               submitting
                 ? 'bg-slate-100 text-slate-400 cursor-wait'

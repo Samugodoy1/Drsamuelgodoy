@@ -1,28 +1,62 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../config';
 import {
   Calendar,
   FileText,
-  DollarSign,
-  Clock,
   CheckCircle2,
   AlertCircle,
-  ChevronRight,
-  Stethoscope,
-  Activity,
   CalendarPlus,
   User,
   Heart,
-  Shield,
   Download,
   X,
-  Home,
   ClipboardList,
   Phone,
-  MessageCircle
+  MessageCircle,
+  MapPin,
+  Copy
 } from '../icons';
+
+// ─── Helpers de data ───
+// A API envia horários como "YYYY-MM-DD HH:mm:ss" no relógio local da clínica
+// (America/Sao_Paulo), sem timezone. Interpretamos os componentes diretamente
+// para que o horário exibido seja sempre o horário da clínica, em qualquer aparelho.
+const parseWallClock = (s: string): Date => {
+  if (!s) return new Date(NaN);
+  const dt = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (dt) return new Date(+dt[1], +dt[2] - 1, +dt[3], +dt[4], +dt[5]);
+  const d = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (d) return new Date(+d[1], +d[2] - 1, +d[3]);
+  return new Date(s);
+};
+
+// Data de hoje no formato YYYY-MM-DD usando o relógio local (toISOString usa UTC
+// e à noite no Brasil já mostra o dia seguinte).
+const localDateISO = (d: Date = new Date()) => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+// Diferença em dias de calendário (0 = hoje, 1 = amanhã), ignorando horas.
+const calendarDaysUntil = (target: Date) => {
+  const now = new Date();
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+};
+
+const formatCurrencyBR = (v: number | string) =>
+  Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const phoneDigits = (phone?: string | null) => (phone || '').replace(/\D/g, '');
+
+const whatsappUrl = (phone?: string | null) => {
+  const digits = phoneDigits(phone);
+  if (digits.length < 10) return null;
+  return `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`;
+};
 
 interface PortalData {
   patient: {
@@ -105,6 +139,16 @@ interface PortalData {
     payment_date: string | null;
     procedure: string;
   }>;
+  appointment_requests?: Array<{
+    id: number;
+    status: string;
+    request_type: string;
+    preferred_date: string;
+    preferred_time: string | null;
+    notes: string | null;
+    created_at: string;
+    appointment_id: number | null;
+  }>;
   consents: Array<{
     consent_type: string;
     signed_at: string;
@@ -119,15 +163,13 @@ interface PortalData {
   } | null;
 }
 
-type Tab = 'inicio' | 'consultas' | 'evolucao' | 'documentos' | 'financeiro' | 'agendar';
-
 export function PatientPortal() {
   const { token } = useParams<{ token: string }>();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('inicio');
+  const [errorClinic, setErrorClinic] = useState<{ name?: string; phone?: string | null } | null>(null);
 
   // Appointment request form
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -142,7 +184,12 @@ export function PatientPortal() {
   const [scheduleTargetAppointment, setScheduleTargetAppointment] = useState<PortalData['appointments'][number] | null>(null);
   const [appointmentSubmittingId, setAppointmentSubmittingId] = useState<number | null>(null);
   const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<number | null>(null);
-  const [rescheduleRequestedAppointmentId, setRescheduleRequestedAppointmentId] = useState<number | null>(null);
+  const [confirmError, setConfirmError] = useState<{ id: number; message: string } | null>(null);
+
+  // Cancelamento de consulta
+  const [cancelTarget, setCancelTarget] = useState<PortalData['appointments'][number] | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const scheduleModalRef = useRef<HTMLDivElement | null>(null);
   const pixModalRef = useRef<HTMLDivElement | null>(null);
@@ -153,6 +200,8 @@ export function PatientPortal() {
   const [showAnamnesisModal, setShowAnamnesisModal] = useState(false);
   const [anamnesisForm, setAnamnesisForm] = useState({ allergies: '', medications: '', medical_history: '' });
   const [anamnesisSubmitting, setAnamnesisSubmitting] = useState(false);
+  const [anamnesisError, setAnamnesisError] = useState<string | null>(null);
+  const [anamnesisSaved, setAnamnesisSaved] = useState(false);
 
   const openAnamnesisModal = () => {
     if (data?.anamnesis) {
@@ -162,12 +211,15 @@ export function PatientPortal() {
         medical_history: data.anamnesis.medical_history || ''
       });
     }
+    setAnamnesisError(null);
+    setAnamnesisSaved(false);
     setShowAnamnesisModal(true);
   };
 
   const handleAnamnesisSubmit = async () => {
     if (!sessionToken) return;
     setAnamnesisSubmitting(true);
+    setAnamnesisError(null);
     try {
       const res = await fetch(`${API_URL}/api/portal/intake`, {
         method: 'POST',
@@ -181,17 +233,20 @@ export function PatientPortal() {
           medications: anamnesisForm.medications
         })
       });
-      if (!res.ok) throw new Error('Erro ao enviar ficha médica');
-      
+      if (!res.ok) throw new Error();
+
       setData((current: any) => current ? {
-        ...current, 
+        ...current,
         anamnesis: { ...current.anamnesis, ...anamnesisForm }
       } : current);
-      
-      setTimeout(() => setShowAnamnesisModal(false), 500);
-    } catch (err) {
-      console.error(err);
-      // Aqui você poderia colocar um estado de erro, se quiser mostrar uma mensagem pro paciente.
+
+      setAnamnesisSaved(true);
+      setTimeout(() => {
+        setShowAnamnesisModal(false);
+        setAnamnesisSaved(false);
+      }, 1600);
+    } catch {
+      setAnamnesisError('Não foi possível salvar. Verifique sua internet e toque em "Salvar" novamente.');
     } finally {
       setAnamnesisSubmitting(false);
     }
@@ -211,11 +266,15 @@ export function PatientPortal() {
   }, [token]);
 
   const authenticateAndLoad = async () => {
+    setLoading(true);
+    setError(null);
+    setErrorClinic(null);
     try {
       const authRes = await fetch(`${API_URL}/api/portal/auth/${token}`);
       const authData = await authRes.json();
       if (!authRes.ok) {
-        setError(authData.error || 'Link inválido ou expirado');
+        setError(authData.error || 'Este link não está mais ativo. Peça um novo link à sua clínica.');
+        if (authData.clinic) setErrorClinic(authData.clinic);
         setLoading(false);
         return;
       }
@@ -228,8 +287,8 @@ export function PatientPortal() {
       const portalData = await dataRes.json();
       if (!dataRes.ok) throw new Error(portalData.error);
       setData(portalData);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados');
+    } catch {
+      setError('Não conseguimos carregar seus dados. Verifique sua internet e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -259,9 +318,23 @@ export function PatientPortal() {
       });
       if (!res.ok) throw new Error('Erro ao solicitar');
       setScheduleSuccess(true);
-      if (isReschedule) {
-        setRescheduleRequestedAppointmentId(scheduleTargetAppointment.id);
-      }
+      // Registra localmente para o card "Aguardando a clínica" aparecer na hora
+      setData(current => current ? {
+        ...current,
+        appointment_requests: [
+          {
+            id: Date.now(),
+            status: 'PENDING',
+            request_type: isReschedule ? 'RESCHEDULE' : 'NEW',
+            preferred_date: scheduleForm.preferred_date,
+            preferred_time: scheduleForm.preferred_time || null,
+            notes: scheduleForm.notes || null,
+            created_at: new Date().toISOString(),
+            appointment_id: isReschedule && scheduleTargetAppointment ? scheduleTargetAppointment.id : null
+          },
+          ...(current.appointment_requests || [])
+        ]
+      } : current);
       setTimeout(() => {
         setShowScheduleModal(false);
         setScheduleSuccess(false);
@@ -276,20 +349,12 @@ export function PatientPortal() {
     }
   };
 
+  // Sem update otimista: o botão mostra "Confirmando..." e só vira
+  // "Presença confirmada" depois da resposta da API. Em erro, a mensagem
+  // permanece visível até o paciente tentar de novo.
   const handleConfirmAppointment = async (appointmentId: number) => {
-    // Optimistic update — muda status imediatamente na UI
-    setData((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        appointments: current.appointments.map((a) =>
-          a.id === appointmentId ? { ...a, status: 'CONFIRMED' } : a
-        )
-      };
-    });
-    setConfirmedAppointmentId(appointmentId);
+    setConfirmError(null);
     setAppointmentSubmittingId(appointmentId);
-
     try {
       const res = await fetch(`${API_URL}/api/portal/confirm-appointment`, {
         method: 'POST',
@@ -301,24 +366,63 @@ export function PatientPortal() {
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => null);
-        // Reverte update otimista em caso de erro
-        setData((current) => {
-          if (!current) return current;
-          return {
-            ...current,
-            appointments: current.appointments.map((a) =>
-              a.id === appointmentId ? { ...a, status: 'SCHEDULED' } : a
-            )
-          };
-        });
-        setConfirmedAppointmentId(null);
-        throw new Error(payload?.error || 'Erro ao confirmar consulta');
+        throw new Error(payload?.error || 'Não foi possível confirmar. Tente novamente.');
       }
+      setData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          appointments: current.appointments.map((a) =>
+            a.id === appointmentId ? { ...a, status: 'CONFIRMED' } : a
+          )
+        };
+      });
+      setConfirmedAppointmentId(appointmentId);
     } catch (err: any) {
-      setError(err.message || 'Erro ao confirmar consulta');
-      setTimeout(() => setError(null), 4000);
+      setConfirmError({ id: appointmentId, message: err.message || 'Não foi possível confirmar. Tente novamente.' });
     } finally {
       setAppointmentSubmittingId(null);
+    }
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!cancelTarget) return;
+    setCancelSubmitting(true);
+    setCancelError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/portal/cancel-appointment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({ appointment_id: cancelTarget.id })
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || 'Não foi possível enviar o pedido. Tente novamente.');
+      }
+      setData(current => current ? {
+        ...current,
+        appointment_requests: [
+          {
+            id: Date.now(),
+            status: 'PENDING',
+            request_type: 'CANCEL',
+            preferred_date: localDateISO(),
+            preferred_time: null,
+            notes: null,
+            created_at: new Date().toISOString(),
+            appointment_id: cancelTarget.id
+          },
+          ...(current.appointment_requests || [])
+        ]
+      } : current);
+      setCancelTarget(null);
+    } catch (err: any) {
+      setCancelError(err.message || 'Não foi possível enviar o pedido. Tente novamente.');
+    } finally {
+      setCancelSubmitting(false);
     }
   };
 
@@ -413,7 +517,7 @@ export function PatientPortal() {
     setScheduleTargetAppointment(appointment);
     setScheduleSuccess(false);
     setScheduleForm({
-      preferred_date: new Date(appointment.start_time).toLocaleDateString('en-CA'),
+      preferred_date: localDateISO(parseWallClock(appointment.start_time)),
       preferred_time: '',
       notes: ''
     });
@@ -430,93 +534,108 @@ export function PatientPortal() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-academy-bg flex items-center justify-center">
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
       <div className="flex flex-col items-center gap-5">
-        <div className="w-10 h-10 border-[3px] border-[#C6C6C8] border-t-[#0C9B72] rounded-full animate-spin" />
-        <p role="status" aria-live="polite" className="text-academy-muted text-[15px] font-medium tracking-tight">Carregando...</p>
+        <div className="w-10 h-10 border-[3px] border-[#E2E8F0] border-t-[#216153] rounded-full animate-spin" />
+        <p role="status" aria-live="polite" className="text-[#475569] text-[16px] font-medium tracking-tight">Carregando...</p>
       </div>
     </div>
   );
 
-  if (error && !data) return (
-    <div className="min-h-screen bg-academy-bg flex items-center justify-center px-6">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
-          <AlertCircle size={28} className="text-[#FF3B30]" />
+  if (error && !data) {
+    const errorPhoneDigits = phoneDigits(errorClinic?.phone);
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-6">
+        <div className="text-center max-w-sm w-full">
+          <div className="w-16 h-16 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-5">
+            <AlertCircle size={28} className="text-[#FF3B30]" />
+          </div>
+          <h2 className="text-[22px] font-bold text-[#0F172A] mb-2 tracking-tight">Não foi possível entrar</h2>
+          <p className="text-[#475569] text-[16px] leading-relaxed">{error}</p>
+
+          {errorClinic && (
+            <div className="mt-6 bg-white border border-[#E2E8F0] rounded-2xl p-5 text-left">
+              <p className="text-[#0F172A] text-[16px] font-bold mb-1">
+                {errorClinic.name || 'Sua clínica'}
+              </p>
+              <p className="text-[#475569] text-[15px] leading-relaxed mb-4">
+                Ligue e peça um novo link do portal — leva menos de um minuto.
+              </p>
+              {errorPhoneDigits && (
+                <a
+                  href={`tel:${errorPhoneDigits}`}
+                  className="w-full h-14 bg-[#216153] text-white rounded-xl font-bold text-[16px] flex items-center justify-center gap-3"
+                >
+                  <Phone size={20} />
+                  Ligar: {errorClinic.phone}
+                </a>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={authenticateAndLoad}
+            className="mt-6 w-full h-14 bg-white border border-[#E2E8F0] text-[#0F172A] rounded-xl font-bold text-[16px] active:bg-slate-50"
+          >
+            Tentar novamente
+          </button>
         </div>
-        <h2 className="text-[20px] font-semibold text-academy-text mb-2 tracking-tight">Acesso Indisponível</h2>
-        <p className="text-academy-muted text-[15px] leading-relaxed">{error}</p>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (!data) return null;
 
-  const { patient, clinic, appointments, evolution, files, payment_plans, transactions = [], installments = [] } = data;
+  const { patient, clinic, appointments, evolution, files, installments = [], appointment_requests = [] } = data;
 
   const futureAppointments = appointments
-    .filter(a => new Date(a.start_time) > new Date() && a.status !== 'CANCELLED')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  const pastAppointments = appointments
-    .filter(a => new Date(a.start_time) <= new Date() || a.status === 'CANCELLED')
-    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-
-  const tabs: { id: Tab; icon: React.ElementType; label: string }[] = [
-    { id: 'inicio', icon: Home, label: 'Início' },
-    { id: 'consultas', icon: Calendar, label: 'Consultas' },
-    { id: 'evolucao', icon: Activity, label: 'Evolução' },
-    { id: 'documentos', icon: FileText, label: 'Documentos' },
-    { id: 'financeiro', icon: DollarSign, label: 'Financeiro' },
-  ];
+    .filter(a => parseWallClock(a.start_time) > new Date() && a.status !== 'CANCELLED')
+    .sort((a, b) => parseWallClock(a.start_time).getTime() - parseWallClock(b.start_time).getTime());
 
   const formatDateBR = (d: string) => {
-    try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
+    try { return parseWallClock(d).toLocaleDateString('pt-BR'); } catch { return d; }
   };
 
   const formatTimeBR = (d: string) => {
-    try { return new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
+    try {
+      const date = parseWallClock(d);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    } catch { return ''; }
   };
 
-  const getConfirmationQuestion = (appointmentDate: string) => {
-    const date = new Date(appointmentDate);
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
-
-    const isSameDay = (left: Date, right: Date) => (
-      left.getFullYear() === right.getFullYear()
-      && left.getMonth() === right.getMonth()
-      && left.getDate() === right.getDate()
-    );
-
-    const dayLabel = isSameDay(date, today)
-      ? 'hoje'
-      : isSameDay(date, tomorrow)
-      ? 'amanhã'
-      : `dia ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-
-    return `Você vem ${dayLabel} às ${formatTimeBR(appointmentDate)}?`;
+  // "hoje", "amanhã" ou "sexta-feira, dia 15/08" — datas por extenso ajudam todos os públicos
+  const friendlyDayLabel = (d: string) => {
+    const date = parseWallClock(d);
+    const days = calendarDaysUntil(date);
+    if (days === 0) return 'hoje';
+    if (days === 1) return 'amanhã';
+    const weekday = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+    const dayMonth = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return `${weekday}, dia ${dayMonth}`;
   };
 
-  const statusLabel = (s: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      'SCHEDULED': { label: 'Agendado', color: 'bg-[#007AFF]/10 text-[#007AFF]' },
-      'CONFIRMED': { label: 'Confirmado', color: 'bg-[#34C759]/10 text-[#34C759]' },
-      'IN_PROGRESS': { label: 'Em Atendimento', color: 'bg-[#FF9500]/10 text-[#FF9500]' },
-      'FINISHED': { label: 'Finalizado', color: 'bg-academy-border text-academy-muted' },
-      'CANCELLED': { label: 'Cancelado', color: 'bg-[#FF3B30]/10 text-[#FF3B30]' },
-      'NO_SHOW': { label: 'Faltou', color: 'bg-[#FF3B30]/10 text-[#FF3B30]' }
-    };
-    return map[s] || { label: s, color: 'bg-academy-border text-academy-muted' };
+  const friendlyTimeLabel = (d: string) => {
+    const t = formatTimeBR(d);
+    return t.endsWith(':00') ? t.replace(':00', 'h') : t.replace(':', 'h');
   };
 
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bom dia';
-    if (h < 18) return 'Boa tarde';
-    return 'Boa noite';
+  // Parcelas em aberto (financeiro)
+  const pendingInstallments = installments
+    .filter(i => !i.payment_date && i.status !== 'PAID' && i.status !== 'CANCELLED')
+    .sort((a, b) => parseWallClock(a.due_date).getTime() - parseWallClock(b.due_date).getTime());
+  const nextInstallment = pendingInstallments[0] || null;
+
+  // Pedidos do paciente aguardando resposta da clínica
+  const pendingRequests = appointment_requests.filter(r => r.status === 'PENDING');
+  const requestTypeLabel = (t: string) => {
+    if (t === 'RESCHEDULE') return 'Pedido para remarcar consulta';
+    if (t === 'CANCEL') return 'Pedido para cancelar consulta';
+    return 'Pedido de nova consulta';
   };
+
+  const clinicPhoneDigits = phoneDigits(clinic?.phone);
+  const clinicWhatsapp = whatsappUrl(clinic?.phone);
 
   // ─── Detect recent procedures for post-care guide ───
   type ProcedureCategory = 'implante' | 'enxerto' | 'extracao' | 'cirurgia' | 'canal' | 'restauracao' | 'clareamento' | 'protese' | 'ortodontia' | 'raspagem' | 'limpeza';
@@ -742,22 +861,34 @@ export function PatientPortal() {
         {error || (scheduleSuccess ? (scheduleMode === 'reschedule' ? 'Pedido de reagendamento enviado' : 'Solicitação de agendamento enviada') : '') || (paymentInformed ? 'Pagamento informado' : '') || (pixCopied ? 'Chave PIX copiada' : '')}
       </div>
 
-      {/* ─── Header Minimalista ─── */}
-      <div className="px-6 pt-10 pb-4 flex items-center gap-3">
+      {/* ─── Header: clínica + atalho de ligação ─── */}
+      <div className="px-6 pt-8 pb-4 max-w-lg mx-auto flex items-center gap-3">
         {clinic?.photo_url ? (
-          <img src={clinic.photo_url} alt="Dentista" className="w-10 h-10 rounded-[10px] object-cover shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-slate-100/50" />
+          <img src={clinic.photo_url} alt="" className="w-11 h-11 rounded-[12px] object-cover shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-slate-100/50" />
         ) : (
-          <div className="w-10 h-10 bg-[#216153] rounded-[10px] flex items-center justify-center text-white font-bold text-lg tracking-tight">
-            {clinic?.name ? clinic.name.charAt(0).toUpperCase() : 'OH'}
+          <div className="w-11 h-11 bg-[#216153] rounded-[12px] flex items-center justify-center text-white font-bold text-lg tracking-tight">
+            {(clinic?.clinic_name || clinic?.name || 'C').charAt(0).toUpperCase()}
           </div>
         )}
-        <p className="text-[#216153] text-[13px] font-bold tracking-[0.1em]">PORTAL DO PACIENTE</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-[#0F172A] text-[16px] font-bold truncate">{clinic?.clinic_name || clinic?.name || 'Sua clínica'}</p>
+          <p className="text-[#216153] text-[13px] font-semibold">Portal do Paciente</p>
+        </div>
+        {clinicPhoneDigits && (
+          <a
+            href={`tel:${clinicPhoneDigits}`}
+            aria-label="Ligar para a clínica"
+            className="w-11 h-11 bg-[#216153]/10 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+          >
+            <Phone size={20} className="text-[#216153]" />
+          </a>
+        )}
       </div>
 
       {/* ─── Content ─── */}
-      <div className="px-6 pt-8 max-w-lg mx-auto">
+      <div className="px-6 pt-6 max-w-lg mx-auto">
         {/* Saudação */}
-        <div className="mb-10">
+        <div className="mb-8">
           <h1 className="text-[32px] font-bold text-[#0F172A] leading-tight tracking-tight">
             Olá, {(() => {
               const parts = patient.name.trim().split(/\s+/);
@@ -766,106 +897,265 @@ export function PatientPortal() {
               return firstSurname ? `${firstName} ${firstSurname}` : firstName;
             })()}
           </h1>
-          {futureAppointments.length > 0 ? (
-            (() => {
-              const nextDate = new Date(futureAppointments[0].start_time);
-              const today = new Date();
-              const tomorrow = new Date();
-              tomorrow.setDate(today.getDate() + 1);
-
-              const isSameDay = (left: Date, right: Date) => (
-                left.getFullYear() === right.getFullYear()
-                && left.getMonth() === right.getMonth()
-                && left.getDate() === right.getDate()
-              );
-
-              const dayLabel = isSameDay(nextDate, today)
-                ? 'hoje'
-                : isSameDay(nextDate, tomorrow)
-                ? 'amanhã'
-                : `dia ${nextDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-
-              const nextTime = formatTimeBR(futureAppointments[0].start_time);
-              const timeLabel = nextTime.endsWith(':00') ? nextTime.replace(':00', 'h') : nextTime.replace(':', 'h');
-
-              return (
-                <p className="text-[#216153] text-[17px] font-semibold mt-2">
-                  Sua próxima visita é {dayLabel} às {timeLabel}.
-                </p>
-              );
-            })()
-          ) : (
+          {futureAppointments.length === 0 && (
             <p className="text-[#216153] text-[17px] font-semibold mt-2">
-              Nenhuma visita agendada.
+              Você não tem consultas marcadas.
             </p>
           )}
         </div>
 
-        {/* Botões Principais */}
-        <div className="space-y-4 mb-14">
-          {futureAppointments.length > 0 && (() => {
-            const nextAppt = futureAppointments[0];
-            const isConfirmed = nextAppt.status === 'CONFIRMED' || confirmedAppointmentId === nextAppt.id;
+        {/* ─── Próximas consultas ─── */}
+        {futureAppointments.length > 0 && (
+          <div className="space-y-4 mb-8">
+            {futureAppointments.map((appt, idx) => {
+              const isNext = idx === 0;
+              const isConfirmed = appt.status === 'CONFIRMED' || confirmedAppointmentId === appt.id;
+              const isSubmitting = appointmentSubmittingId === appt.id;
+              // Pedidos pendentes vêm da API: persistem mesmo se o paciente recarregar a página
+              const rescheduleAsked = pendingRequests.some(r => r.request_type === 'RESCHEDULE' && r.appointment_id === appt.id);
+              const cancelAsked = pendingRequests.some(r => r.request_type === 'CANCEL' && r.appointment_id === appt.id);
 
-            return (
-              <button
-                onClick={() => !isConfirmed ? handleConfirmAppointment(nextAppt.id) : null}
-                disabled={isConfirmed || appointmentSubmittingId === nextAppt.id}
-                className={`w-full h-[64px] rounded-2xl flex items-center justify-center gap-3 font-bold text-[17px] transition-transform ${
-                  isConfirmed 
-                    ? 'bg-[#34C759]/10 text-[#34C759] cursor-default' 
-                    : 'bg-[#216153] text-white active:scale-[0.98] shadow-[0_8px_24px_rgba(33,97,83,0.25)]'
-                }`}
-              >
-                {appointmentSubmittingId === nextAppt.id ? (
-                  <div className="w-5 h-5 border-[2px] border-white/25 border-t-white rounded-full animate-spin" />
-                ) : isConfirmed ? (
-                  <>
-                    <CheckCircle2 size={22} className="text-[#34C759]" />
-                    Presença confirmada
-                  </>
-                ) : (
-                  <>
-                    <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-white flex items-center justify-center">
-                      <CheckCircle2 size={14} className="text-white" />
-                    </div>
-                    Confirmar minha ida
-                  </>
-                )}
-              </button>
-            );
-          })()}
+              return (
+                <div
+                  key={appt.id}
+                  className={`bg-white border rounded-2xl p-5 shadow-sm ${isNext ? 'border-[#216153]/30' : 'border-[#E2E8F0]'}`}
+                >
+                  <p className="text-[#475569] text-[14px] font-semibold mb-1">
+                    {isNext ? 'Sua próxima consulta' : 'Consulta seguinte'}
+                  </p>
+                  <p className="text-[#0F172A] text-[21px] font-bold leading-snug capitalize">
+                    {friendlyDayLabel(appt.start_time)}
+                  </p>
+                  <p className="text-[#216153] text-[18px] font-bold mt-0.5">
+                    às {friendlyTimeLabel(appt.start_time)}
+                  </p>
+                  {appt.dentist_name && (
+                    <p className="text-[#475569] text-[15px] mt-1">Dr(a). {appt.dentist_name}</p>
+                  )}
 
+                  {cancelAsked ? (
+                    <p className="mt-4 text-[#92600A] text-[15px] font-semibold bg-[#FFF8EB] border border-[#F5E1B8] rounded-xl px-4 py-3">
+                      Pedido de cancelamento enviado. A clínica vai confirmar com você.
+                    </p>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => !isConfirmed && !isSubmitting && handleConfirmAppointment(appt.id)}
+                        disabled={isConfirmed || isSubmitting}
+                        className={`w-full h-14 mt-4 rounded-xl flex items-center justify-center gap-3 font-bold text-[16px] transition-transform ${
+                          isConfirmed
+                            ? 'bg-[#34C759]/10 text-[#1F9D4D] cursor-default'
+                            : 'bg-[#216153] text-white active:scale-[0.98] shadow-[0_6px_18px_rgba(33,97,83,0.22)]'
+                        }`}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-5 h-5 border-[2px] border-white/25 border-t-white rounded-full animate-spin" />
+                            Confirmando...
+                          </>
+                        ) : isConfirmed ? (
+                          <>
+                            <CheckCircle2 size={22} />
+                            Presença confirmada
+                          </>
+                        ) : (
+                          'Confirmar minha ida'
+                        )}
+                      </button>
+                      {confirmError?.id === appt.id && (
+                        <p role="alert" className="mt-3 text-[#C0392B] text-[15px] font-medium bg-[#FF3B30]/5 border border-[#FF3B30]/15 rounded-xl px-4 py-3">
+                          {confirmError.message}
+                        </p>
+                      )}
+                      {rescheduleAsked ? (
+                        <p className="mt-3 text-[#92600A] text-[15px] font-semibold bg-[#FFF8EB] border border-[#F5E1B8] rounded-xl px-4 py-3">
+                          Pedido para remarcar enviado. A clínica vai confirmar com você.
+                        </p>
+                      ) : (
+                        <button
+                          onClick={() => { setCancelError(null); setCancelTarget(appt); }}
+                          className="w-full h-12 mt-2 text-[#475569] font-semibold text-[15px] rounded-xl active:bg-slate-50"
+                        >
+                          Não poderei ir nesse dia
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ─── Pedidos aguardando a clínica ───
+             Remarcações/cancelamentos já aparecem no card da própria consulta;
+             aqui mostramos apenas pedidos de consulta nova. */}
+        {(() => {
+          const futureIds = new Set(futureAppointments.map(a => a.id));
+          const visibleRequests = pendingRequests.filter(
+            r => r.request_type === 'NEW' || !r.appointment_id || !futureIds.has(r.appointment_id)
+          );
+          if (visibleRequests.length === 0) return null;
+          return (
+            <div className="mb-8 bg-[#FFF8EB] border border-[#F5E1B8] rounded-2xl p-5">
+              <p className="text-[#92600A] text-[16px] font-bold mb-2">Aguardando a clínica</p>
+              <div className="space-y-2">
+                {visibleRequests.map(r => (
+                  <p key={r.id} className="text-[#92600A] text-[15px] leading-relaxed">
+                    {requestTypeLabel(r.request_type)}
+                    {r.request_type !== 'CANCEL' && r.preferred_date ? ` para ${formatDateBR(r.preferred_date)}` : ''}.
+                    {' '}A clínica vai entrar em contato para confirmar.
+                  </p>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ─── Ações ─── */}
+        <div className="space-y-4 mb-10">
           <button onClick={openNewScheduleModal} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <CalendarPlus size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Solicitar consulta</span>
+            <CalendarPlus size={24} className="text-[#216153]" />
+            <span className="text-[#0F172A] font-bold text-[16px]">Pedir uma consulta</span>
           </button>
 
-          <button onClick={() => setShowPreOpModal(true)} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <ClipboardList size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Orientações da cirurgia</span>
-          </button>
+          {futureAppointments.length > 0 && (
+            <button onClick={() => setShowPreOpModal(true)} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
+              <ClipboardList size={24} className="text-[#216153]" />
+              <span className="text-[#0F172A] font-bold text-[16px]">Como me preparar para a consulta</span>
+            </button>
+          )}
 
           <button onClick={openAnamnesisModal} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <User size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Atualizar ficha médica</span>
+            <User size={24} className="text-[#216153]" />
+            <span className="text-[#0F172A] font-bold text-[16px]">Atualizar minha ficha médica</span>
           </button>
 
           <button onClick={() => setShowPostOpModal(true)} className="w-full h-[64px] bg-white border border-[#E2E8F0] rounded-2xl flex items-center px-5 gap-4 active:bg-slate-50 transition-colors shadow-sm">
-            <MessageCircle size={24} className="text-[#1E293B]" />
-            <span className="text-[#0F172A] font-bold text-[16px]">Dúvidas pós-atendimento</span>
+            <Heart size={24} className="text-[#216153]" />
+            <span className="text-[#0F172A] font-bold text-[16px]">Cuidados após o atendimento</span>
           </button>
         </div>
 
-        {/* Dica de Hoje */}
-        <div className="w-full bg-[#FCF8FF] border border-[#F3E8FF] rounded-[24px] p-6">
-          <h3 className="text-[#7C3AED] text-[11px] font-extrabold tracking-widest uppercase mb-3">DICA DE HOJE</h3>
-          <p className="text-[#64748B] text-[15px] font-medium leading-relaxed">
+        {/* ─── Pagamentos ─── */}
+        {nextInstallment && (
+          <div className="mb-10">
+            <h2 className="text-[20px] font-bold text-[#0F172A] mb-3">Pagamentos</h2>
+            <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm">
+              {(() => {
+                const overdue = calendarDaysUntil(parseWallClock(nextInstallment.due_date)) < 0;
+                return (
+                  <>
+                    <p className="text-[#475569] text-[14px] font-semibold">
+                      Próxima parcela{nextInstallment.procedure ? ` — ${nextInstallment.procedure}` : ''}
+                    </p>
+                    <p className="text-[#0F172A] text-[26px] font-bold mt-1">{formatCurrencyBR(nextInstallment.amount)}</p>
+                    <p className={`text-[15px] font-medium mt-0.5 ${overdue ? 'text-[#C0392B]' : 'text-[#475569]'}`}>
+                      {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(nextInstallment.due_date)}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowPixModal({
+                          amount: Number(nextInstallment.amount),
+                          installment_id: nextInstallment.id,
+                          label: `Parcela ${nextInstallment.number}${nextInstallment.procedure ? ` — ${nextInstallment.procedure}` : ''}`
+                        });
+                        loadPixInfo();
+                      }}
+                      className="w-full h-14 mt-4 bg-[#216153] text-white rounded-xl font-bold text-[16px] active:scale-[0.98] transition-transform"
+                    >
+                      Ver como pagar (PIX)
+                    </button>
+                  </>
+                );
+              })()}
+
+              {pendingInstallments.length > 1 && (
+                <details className="mt-4">
+                  <summary className="text-[#216153] text-[15px] font-bold cursor-pointer py-2 list-none flex items-center gap-2">
+                    Ver todas as parcelas em aberto ({pendingInstallments.length})
+                  </summary>
+                  <div className="mt-2 divide-y divide-[#F1F5F9]">
+                    {pendingInstallments.map(inst => (
+                      <div key={inst.id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[#0F172A] text-[15px] font-semibold">
+                            Parcela {inst.number}{inst.procedure ? ` — ${inst.procedure}` : ''}
+                          </p>
+                          <p className="text-[#475569] text-[14px]">Vence em {formatDateBR(inst.due_date)}</p>
+                        </div>
+                        <p className="text-[#0F172A] text-[15px] font-bold shrink-0">{formatCurrencyBR(inst.amount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Meu tratamento (histórico + documentos) ─── */}
+        {(evolution.length > 0 || files.length > 0) && (
+          <div className="mb-10">
+            <h2 className="text-[20px] font-bold text-[#0F172A] mb-3">Meu tratamento</h2>
+            <div className="space-y-3">
+              {evolution.length > 0 && (
+                <details className="bg-white border border-[#E2E8F0] rounded-2xl px-5 py-4 shadow-sm">
+                  <summary className="text-[#0F172A] text-[16px] font-bold cursor-pointer list-none flex items-center gap-3 min-h-[44px]">
+                    <Calendar size={22} className="text-[#216153] shrink-0" />
+                    O que já foi feito ({evolution.length})
+                  </summary>
+                  <div className="mt-2 divide-y divide-[#F1F5F9]">
+                    {evolution.map(e => (
+                      <div key={e.id} className="py-3">
+                        <p className="text-[#0F172A] text-[15px] font-semibold">{e.procedure_performed || 'Atendimento'}</p>
+                        <p className="text-[#475569] text-[14px] mt-0.5">
+                          {formatDateBR(e.date)}{e.dentist_name ? ` · Dr(a). ${e.dentist_name}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {files.length > 0 && (
+                <details className="bg-white border border-[#E2E8F0] rounded-2xl px-5 py-4 shadow-sm">
+                  <summary className="text-[#0F172A] text-[16px] font-bold cursor-pointer list-none flex items-center gap-3 min-h-[44px]">
+                    <FileText size={22} className="text-[#216153] shrink-0" />
+                    Meus documentos ({files.length})
+                  </summary>
+                  <div className="mt-2 divide-y divide-[#F1F5F9]">
+                    {files.map(f => (
+                      <a
+                        key={f.id}
+                        href={f.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="py-3 flex items-center gap-3 active:bg-slate-50"
+                      >
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[#0F172A] text-[15px] font-semibold truncate">{f.description || 'Documento'}</span>
+                          <span className="block text-[#475569] text-[14px]">{formatDateBR(f.created_at)}</span>
+                        </span>
+                        <Download size={20} className="text-[#216153] shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Dica do dia ─── */}
+        <div className="w-full bg-[#FCF8FF] border border-[#F3E8FF] rounded-[24px] p-6 mb-6">
+          <h3 className="text-[#6D28D9] text-[14px] font-bold mb-2">Dica do dia</h3>
+          <p className="text-[#475569] text-[15px] font-medium leading-relaxed">
             {(() => {
               if (futureAppointments.length > 0) {
-                const nextDate = new Date(futureAppointments[0].start_time);
-                const daysUntil = Math.ceil((nextDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                if (daysUntil === 1) return "Sua consulta é amanhã! Lembre-se de ter uma boa noite de sono e evite alimentos pesados.";
+                const daysUntil = calendarDaysUntil(parseWallClock(futureAppointments[0].start_time));
+                if (daysUntil === 0) return "Sua consulta é hoje! Escove os dentes antes de sair e leve um documento com foto.";
+                if (daysUntil === 1) return "Sua consulta é amanhã! Tenha uma boa noite de sono e evite alimentos pesados.";
                 if (daysUntil <= 3) return "Faltam poucos dias para sua consulta. Mantenha a higiene bucal em dia e anote qualquer dúvida para perguntar ao dentista.";
               }
               if (recentProcedures.length > 0 && detectCategory(recentProcedures[0].procedure)) {
@@ -878,8 +1168,50 @@ export function PatientPortal() {
                 "Uma escova de cerdas macias é a melhor amiga do seu sorriso.",
                 "Sorria! Cuidar dos dentes é cuidar de todo o corpo."
               ];
-              return generalTips[(patient.id || 0) % generalTips.length] || generalTips[0];
+              // Muda a cada dia (e varia entre pacientes)
+              const dayIndex = Math.floor(Date.now() / 86400000);
+              return generalTips[(dayIndex + (patient.id || 0)) % generalTips.length];
             })()}
+          </p>
+        </div>
+
+        {/* ─── Falar com a clínica ─── */}
+        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[24px] p-6">
+          <h3 className="text-[#0F172A] text-[18px] font-bold mb-1">Precisa falar com a clínica?</h3>
+          <p className="text-[#475569] text-[15px] leading-relaxed mb-4">
+            Para dor forte, dúvidas sobre o tratamento ou remarcação urgente, fale direto com a gente.
+          </p>
+          <div className="space-y-3">
+            {clinicPhoneDigits && (
+              <a
+                href={`tel:${clinicPhoneDigits}`}
+                className="w-full h-14 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-center gap-3 font-bold text-[16px] text-[#0F172A] active:bg-slate-50 shadow-sm"
+              >
+                <Phone size={20} className="text-[#216153]" />
+                Ligar: {clinic?.phone}
+              </a>
+            )}
+            {clinicWhatsapp && (
+              <a
+                href={clinicWhatsapp}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full h-14 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-center gap-3 font-bold text-[16px] text-[#0F172A] active:bg-slate-50 shadow-sm"
+              >
+                <MessageCircle size={20} className="text-[#25A05A]" />
+                Chamar no WhatsApp
+              </a>
+            )}
+          </div>
+          {clinic?.clinic_address && (
+            <p className="text-[#475569] text-[15px] mt-4 flex items-start gap-2">
+              <MapPin size={18} className="text-[#216153] shrink-0 mt-0.5" />
+              {clinic.clinic_address}
+            </p>
+          )}
+          <p className="text-[#64748B] text-[14px] leading-relaxed mt-4">
+            Dica: guarde a mensagem com este link para voltar ao portal quando precisar.
+            Se o link parar de funcionar, é só pedir um novo à clínica.
           </p>
         </div>
       </div>
@@ -891,30 +1223,37 @@ export function PatientPortal() {
             <motion.div role="dialog" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} onClick={e => e.stopPropagation()} className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-9 h-1 bg-[#C6C6C8] rounded-full" /></div>
               <div className="px-5 pb-4 pt-3 flex items-center justify-between border-b border-[#E5E5EA]">
-                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Orientações Pré-Consulta</h3>
-                <button type="button" onClick={() => setShowPreOpModal(false)} className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center"><X size={16} className="text-[#8E8E93]" /></button>
+                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Como me preparar</h3>
+                <button type="button" aria-label="Fechar" onClick={() => setShowPreOpModal(false)} className="w-11 h-11 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-95"><X size={18} className="text-[#475569]" /></button>
               </div>
               <div className="p-5 overflow-y-auto">
                 {futureAppointments.length > 0 ? (
                   <div className="space-y-4">
-                    <p className="text-[#64748B] text-[15px] leading-relaxed">
-                      Para sua próxima consulta no dia <strong className="text-[#1C1C1E]">{new Date(futureAppointments[0].start_time).toLocaleDateString('pt-BR')}</strong>, siga as seguintes orientações gerais:
+                    <p className="text-[#475569] text-[15px] leading-relaxed">
+                      Para sua próxima consulta no dia <strong className="text-[#1C1C1E]">{formatDateBR(futureAppointments[0].start_time)}</strong>, siga estas orientações:
                     </p>
                     <ul className="space-y-3">
-                      <li className="flex items-start gap-3"><span className="text-xl">🪥</span><span className="text-[#334155] text-[14px]">Escove bem os dentes antes de sair de casa.</span></li>
-                      <li className="flex items-start gap-3"><span className="text-xl">⏱️</span><span className="text-[#334155] text-[14px]">Chegue com 10 minutos de antecedência.</span></li>
-                      <li className="flex items-start gap-3"><span className="text-xl">📄</span><span className="text-[#334155] text-[14px]">Traga documento com foto e exames recentes, caso tenha.</span></li>
-                      {futureAppointments[0].notes && futureAppointments[0].notes.toLowerCase().match(/cirurgia|implante|extração|siso|enxerto/) && (
-                        <>
-                          <li className="flex items-start gap-3"><span className="text-xl">💧</span><span className="text-[#334155] text-[14px]">Jejum absoluto de 8 horas (inclusive água) se for receber sedação.</span></li>
-                          <li className="flex items-start gap-3"><span className="text-xl">🫂</span><span className="text-[#334155] text-[14px]">Venha com um acompanhante maior de idade.</span></li>
-                          <li className="flex items-start gap-3"><span className="text-xl">👕</span><span className="text-[#334155] text-[14px]">Use roupas confortáveis e com mangas folgadas.</span></li>
-                        </>
-                      )}
+                      <li className="flex items-start gap-3"><span className="text-xl">🪥</span><span className="text-[#334155] text-[15px]">Escove bem os dentes antes de sair de casa.</span></li>
+                      <li className="flex items-start gap-3"><span className="text-xl">⏱️</span><span className="text-[#334155] text-[15px]">Chegue com 10 minutos de antecedência.</span></li>
+                      <li className="flex items-start gap-3"><span className="text-xl">📄</span><span className="text-[#334155] text-[15px]">Traga documento com foto e exames recentes, caso tenha.</span></li>
+                      <li className="flex items-start gap-3"><span className="text-xl">💊</span><span className="text-[#334155] text-[15px]">Tome seus remédios de uso diário normalmente, a não ser que a clínica tenha orientado o contrário.</span></li>
                     </ul>
+                    <div className="p-4 bg-[#FFF8EB] border border-[#F5E1B8] rounded-xl">
+                      <p className="text-[#92600A] text-[15px] font-bold mb-1">Vai passar por cirurgia?</p>
+                      <p className="text-[#92600A] text-[15px] leading-relaxed">
+                        Siga as orientações de jejum e acompanhante que a clínica passou para você.
+                        Se tiver qualquer dúvida, ligue antes da consulta.
+                      </p>
+                      {clinicPhoneDigits && (
+                        <a href={`tel:${clinicPhoneDigits}`} className="mt-3 w-full h-12 bg-white border border-[#F5E1B8] rounded-xl flex items-center justify-center gap-2 font-bold text-[15px] text-[#92600A]">
+                          <Phone size={18} />
+                          Ligar para a clínica
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-[#64748B] text-[15px] text-center py-6">Você não possui consultas futuras agendadas.</p>
+                  <p className="text-[#475569] text-[15px] text-center py-6">Você não possui consultas futuras agendadas.</p>
                 )}
               </div>
             </motion.div>
@@ -929,31 +1268,56 @@ export function PatientPortal() {
             <motion.div role="dialog" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} onClick={e => e.stopPropagation()} className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-9 h-1 bg-[#C6C6C8] rounded-full" /></div>
               <div className="px-5 pb-4 pt-3 flex items-center justify-between border-b border-[#E5E5EA]">
-                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Recomendações Pós-Atendimento</h3>
-                <button type="button" onClick={() => setShowPostOpModal(false)} className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center"><X size={16} className="text-[#8E8E93]" /></button>
+                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Cuidados após o atendimento</h3>
+                <button type="button" aria-label="Fechar" onClick={() => setShowPostOpModal(false)} className="w-11 h-11 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-95"><X size={18} className="text-[#475569]" /></button>
               </div>
               <div className="p-5 overflow-y-auto space-y-4">
                 {recentProcedures.length > 0 ? (
-                  recentProcedures.map((proc, idx) => {
-                    const guide = PROCEDURE_GUIDES[proc.category];
-                    if (!guide) return null;
-                    return (
-                      <div key={idx} className="mb-6 last:mb-0">
-                        <h4 className="text-[#1C1C1E] font-bold text-[16px] mb-2">{guide.title}</h4>
-                        <p className="text-[#8E8E93] text-[13px] mb-4">Referente ao procedimento: {proc.procedure}</p>
-                        <div className="space-y-3">
-                          {guide.items.map((item, i) => (
-                            <div key={i} className="flex items-start gap-3">
-                              <span className="text-[16px] mt-0.5 shrink-0">{item.icon}</span>
-                              <p className="text-[#3A3A3C] text-[14px] leading-relaxed">{item.text}</p>
-                            </div>
-                          ))}
+                  <>
+                    {recentProcedures.map((proc, idx) => {
+                      const guide = PROCEDURE_GUIDES[proc.category];
+                      if (!guide) return null;
+                      return (
+                        <div key={idx} className="mb-6 last:mb-0">
+                          <h4 className="text-[#1C1C1E] font-bold text-[16px] mb-2">{guide.title}</h4>
+                          <p className="text-[#475569] text-[14px] mb-4">Referente ao procedimento: {proc.procedure}</p>
+                          <div className="space-y-3">
+                            {guide.items.map((item, i) => (
+                              <div key={i} className="flex items-start gap-3">
+                                <span className="text-[16px] mt-0.5 shrink-0">{item.icon}</span>
+                                <p className="text-[#3A3A3C] text-[15px] leading-relaxed">{item.text}</p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                    <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
+                      <p className="text-[#475569] text-[14px] leading-relaxed">
+                        Estas são orientações gerais. Em caso de dor forte, sangramento intenso ou febre,
+                        ligue para a clínica.
+                      </p>
+                      {clinicPhoneDigits && (
+                        <a href={`tel:${clinicPhoneDigits}`} className="mt-3 w-full h-12 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-center gap-2 font-bold text-[15px] text-[#0F172A]">
+                          <Phone size={18} className="text-[#216153]" />
+                          Ligar para a clínica
+                        </a>
+                      )}
+                    </div>
+                  </>
                 ) : (
-                  <p className="text-[#64748B] text-[15px] text-center py-6">Não há recomendações de pós-operatório ou procedimento recente no seu histórico no momento. Para dúvidas gerais, entre em contato com a clínica.</p>
+                  <div className="py-6 text-center space-y-4">
+                    <p className="text-[#475569] text-[15px]">
+                      Você não tem procedimento recente no seu histórico.
+                      Para dúvidas gerais, fale com a clínica.
+                    </p>
+                    {clinicPhoneDigits && (
+                      <a href={`tel:${clinicPhoneDigits}`} className="w-full h-12 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-center gap-2 font-bold text-[15px] text-[#0F172A]">
+                        <Phone size={18} className="text-[#216153]" />
+                        Ligar para a clínica
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
             </motion.div>
@@ -968,48 +1332,62 @@ export function PatientPortal() {
             <motion.div role="dialog" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} onClick={e => e.stopPropagation()} className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-9 h-1 bg-[#C6C6C8] rounded-full" /></div>
               <div className="px-5 pb-4 pt-3 flex items-center justify-between border-b border-[#E5E5EA]">
-                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Ficha Médica</h3>
-                <button type="button" onClick={() => !anamnesisSubmitting && setShowAnamnesisModal(false)} className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center"><X size={16} className="text-[#8E8E93]" /></button>
+                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Minha ficha médica</h3>
+                <button type="button" aria-label="Fechar" onClick={() => !anamnesisSubmitting && setShowAnamnesisModal(false)} className="w-11 h-11 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-95"><X size={18} className="text-[#475569]" /></button>
               </div>
               <div className="p-5 overflow-y-auto space-y-4">
                 <div>
-                  <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Alergias a Medicamentos</label>
+                  <label className="block text-[#334155] text-[15px] font-semibold mb-2">Alergias a remédios</label>
                   <textarea
                     placeholder="Ex: Dipirona, Penicilina..."
                     value={anamnesisForm.allergies}
                     onChange={e => setAnamnesisForm({ ...anamnesisForm, allergies: e.target.value })}
-                    rows={2}
-                    className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#8E8E93]"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[16px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#94A3B8]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Medicamentos de Uso Contínuo</label>
+                  <label className="block text-[#334155] text-[15px] font-semibold mb-2">Remédios que tomo todo dia</label>
                   <textarea
-                    placeholder="Ex: Losartana, Anticoncepcional..."
+                    placeholder="Ex: Losartana, remédio para diabetes..."
                     value={anamnesisForm.medications}
                     onChange={e => setAnamnesisForm({ ...anamnesisForm, medications: e.target.value })}
-                    rows={2}
-                    className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#8E8E93]"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[16px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#94A3B8]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Histórico de Doenças (Ex: Diabetes, Hipertensão)</label>
+                  <label className="block text-[#334155] text-[15px] font-semibold mb-2">Problemas de saúde (ex: diabetes, pressão alta)</label>
                   <textarea
                     placeholder="Ex: Diabetes tipo 2 controlada."
                     value={anamnesisForm.medical_history}
                     onChange={e => setAnamnesisForm({ ...anamnesisForm, medical_history: e.target.value })}
-                    rows={2}
-                    className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#8E8E93]"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[16px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#94A3B8]"
                   />
                 </div>
+
+                {anamnesisError && (
+                  <p role="alert" className="text-[#C0392B] text-[15px] font-medium bg-[#FF3B30]/5 border border-[#FF3B30]/15 rounded-xl px-4 py-3">
+                    {anamnesisError}
+                  </p>
+                )}
+
                 <button
                   onClick={handleAnamnesisSubmit}
-                  disabled={anamnesisSubmitting}
-                  className="w-full h-14 mt-2 bg-[#216153] text-white rounded-xl font-bold text-[16px] active:scale-[0.98] transition-all flex items-center justify-center"
+                  disabled={anamnesisSubmitting || anamnesisSaved}
+                  className={`w-full h-14 mt-2 rounded-xl font-bold text-[16px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
+                    anamnesisSaved ? 'bg-[#34C759]/10 text-[#1F9D4D]' : 'bg-[#216153] text-white'
+                  }`}
                 >
                   {anamnesisSubmitting ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : 'Salvar Ficha Médica'}
+                  ) : anamnesisSaved ? (
+                    <>
+                      <CheckCircle2 size={20} />
+                      Ficha salva!
+                    </>
+                  ) : 'Salvar ficha médica'}
                 </button>
               </div>
             </motion.div>
@@ -1017,7 +1395,7 @@ export function PatientPortal() {
         )}
       </AnimatePresence>
 
-      {/* Mantendo Modais Existentes ocultos para não quebrar funcionalidade caso sejam abertos por outro meio no futuro */}
+      {/* ─── Modal de agendamento/remarcação ─── */}
       <AnimatePresence>
         {showScheduleModal && (
           <motion.div
@@ -1045,14 +1423,15 @@ export function PatientPortal() {
               <div className="px-5 pb-6 pt-3">
                 <div className="flex items-center justify-between mb-6">
                   <h3 id="schedule-modal-title" className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">
-                    {scheduleMode === 'reschedule' ? 'Reagendar Consulta' : 'Solicitar Nova Consulta'}
+                    {scheduleMode === 'reschedule' ? 'Remarcar consulta' : 'Pedir uma consulta'}
                   </h3>
                   <button
                     type="button"
+                    aria-label="Fechar"
                     onClick={closeScheduleModal}
-                    className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-11 h-11 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-90 transition-transform"
                   >
-                    <X size={16} className="text-[#8E8E93]" />
+                    <X size={18} className="text-[#475569]" />
                   </button>
                 </div>
 
@@ -1061,38 +1440,38 @@ export function PatientPortal() {
                     <div className="w-16 h-16 bg-[#34C759]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <CheckCircle2 size={32} className="text-[#34C759]" />
                     </div>
-                    <p className="text-[#1C1C1E] text-[17px] font-semibold mb-2">Pedido Enviado!</p>
-                    <p className="text-[#64748B] text-[15px] leading-relaxed">A clínica entrará em contato em breve para confirmar o agendamento.</p>
+                    <p className="text-[#1C1C1E] text-[17px] font-semibold mb-2">Pedido enviado!</p>
+                    <p className="text-[#475569] text-[15px] leading-relaxed">A clínica vai entrar em contato para confirmar. Você pode acompanhar o pedido na tela inicial do portal.</p>
                   </div>
                 ) : (
                   <form onSubmit={(e) => { e.preventDefault(); handleRequestAppointment(); }} className="space-y-4">
                     {scheduleMode === 'reschedule' && scheduleTargetAppointment && (
                       <div className="p-4 bg-[#F2F2F7] rounded-xl mb-4">
-                        <p className="text-[#8E8E93] text-[13px] font-medium mb-1">Consulta original</p>
-                        <p className="text-[#1C1C1E] text-[15px] font-semibold">
-                          {new Date(scheduleTargetAppointment.start_time).toLocaleDateString('pt-BR')} às {new Date(scheduleTargetAppointment.start_time).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                        <p className="text-[#475569] text-[14px] font-medium mb-1">Consulta que será remarcada</p>
+                        <p className="text-[#1C1C1E] text-[16px] font-semibold">
+                          {formatDateBR(scheduleTargetAppointment.start_time)} às {formatTimeBR(scheduleTargetAppointment.start_time)}
                         </p>
                       </div>
                     )}
                     
                     <div>
-                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Data de preferência</label>
+                      <label className="block text-[#334155] text-[15px] font-semibold mb-2">Qual o melhor dia para você?</label>
                       <input 
                         type="date"
                         required
-                        min={new Date().toISOString().split('T')[0]}
+                        min={localDateISO()}
                         value={scheduleForm.preferred_date}
                         onChange={(e) => setScheduleForm(prev => ({...prev, preferred_date: e.target.value}))}
-                        className="w-full px-4 py-3.5 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors"
+                        className="w-full px-4 py-3.5 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[16px] outline-none focus:border-[#216153]/40 transition-colors"
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Qual o melhor horário?</label>
+                      <label className="block text-[#334155] text-[15px] font-semibold mb-2">Qual o melhor horário?</label>
                       <select
                         value={scheduleForm.preferred_time}
                         onChange={(e) => setScheduleForm(prev => ({...prev, preferred_time: e.target.value}))}
-                        className="w-full px-4 py-3.5 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors appearance-none"
+                        className="w-full px-4 py-3.5 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[16px] outline-none focus:border-[#216153]/40 transition-colors appearance-none"
                       >
                         <option value="">Qualquer horário</option>
                         <option value="Manhã">Manhã (08:00 - 12:00)</option>
@@ -1102,13 +1481,13 @@ export function PatientPortal() {
                     </div>
 
                     <div>
-                      <label className="block text-[#8E8E93] text-[13px] font-medium mb-2">Motivo / Observações</label>
+                      <label className="block text-[#334155] text-[15px] font-semibold mb-2">Qual o motivo?</label>
                       <textarea
                         rows={2}
                         placeholder="Ex: Dor de dente, limpeza de rotina..."
                         value={scheduleForm.notes}
                         onChange={(e) => setScheduleForm(prev => ({...prev, notes: e.target.value}))}
-                        className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[15px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#8E8E93]"
+                        className="w-full px-4 py-3 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl text-[#1C1C1E] text-[16px] outline-none focus:border-[#216153]/40 transition-colors resize-none placeholder:text-[#94A3B8]"
                       />
                     </div>
 
@@ -1120,7 +1499,7 @@ export function PatientPortal() {
                       {scheduleSubmitting ? (
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       ) : (
-                        'Enviar Solicitação'
+                        'Enviar pedido'
                       )}
                     </button>
                   </form>
@@ -1130,86 +1509,168 @@ export function PatientPortal() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
 
+      {/* ─── Modal: não poderei ir (remarcar ou cancelar) ─── */}
+      <AnimatePresence>
+        {cancelTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center" onClick={() => !cancelSubmitting && setCancelTarget(null)}>
+            <motion.div role="dialog" aria-modal="true" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} onClick={e => e.stopPropagation()} className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl">
+              <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-9 h-1 bg-[#C6C6C8] rounded-full" /></div>
+              <div className="px-5 pb-6 pt-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Não poderá comparecer?</h3>
+                  <button type="button" aria-label="Fechar" onClick={() => !cancelSubmitting && setCancelTarget(null)} className="w-11 h-11 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-95">
+                    <X size={18} className="text-[#475569]" />
+                  </button>
+                </div>
 
-// ─── Helper Components ───
+                <p className="text-[#475569] text-[16px] leading-relaxed mb-5">
+                  Sua consulta está marcada para{' '}
+                  <strong className="text-[#1C1C1E]">
+                    {formatDateBR(cancelTarget.start_time)} às {friendlyTimeLabel(cancelTarget.start_time)}
+                  </strong>. O que você prefere?
+                </p>
 
-function PortalQuickAction({ icon: Icon, label, onClick }: {
-  icon: React.ElementType; label: string; onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-white shadow-[0_1px_6px_rgba(0,0,0,0.05)] active:scale-95 transition-transform"
-    >
-      <div className="w-10 h-10 bg-academy-bg rounded-full flex items-center justify-center">
-        <Icon size={18} className="text-[#0C9B72]" />
-      </div>
-      <span className="text-academy-muted text-[11px] font-medium">{label}</span>
-    </button>
-  );
-}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      const target = cancelTarget;
+                      setCancelTarget(null);
+                      if (target) openRescheduleModal(target);
+                    }}
+                    className="w-full h-14 bg-[#216153] text-white rounded-xl font-bold text-[16px] active:scale-[0.98] transition-transform"
+                  >
+                    Quero remarcar para outro dia
+                  </button>
+                  <button
+                    onClick={handleCancelAppointment}
+                    disabled={cancelSubmitting}
+                    className="w-full h-14 bg-white border border-[#FF3B30]/30 text-[#C0392B] rounded-xl font-bold text-[16px] active:bg-red-50 transition-colors flex items-center justify-center"
+                  >
+                    {cancelSubmitting ? (
+                      <div className="w-5 h-5 border-2 border-[#C0392B]/30 border-t-[#C0392B] rounded-full animate-spin" />
+                    ) : 'Cancelar esta consulta'}
+                  </button>
+                </div>
 
-function PortalStatCard({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="bg-white rounded-2xl p-4 text-center shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-      <p className="text-academy-text text-[24px] font-bold tracking-tight">{value}</p>
-      <p className="text-[#AEAEB2] text-[11px] font-medium uppercase tracking-wider mt-0.5">{label}</p>
-    </div>
-  );
-}
+                {cancelError && (
+                  <p role="alert" className="mt-3 text-[#C0392B] text-[15px] font-medium bg-[#FF3B30]/5 border border-[#FF3B30]/15 rounded-xl px-4 py-3">
+                    {cancelError}
+                  </p>
+                )}
 
-function PortalAppointmentRow({ appointment, formatDate, formatTime, statusLabel, past, actionContent, actionNotice }: any) {
-  const s = statusLabel(appointment.status);
-  const statusColors: Record<string, string> = {
-    'SCHEDULED': 'bg-[#007AFF]/10 text-[#007AFF]',
-    'CONFIRMED': 'bg-[#34C759]/10 text-[#34C759]',
-    'IN_PROGRESS': 'bg-[#FF9500]/10 text-[#FF9500]',
-    'FINISHED': 'bg-academy-border text-academy-muted',
-    'CANCELLED': 'bg-[#FF3B30]/10 text-[#FF3B30]',
-    'NO_SHOW': 'bg-[#FF3B30]/10 text-[#FF3B30]',
-  };
-  return (
-    <div className={`px-4 py-3.5 ${past ? 'opacity-40' : ''}`}>
-      <div className="flex items-center gap-3.5">
-        <div className="w-10 h-10 bg-academy-bg rounded-xl flex items-center justify-center shrink-0">
-          <Calendar size={16} className="text-academy-muted" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-academy-text text-[15px] font-medium">{formatDate(appointment.start_time)}</p>
-          <p className="text-academy-muted text-[13px] mt-0.5">
-            {formatTime(appointment.start_time)} · Dr(a). {appointment.dentist_name}
-          </p>
-        </div>
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${statusColors[appointment.status] || 'bg-academy-border text-academy-muted'}`}>
-          {s.label}
-        </span>
-      </div>
-      {appointment.notes && (
-        <p className="text-academy-muted text-[13px] mt-2 ml-[54px]">{appointment.notes}</p>
-      )}
-      {actionContent && !past && (
-        <div className="mt-3 ml-[54px]">
-          {actionContent}
-        </div>
-      )}
-      {actionNotice && !past && (
-        <p className="text-[#34C759] text-[12px] font-medium mt-1.5 ml-[54px]">{actionNotice}</p>
-      )}
-    </div>
-  );
-}
+                <p className="text-[#64748B] text-[14px] leading-relaxed mt-4 text-center">
+                  O cancelamento só é efetivado depois que a clínica confirmar.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-function PortalEmptyState({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
-  return (
-    <div className="py-16 text-center">
-      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-        <Icon size={24} className="text-academy-muted" />
-      </div>
-      <p className="text-[#AEAEB2] text-[15px]">{text}</p>
+      {/* ─── Modal: pagamento PIX ─── */}
+      <AnimatePresence>
+        {showPixModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center" onClick={() => !actionSubmitting && setShowPixModal(null)}>
+            <motion.div ref={pixModalRef} role="dialog" aria-modal="true" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} onClick={e => e.stopPropagation()} className="bg-white rounded-t-[20px] sm:rounded-[20px] w-full sm:max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-9 h-1 bg-[#C6C6C8] rounded-full" /></div>
+              <div className="px-5 pb-4 pt-3 flex items-center justify-between border-b border-[#E5E5EA]">
+                <h3 className="text-[18px] font-semibold text-[#1C1C1E] tracking-tight">Pagar com PIX</h3>
+                <button type="button" aria-label="Fechar" onClick={() => !actionSubmitting && setShowPixModal(null)} className="w-11 h-11 bg-[#E5E5EA] rounded-full flex items-center justify-center active:scale-95">
+                  <X size={18} className="text-[#475569]" />
+                </button>
+              </div>
+              <div className="p-5 overflow-y-auto">
+                {paymentInformed ? (
+                  <div className="py-6 text-center">
+                    <div className="w-16 h-16 bg-[#34C759]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 size={32} className="text-[#34C759]" />
+                    </div>
+                    <p className="text-[#1C1C1E] text-[17px] font-semibold mb-2">Aviso enviado!</p>
+                    <p className="text-[#475569] text-[15px] leading-relaxed">A clínica vai confirmar o recebimento do seu pagamento.</p>
+                  </div>
+                ) : !pixInfo ? (
+                  <div className="py-10 flex justify-center">
+                    <div className="w-8 h-8 border-[3px] border-[#E2E8F0] border-t-[#216153] rounded-full animate-spin" />
+                  </div>
+                ) : pixInfo.has_pix && pixInfo.pix_key ? (
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <p className="text-[#475569] text-[14px] font-semibold">{showPixModal.label}</p>
+                      <p className="text-[#0F172A] text-[28px] font-bold mt-1">{formatCurrencyBR(showPixModal.amount)}</p>
+                    </div>
+
+                    <div className="p-4 bg-[#F2F2F7] border border-[#E5E5EA] rounded-xl">
+                      <p className="text-[#475569] text-[14px] font-semibold mb-1">
+                        Chave PIX{pixInfo.pix_key_type ? ` (${pixInfo.pix_key_type})` : ''}
+                      </p>
+                      <p className="text-[#0F172A] text-[16px] font-semibold break-all">{pixInfo.pix_key}</p>
+                      {pixInfo.beneficiary_name && (
+                        <p className="text-[#475569] text-[14px] mt-2">Em nome de: <strong className="text-[#1C1C1E]">{pixInfo.beneficiary_name}</strong></p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => copyToClipboard(pixInfo.pix_key!)}
+                      className={`w-full h-14 rounded-xl font-bold text-[16px] flex items-center justify-center gap-2 transition-colors ${
+                        pixCopied ? 'bg-[#34C759]/10 text-[#1F9D4D]' : 'bg-[#216153] text-white active:scale-[0.98]'
+                      }`}
+                    >
+                      {pixCopied ? (
+                        <>
+                          <CheckCircle2 size={20} />
+                          Chave copiada!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={20} />
+                          Copiar chave PIX
+                        </>
+                      )}
+                    </button>
+
+                    <ol className="space-y-2 text-[#475569] text-[15px] leading-relaxed list-decimal pl-5">
+                      <li>Abra o aplicativo do seu banco.</li>
+                      <li>Escolha <strong className="text-[#1C1C1E]">PIX</strong> e depois <strong className="text-[#1C1C1E]">Pagar com chave</strong>.</li>
+                      <li>Cole a chave e confira o nome de quem recebe.</li>
+                      <li>Pague o valor de <strong className="text-[#1C1C1E]">{formatCurrencyBR(showPixModal.amount)}</strong>.</li>
+                    </ol>
+
+                    <button
+                      onClick={() => handleInformPayment(showPixModal.amount, showPixModal.installment_id)}
+                      disabled={actionSubmitting}
+                      className="w-full h-14 bg-white border border-[#E2E8F0] text-[#0F172A] rounded-xl font-bold text-[16px] active:bg-slate-50 flex items-center justify-center"
+                    >
+                      {actionSubmitting ? (
+                        <div className="w-5 h-5 border-2 border-[#216153]/30 border-t-[#216153] rounded-full animate-spin" />
+                      ) : 'Já paguei — avisar a clínica'}
+                    </button>
+
+                    {error && (
+                      <p role="alert" className="text-[#C0392B] text-[15px] font-medium bg-[#FF3B30]/5 border border-[#FF3B30]/15 rounded-xl px-4 py-3">
+                        {error}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-4 text-center space-y-4">
+                    <p className="text-[#475569] text-[15px] leading-relaxed">
+                      A clínica ainda não cadastrou uma chave PIX no portal.
+                      Combine o pagamento diretamente com a clínica.
+                    </p>
+                    {clinicPhoneDigits && (
+                      <a href={`tel:${clinicPhoneDigits}`} className="w-full h-12 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-center gap-2 font-bold text-[15px] text-[#0F172A]">
+                        <Phone size={18} className="text-[#216153]" />
+                        Ligar para a clínica
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
