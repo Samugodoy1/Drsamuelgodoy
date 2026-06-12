@@ -3966,7 +3966,7 @@ export default function App() {
                                 </div>
 
                                 {/* Time grid with proportional appointment blocks */}
-                                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm max-h-[calc(100vh-260px)] overflow-y-auto">
+                                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                                   <div
                                     className="grid grid-cols-[80px_repeat(7,1fr)] divide-x divide-slate-200"
                                     style={{ height: weekGridHeight }}
