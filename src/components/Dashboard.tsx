@@ -562,10 +562,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Sparkles size={24} className="text-primary" />
           </div>
           <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2]">
-            Seu consultório não precisa de mais dados. Precisa de menos decisões.
+            Daqui a alguns minutos, esta será sua rotina.
           </h1>
           <p className="text-[15px] text-[#8E8E93] leading-relaxed">
-            Veja como o OdontoHub organiza sua rotina — antes de cadastrar qualquer coisa.
+            Próximos pacientes, retornos pendentes e oportunidades organizados em um só lugar.
           </p>
         </motion.header>
 
@@ -575,21 +575,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
           transition={{ delay: 0.15, duration: 0.4 }}
           className="space-y-3"
         >
-          <p className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-widest px-2">
-            Prévia do seu painel
-          </p>
+          <div className="px-2 flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-widest">
+              Exemplo de como o OdontoHub organiza o dia
+            </p>
+            <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-[#8E8E93]">
+              Exemplo
+            </span>
+          </div>
 
-          <div className="rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1E4430] via-[#264E36] to-[#3A6B4E] p-6 shadow-[0_16px_48px_rgba(30,68,48,0.2)]">
+          <div className="rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1E4430] via-[#264E36] to-[#3A6B4E] p-6 shadow-[0_16px_48px_rgba(30,68,48,0.2)] ring-1 ring-black/5">
             <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
               Próximo atendimento
             </span>
             <div className="flex items-start justify-between gap-4 mt-2">
               <div>
-                <p className="text-[28px] font-bold text-white leading-tight tracking-tight">Maria Silva</p>
-                <p className="text-[14px] text-white/70 mt-1">Limpeza · daqui a 45 min</p>
+                <p className="text-[28px] font-bold text-white leading-tight tracking-tight">Seu próximo paciente</p>
+                <p className="text-[14px] text-white/70 mt-1">Procedimento agendado · daqui a 45 min</p>
               </div>
-              <div className="w-12 h-12 rounded-[16px] bg-white/15 border border-white/20 flex items-center justify-center text-white font-bold text-lg shrink-0">
-                M
+              <div className="w-12 h-12 rounded-[16px] bg-white/15 border border-white/20 flex items-center justify-center text-white/60 font-bold text-lg shrink-0">
+                ···
               </div>
             </div>
             <div className="mt-4 flex items-center gap-2">
@@ -599,37 +604,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="grid gap-3">
-            <div className="bg-white rounded-[20px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-4 flex items-center gap-4">
+            <div className="bg-white rounded-[20px] border border-dashed border-slate-200 shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-4 flex items-center gap-4">
               <div className="w-10 h-10 bg-rose-50 rounded-[14px] flex items-center justify-center shrink-0">
                 <UserX size={20} className="text-rose-500" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-bold text-[#1C1C1E]">Paciente sem retorno</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">João Costa · 4 meses sem visita</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5">Em tratamento · 4 meses sem visita</p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 shrink-0">Urgente</span>
             </div>
 
-            <div className="bg-white rounded-[20px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-4 flex items-center gap-4">
+            <div className="bg-white rounded-[20px] border border-dashed border-slate-200 shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-4 flex items-center gap-4">
               <div className="w-10 h-10 bg-amber-50 rounded-[14px] flex items-center justify-center shrink-0">
                 <Calendar size={20} className="text-amber-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-bold text-[#1C1C1E]">Consulta sem confirmação</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">Ana Souza · amanhã às 14:00</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5">Amanhã · 14:00 · aguardando resposta</p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 shrink-0">Pendente</span>
             </div>
 
-            <div className="bg-white rounded-[20px] border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-4 flex items-center gap-4">
+            <div className="bg-white rounded-[20px] border border-dashed border-slate-200 shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-4 flex items-center gap-4">
               <div className="w-10 h-10 bg-emerald-50 rounded-[14px] flex items-center justify-center shrink-0">
                 <DollarSign size={20} className="text-emerald-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-bold text-[#1C1C1E]">Faturamento do dia</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">3 consultas · 1 pendente</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5">Consultas realizadas e pendentes</p>
               </div>
-              <p className="text-[18px] font-bold text-emerald-600 shrink-0">R$ 850</p>
+              <p className="text-[18px] font-bold text-emerald-600 shrink-0">R$ ···</p>
             </div>
           </div>
         </motion.section>
@@ -638,7 +643,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35, duration: 0.4 }}
-          className="px-2 pt-2"
+          className="px-2 pt-2 space-y-3"
         >
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -648,21 +653,68 @@ export const Dashboard: React.FC<DashboardProps> = ({
             }}
             className="w-full flex items-center justify-center gap-3 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all"
           >
-            Vamos começar
+            Cadastrar primeiro paciente
             <ArrowRight size={18} />
+          </motion.button>
+          <p className="text-center text-[12px] text-[#8E8E93]">
+            Leva menos de 2 minutos · em seguida você agenda a primeira consulta
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (showOnboarding && currentOnboardingStep === 5) {
+    return (
+      <div className="flex flex-col justify-center min-h-[60vh] pb-32 pt-12 px-4 max-w-lg mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-8"
+        >
+          <div className="space-y-5">
+            <p className="text-[13px] font-medium text-[#8E8E93] tracking-wide">
+              {timeGreeting.text}{getGreetingName() ? `, ${getGreetingName()}` : ''}
+            </p>
+            <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1C1C1E] leading-[1.25]">
+              O OdontoHub fica mais útil conforme conhece sua rotina.
+            </h1>
+            <div className="space-y-4 text-[16px] text-[#3A3A3C] leading-[1.65]">
+              <p>Nos primeiros dias, ele organiza informações.</p>
+              <p>
+                Com o uso contínuo, começa a identificar retornos pendentes, oportunidades de acompanhamento e situações que merecem atenção.
+              </p>
+              <p>
+                Você não precisa aprender um método novo.
+                <br />
+                Basta trabalhar normalmente.
+              </p>
+            </div>
+          </div>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              setOnboardingDismissed(true);
+              onDismissOnboarding();
+            }}
+            className="w-full flex items-center justify-center gap-2.5 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_8px_28px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
+          >
+            Começar minha rotina
+            <ArrowRight size={17} />
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // ─── Onboarding Steps 2–5 (one focused step at a time) ────
+  // ─── Onboarding Steps 2–4 (one focused step at a time) ────
   if (showOnboarding) {
     const stepTitles: Record<number, string> = {
       2: 'Para chegar lá, preciso conhecer pelo menos um paciente.',
       3: 'Agora consigo acompanhar a jornada desse paciente.',
       4: 'Aqui é onde a história clínica começa.',
-      5: 'Pronto. Agora o OdontoHub pode começar a trabalhar por você.',
     };
 
     return (
@@ -797,44 +849,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="flex items-center gap-2.5 bg-sky-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(2,132,199,0.2)] hover:bg-sky-700 transition-all"
               >
                 Abrir prontuário
-                <ArrowRight size={15} />
-              </motion.button>
-            </>
-          )}
-
-          {currentOnboardingStep === 5 && (
-            <>
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-emerald-50 rounded-[18px] flex items-center justify-center shrink-0">
-                  <Sparkles size={22} className="text-emerald-500" />
-                </div>
-                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
-                  Próximos atendimentos, pacientes sem retorno, confirmações pendentes e faturamento — tudo no mesmo lugar.
-                </p>
-              </div>
-              <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2.5 border border-slate-100/50">
-                <div className="flex items-center gap-2.5 py-1">
-                  <div className="w-2 h-2 bg-primary rounded-full shrink-0" />
-                  <p className="text-[12px] text-[#636366] font-medium">Próximo atendimento do dia</p>
-                </div>
-                <div className="flex items-center gap-2.5 py-1">
-                  <div className="w-2 h-2 bg-rose-400 rounded-full shrink-0" />
-                  <p className="text-[12px] text-[#636366] font-medium">Pacientes que precisam de retorno</p>
-                </div>
-                <div className="flex items-center gap-2.5 py-1">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
-                  <p className="text-[12px] text-[#636366] font-medium">Faturamento e alertas do dia</p>
-                </div>
-              </div>
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  setOnboardingDismissed(true);
-                  onDismissOnboarding();
-                }}
-                className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
-              >
-                Ir para minha rotina
                 <ArrowRight size={15} />
               </motion.button>
             </>
