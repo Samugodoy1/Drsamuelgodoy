@@ -540,13 +540,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const insightCard = !loading ? getInsightCard() : null;
 
   const portalRecentCount = (portalActivity?.recentConfirmations?.length || 0)
-    + (portalActivity?.intakeForms?.length || 0)
     + (portalActivity?.requests?.filter(r => r.status === 'PENDING').length || 0);
 
-  const attentionItemsCount =
+  const attentionItemsForSummary =
     (intelligence?.overdueReturns?.length || 0) +
     noShowsNeedingReschedule.length +
-    tomorrowUnconfirmedCount +
     (portalPendingCount > 0 ? portalPendingCount : 0);
 
   const formatFirstAppointmentTime = () => {
@@ -559,7 +557,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const firstAppointmentTime = formatFirstAppointmentTime();
 
   const getDaySummaryTitle = (): string => {
-    if (todayAppointmentsTotalCount === 0) return 'Agenda livre hoje';
+    if (todayAppointmentsTotalCount === 0) {
+      if (tomorrowUnconfirmedCount > 0) {
+        return tomorrowUnconfirmedCount === 1
+          ? '1 lembrete para enviar'
+          : `${tomorrowUnconfirmedCount} lembretes para enviar`;
+      }
+      return 'Agenda livre hoje';
+    }
     if (todayAppointmentsTotalCount === 1) return '1 consulta hoje';
     return `${todayAppointmentsTotalCount} consultas hoje`;
   };
@@ -577,10 +582,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       parts.push(`amanhã: ${tomorrowTotalCount} confirmada${tomorrowTotalCount === 1 ? '' : 's'}`);
     }
 
-    const attentionItemsForSummary =
-      (intelligence?.overdueReturns?.length || 0) +
-      noShowsNeedingReschedule.length +
-      (portalPendingCount > 0 ? portalPendingCount : 0);
+    if (tomorrowUnconfirmedCount > 0 && todayAppointmentsTotalCount > 0) {
+      parts.push(
+        tomorrowUnconfirmedCount === 1
+          ? '1 consulta de amanhã sem confirmação'
+          : `${tomorrowUnconfirmedCount} consultas de amanhã sem confirmação`
+      );
+    } else if (tomorrowUnconfirmedCount > 0) {
+      parts.push('Consultas de amanhã sem confirmação');
+    }
 
     if (attentionItemsForSummary > 0) {
       const attentionParts = [
@@ -602,8 +612,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (portalActivity.recentConfirmations.length > 0) {
         portalParts.push(`${portalActivity.recentConfirmations.length} confirmação${portalActivity.recentConfirmations.length === 1 ? '' : 'ões'} pelo portal`);
       }
-      if (portalActivity.intakeForms.length > 0) {
-        portalParts.push(`${portalActivity.intakeForms.length} cadastro${portalActivity.intakeForms.length === 1 ? '' : 's'} preenchido${portalActivity.intakeForms.length === 1 ? '' : 's'}`);
+      const pendingPortalRequests = portalActivity.requests?.filter(r => r.status === 'PENDING').length || 0;
+      if (pendingPortalRequests > 0) {
+        portalParts.push(`${pendingPortalRequests} solicitação${pendingPortalRequests === 1 ? '' : 'ões'} no portal`);
       }
       if (portalParts.length > 0) parts.push(`${portalParts.join(' · ')} desde ontem`);
     }
@@ -612,7 +623,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return parts.join(' · ');
   };
 
-  const showDaySummary = todayAppointmentsTotalCount > 0 || tomorrowTotalCount > 0 || attentionItemsCount > 0 || portalRecentCount > 0;
+  const showDaySummary =
+    todayAppointmentsTotalCount > 0 ||
+    tomorrowTotalCount > 0 ||
+    tomorrowUnconfirmedCount > 0 ||
+    attentionItemsForSummary > 0 ||
+    portalRecentCount > 0;
+
+  const showFinancialSummary = todayRevenue > 0 || weekRevenue > 0 || pendingReceivablesTotal > 0;
+
+  const handleDaySummaryClick = () => {
+    if (tomorrowUnconfirmedCount > 0) {
+      openReminderModal();
+      return;
+    }
+    setActiveTab('agenda');
+  };
+
+  const daySummaryIcon = tomorrowUnconfirmedCount > 0 && todayAppointmentsTotalCount === 0
+    ? MessageCircle
+    : Calendar;
 
   const getEffectiveStatus = (appointment: any): string => {
     const now = new Date();
@@ -1432,28 +1462,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )
       )}
 
-      {/* 4. WHATSAPP REMINDERS — time-sensitive, promoted */}
-      {tomorrowUnconfirmedCount > 0 && (
-        <section className="px-0">
-          <motion.button
-            whileTap={{ scale: 0.98, opacity: 0.9 }}
-            onClick={openReminderModal}
-            className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all"
-          >
-            <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-primary shadow-sm shrink-0">
-              <MessageCircle size={20} />
-            </div>
-            <div className="flex-1 min-w-0 text-left">
-              <p className="text-[15px] font-semibold text-[#1C1C1E]">
-                {tomorrowUnconfirmedCount} lembrete{tomorrowUnconfirmedCount === 1 ? '' : 's'} para enviar
-              </p>
-              <p className="text-[12px] text-[#8E8E93]">Consultas de amanhã sem confirmação</p>
-            </div>
-            <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
-          </motion.button>
-          <AnimatePresence>
-            {isReminderModalOpen && (
-              <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      {/* Modal — confirmações de amanhã (aberto pelo card Seu dia) */}
+      <AnimatePresence>
+        {isReminderModalOpen && (
+          <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1527,10 +1539,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </motion.div>
               </div>
-            )}
-          </AnimatePresence>
-        </section>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* 5. TODAY'S SCHEDULE — clean with green time accent */}
       {otherAppointments.length > 0 && (
@@ -1569,17 +1579,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
-      {/* Seu dia — compacto, mesmo visual dos lembretes */}
+      {/* Seu dia — resumo unificado (agenda, lembretes, portal) */}
       {showDaySummary && (
         <section className="px-0">
           <motion.button
             type="button"
             whileTap={{ scale: 0.98, opacity: 0.9 }}
-            onClick={() => setActiveTab('agenda')}
+            onClick={handleDaySummaryClick}
             className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all text-left"
           >
             <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-primary shadow-sm shrink-0">
-              <Calendar size={20} />
+              {React.createElement(daySummaryIcon, { size: 20 })}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-semibold text-[#1C1C1E]">{getDaySummaryTitle()}</p>
@@ -1677,58 +1687,52 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
-      {/* 9. FINANCIAL SUMMARY — funciona cedo, sem gráficos vazios */}
-      {(todayRevenue > 0 || weekRevenue > 0 || todayAppointmentsTotalCount > 0 || pendingReceivablesTotal > 0) && (
+      {/* Financeiro — só quando há valor registrado ou pendência */}
+      {showFinancialSummary && (
         <section className="px-0">
           <motion.button
             whileTap={{ scale: 0.98, opacity: 0.9 }}
             onClick={() => setActiveTab('financeiro')}
-            className="w-full flex items-center justify-between bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 rounded-[20px] px-5 py-5 border border-emerald-100/40 text-left transition-all"
+            className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all text-left"
           >
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="w-11 h-11 bg-emerald-500 rounded-[14px] flex items-center justify-center shadow-sm shrink-0">
-                <DollarSign size={20} className="text-white" />
-              </div>
-              <div className="min-w-0">
-                {todayRevenue > 0 ? (
-                  <>
-                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Faturamento hoje</p>
-                    <p className="text-[22px] font-bold text-emerald-900 leading-tight">
-                      {todayRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                  </>
-                ) : todayAppointmentsTotalCount > 0 ? (
-                  <>
-                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Financeiro do dia</p>
-                    <p className="text-[16px] font-bold text-emerald-900 leading-tight">
-                      {todayAppointmentsTotalCount} consulta{todayAppointmentsTotalCount === 1 ? '' : 's'} hoje · registre os pagamentos
-                    </p>
-                  </>
-                ) : weekRevenue > 0 ? (
-                  <>
-                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Esta semana</p>
-                    <p className="text-[22px] font-bold text-emerald-900 leading-tight">
-                      {weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">A receber</p>
-                    <p className="text-[22px] font-bold text-emerald-900 leading-tight">
-                      {pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                  </>
-                )}
-                {(weekRevenue > 0 || pendingReceivablesTotal > 0) && todayRevenue > 0 && (
-                  <p className="text-[12px] text-emerald-700/70 mt-1 font-medium">
-                    {weekRevenue > 0 ? `Semana: ${weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
-                    {weekRevenue > 0 && pendingReceivablesTotal > 0 ? ' · ' : ''}
-                    {pendingReceivablesTotal > 0 ? `Pendente: ${pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
-                  </p>
-                )}
-              </div>
+            <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+              <DollarSign size={20} />
             </div>
-            <ChevronRight size={16} className="text-emerald-300 shrink-0" />
+            <div className="flex-1 min-w-0">
+              {todayRevenue > 0 ? (
+                <>
+                  <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                    {todayRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} faturados hoje
+                  </p>
+                  {(weekRevenue > todayRevenue || pendingReceivablesTotal > 0) && (
+                    <p className="text-[12px] text-[#8E8E93] mt-0.5 leading-snug">
+                      {weekRevenue > todayRevenue
+                        ? `Semana: ${weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                        : ''}
+                      {weekRevenue > todayRevenue && pendingReceivablesTotal > 0 ? ' · ' : ''}
+                      {pendingReceivablesTotal > 0
+                        ? `${pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} a receber`
+                        : ''}
+                    </p>
+                  )}
+                </>
+              ) : pendingReceivablesTotal > 0 ? (
+                <>
+                  <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                    {pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} a receber
+                  </p>
+                  <p className="text-[12px] text-[#8E8E93] mt-0.5">Pendências de pagamento</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                    {weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} esta semana
+                  </p>
+                  <p className="text-[12px] text-[#8E8E93] mt-0.5">Ver movimentações</p>
+                </>
+              )}
+            </div>
+            <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
           </motion.button>
         </section>
       )}
