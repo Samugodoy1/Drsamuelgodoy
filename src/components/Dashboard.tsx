@@ -558,6 +558,62 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
   const firstAppointmentTime = formatFirstAppointmentTime();
 
+  const getDaySummaryTitle = (): string => {
+    if (todayAppointmentsTotalCount === 0) return 'Agenda livre hoje';
+    if (todayAppointmentsTotalCount === 1) return '1 consulta hoje';
+    return `${todayAppointmentsTotalCount} consultas hoje`;
+  };
+
+  const getDaySummarySubtitle = (): string => {
+    const parts: string[] = [];
+
+    if (firstAppointmentTime && todayAppointmentsRemainingCount > 0) {
+      parts.push(`primeira às ${firstAppointmentTime}`);
+    } else if (todayAppointmentsRemainingCount > 0) {
+      parts.push(`${todayAppointmentsRemainingCount} restante${todayAppointmentsRemainingCount === 1 ? '' : 's'}`);
+    }
+
+    if (tomorrowTotalCount > 0 && tomorrowUnconfirmedCount === 0) {
+      parts.push(`amanhã: ${tomorrowTotalCount} confirmada${tomorrowTotalCount === 1 ? '' : 's'}`);
+    }
+
+    const attentionItemsForSummary =
+      (intelligence?.overdueReturns?.length || 0) +
+      noShowsNeedingReschedule.length +
+      (portalPendingCount > 0 ? portalPendingCount : 0);
+
+    if (attentionItemsForSummary > 0) {
+      const attentionParts = [
+        intelligence?.overdueReturns?.length
+          ? `${intelligence.overdueReturns.length} retorno${intelligence.overdueReturns.length === 1 ? '' : 's'} vencido${intelligence.overdueReturns.length === 1 ? '' : 's'}`
+          : null,
+        noShowsNeedingReschedule.length
+          ? `${noShowsNeedingReschedule.length} falta${noShowsNeedingReschedule.length === 1 ? '' : 's'} sem remarcação`
+          : null,
+        portalPendingCount
+          ? `${portalPendingCount} solicitação${portalPendingCount === 1 ? '' : 'ões'} no portal`
+          : null,
+      ].filter(Boolean);
+      if (attentionParts.length > 0) parts.push(attentionParts.join(' · '));
+    }
+
+    if (portalRecentCount > 0 && portalActivity) {
+      const portalParts: string[] = [];
+      if (portalActivity.recentConfirmations.length > 0) {
+        portalParts.push(`${portalActivity.recentConfirmations.length} confirmação${portalActivity.recentConfirmations.length === 1 ? '' : 'ões'} pelo portal`);
+      }
+      if (portalActivity.intakeForms.length > 0) {
+        portalParts.push(`${portalActivity.intakeForms.length} cadastro${portalActivity.intakeForms.length === 1 ? '' : 's'} preenchido${portalActivity.intakeForms.length === 1 ? '' : 's'}`);
+      }
+      if (portalParts.length > 0) parts.push(`${portalParts.join(' · ')} desde ontem`);
+    }
+
+    if (parts.length === 0) return 'Nada escapando por enquanto';
+    return parts.join(' · ');
+  };
+
+  const showDaySummary = todayAppointmentsTotalCount > 0 || tomorrowTotalCount > 0 || attentionItemsCount > 0 || portalRecentCount > 0;
+
   const getEffectiveStatus = (appointment: any): string => {
     const now = new Date();
     const startTime = new Date(appointment.start_time);
@@ -1051,87 +1107,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.div>
         )}
 
-        {/* Resumo do dia — visão matinal em 30 segundos */}
-        {(todayAppointmentsTotalCount > 0 || tomorrowTotalCount > 0 || attentionItemsCount > 0) && (
-          <motion.section
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.1 }}
-            className="rounded-[24px] border border-[#E5E5EA]/80 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-5 space-y-4"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-[#8E8E93]">Seu dia</p>
-                <p className="text-[17px] font-bold text-[#1C1C1E] mt-1">
-                  {todayAppointmentsTotalCount === 0
-                    ? 'Agenda livre hoje'
-                    : todayAppointmentsTotalCount === 1
-                      ? '1 consulta hoje'
-                      : `${todayAppointmentsTotalCount} consultas hoje`}
-                  {firstAppointmentTime ? ` · primeira às ${firstAppointmentTime}` : ''}
-                </p>
-              </div>
-              {todayAppointmentsRemainingCount > 0 && (
-                <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary shrink-0">
-                  {todayAppointmentsRemainingCount} restante{todayAppointmentsRemainingCount === 1 ? '' : 's'}
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {tomorrowTotalCount > 0 && (
-                <div className="rounded-[18px] bg-[#F9FAFB] px-4 py-3.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#8E8E93]">Amanhã</p>
-                  <p className="text-[14px] font-semibold text-[#1C1C1E] mt-1">
-                    {tomorrowConfirmedCount} confirmada{tomorrowConfirmedCount === 1 ? '' : 's'}
-                    {tomorrowUnconfirmedCount > 0
-                      ? ` · ${tomorrowUnconfirmedCount} aguardando`
-                      : ' · tudo confirmado'}
-                  </p>
-                </div>
-              )}
-
-              {attentionItemsCount > 0 ? (
-                <div className="rounded-[18px] bg-rose-50/70 px-4 py-3.5 border border-rose-100/60">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Precisa de você</p>
-                  <p className="text-[14px] font-semibold text-rose-900 mt-1">
-                    {[
-                      intelligence?.overdueReturns?.length ? `${intelligence.overdueReturns.length} retorno${intelligence.overdueReturns.length === 1 ? '' : 's'}` : null,
-                      noShowsNeedingReschedule.length ? `${noShowsNeedingReschedule.length} falta${noShowsNeedingReschedule.length === 1 ? '' : 's'}` : null,
-                      tomorrowUnconfirmedCount ? `${tomorrowUnconfirmedCount} confirmação${tomorrowUnconfirmedCount === 1 ? '' : 'ões'}` : null,
-                      portalPendingCount ? `${portalPendingCount} portal` : null,
-                    ].filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-[18px] bg-emerald-50/70 px-4 py-3.5 border border-emerald-100/60">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Tudo sob controle</p>
-                  <p className="text-[14px] font-semibold text-emerald-900 mt-1">Nada escapando por enquanto</p>
-                </div>
-              )}
-            </div>
-
-            {portalRecentCount > 0 && portalActivity && (
-              <div className="rounded-[18px] bg-blue-50/60 px-4 py-3 border border-blue-100/60">
-                <p className="text-[12px] font-semibold text-blue-900">
-                  {portalActivity.recentConfirmations.length > 0 && (
-                    <span>
-                      {portalActivity.recentConfirmations.length} confirmação{portalActivity.recentConfirmations.length === 1 ? '' : 'ões'} pelo portal
-                    </span>
-                  )}
-                  {portalActivity.intakeForms.length > 0 && (
-                    <span>
-                      {portalActivity.recentConfirmations.length > 0 ? ' · ' : ''}
-                      {portalActivity.intakeForms.length} cadastro{portalActivity.intakeForms.length === 1 ? '' : 's'} preenchido{portalActivity.intakeForms.length === 1 ? '' : 's'}
-                    </span>
-                  )}
-                  <span className="block text-[11px] font-medium text-blue-700/70 mt-0.5">Desde ontem</span>
-                </p>
-              </div>
-            )}
-          </motion.section>
-        )}
-
         {/* Portal banner */}
         {portalPendingCount > 0 && (
           <motion.button
@@ -1591,6 +1566,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </motion.div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Seu dia — compacto, mesmo visual dos lembretes */}
+      {showDaySummary && (
+        <section className="px-0">
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98, opacity: 0.9 }}
+            onClick={() => setActiveTab('agenda')}
+            className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all text-left"
+          >
+            <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-primary shadow-sm shrink-0">
+              <Calendar size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-semibold text-[#1C1C1E]">{getDaySummaryTitle()}</p>
+              <p className="text-[12px] text-[#8E8E93] mt-0.5 leading-snug">{getDaySummarySubtitle()}</p>
+            </div>
+            <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
+          </motion.button>
         </section>
       )}
 
