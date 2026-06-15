@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Check, Sparkles, Activity, MapPin, Zap, Info, Palette, FlaskConical, Lock } from '../icons';
+import { ChevronLeft, Check, Sparkles, Activity, MapPin, Zap, Info, Palette, FlaskConical, Lock, Calendar } from '../icons';
 import { useNavigate } from 'react-router-dom';
 
 interface Block {
@@ -124,6 +124,14 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [returnPresetDays, setReturnPresetDays] = useState<number | null>(30);
+
+  const computeReturnDate = (days: number | null): string | null => {
+    if (days === null) return null;
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toLocaleDateString('en-CA');
+  };
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
@@ -306,10 +314,12 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       date: new Date().toISOString().split('T')[0],
       procedure: blocks.length > 0 ? blocks[0].label : 'Evolução Clínica',
+      procedure_performed: blocks.length > 0 ? blocks[0].label : 'Evolução Clínica',
       notes: evolutionText,
       raw: inputText,
       materials: '',
-      observations: ''
+      observations: '',
+      return_date: computeReturnDate(returnPresetDays),
     };
 
     if (onSave) {
@@ -432,6 +442,36 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({ patientId, onSave, o
 
             {/* Quick Flow Suggestions */}
             <div className="mt-4 pt-4 border-t border-slate-50">
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-2.5">Retorno sugerido</p>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {[
+                  { label: '7 dias', days: 7 },
+                  { label: '15 dias', days: 15 },
+                  { label: '30 dias', days: 30 },
+                  { label: '60 dias', days: 60 },
+                  { label: 'Sem retorno', days: null },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => setReturnPresetDays(item.days)}
+                    className={`px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all ios-press border ${
+                      returnPresetDays === item.days
+                        ? 'bg-primary/10 text-primary border-primary/20'
+                        : 'bg-slate-50/80 hover:bg-slate-100 text-slate-500 border-slate-100/60'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {returnPresetDays !== null && (
+                <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mb-4">
+                  <Calendar size={12} />
+                  O OdontoHub lembra você em {new Date(`${computeReturnDate(returnPresetDays)}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+                </p>
+              )}
+
               <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-2.5">Fluxos rápidos</p>
               <div className="flex flex-wrap gap-2">
                 {[

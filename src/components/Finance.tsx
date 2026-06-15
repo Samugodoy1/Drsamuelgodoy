@@ -667,13 +667,18 @@ export function Finance({
     const dayOfMonth = now.getDate();
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const monthProgress = dayOfMonth / daysInMonth;
-    const projectedRevenue = monthProgress > 0.1 ? monthRevenue / monthProgress : 0;
-    const revenueGrowth = prevMonthRevenue > 0 ? ((monthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : 0;
+    const totalIncomeCount = transactions.filter((transaction) => transaction.type === 'INCOME').length;
+    const isEarlyStage = totalIncomeCount < 3;
+    const hasComparisonHistory = prevMonthRevenue > 0 && totalIncomeCount >= 5;
+    const projectedRevenue = monthProgress > 0.1 && !isEarlyStage ? monthRevenue / monthProgress : 0;
+    const revenueGrowth = hasComparisonHistory && prevMonthRevenue > 0
+      ? ((monthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100
+      : 0;
     const profitMargin = monthRevenue > 0 ? (netProfit / monthRevenue) * 100 : 0;
     const isStartOfMonth = dayOfMonth <= 5;
     const isEndOfMonth = dayOfMonth >= daysInMonth - 3;
     const freeSlots = typeof todayFreeSlots === 'number' ? todayFreeSlots : Math.max(8 - todayAppointmentsCount, 0);
-    const gap = prevMonthRevenue > 0 ? prevMonthRevenue - monthRevenue : 0;
+    const gap = hasComparisonHistory && prevMonthRevenue > 0 ? prevMonthRevenue - monthRevenue : 0;
 
     let headline = '';
     let headlineIcon: 'rocket' | 'check' | 'target' | 'chart' = 'check';
@@ -681,6 +686,20 @@ export function Finance({
     let subtitle = '';
     let ctaLabel = '';
     let ctaAction: 'agenda' | 'schedule' | 'patients' | 'income' | null = null;
+
+    if (isEarlyStage) {
+      headline = monthRevenue > 0
+        ? 'Primeiros registros no caminho certo'
+        : 'Registre consultas e pagamentos conforme atende';
+      headlineIcon = monthRevenue > 0 ? 'check' : 'rocket';
+      headlineColor = 'text-primary';
+      subtitle = monthRevenue > 0
+        ? `${currency(monthRevenue)} registrado${totalIncomeCount === 1 ? '' : 's'} — comparativos aparecem com mais histórico`
+        : 'Com poucos dados, mostramos só o essencial: o que entrou hoje e o que está pendente';
+      ctaLabel = freeSlots > 0 ? 'Agendar consulta' : 'Registrar primeira receita';
+      ctaAction = freeSlots > 0 ? 'schedule' : 'income';
+      return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction, isEarlyStage };
+    }
 
     // ── Case 1: Zero revenue ──
     if (monthRevenue === 0 && isStartOfMonth) {
@@ -777,8 +796,8 @@ export function Finance({
       }
     }
 
-    return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction };
-  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount, todayFreeSlots]);
+    return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction, isEarlyStage: false };
+  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount, todayFreeSlots, transactions]);
 
   const pendingItems = useMemo(() => insights?.pendingInstallments || [], [insights]);
 

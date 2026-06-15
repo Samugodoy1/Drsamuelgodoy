@@ -1715,6 +1715,55 @@ export default function App() {
 
   const tomorrowUnconfirmedCount = tomorrowUnconfirmedAppointments.length;
 
+  const tomorrowAppointments = appointments.filter(a => {
+    const apptDate = new Date(a.start_time);
+    return apptDate >= tomorrowStart && apptDate <= tomorrowEnd && a.status !== 'CANCELLED';
+  });
+  const tomorrowTotalCount = tomorrowAppointments.length;
+  const tomorrowConfirmedCount = tomorrowAppointments.filter(a => a.status === 'CONFIRMED').length;
+
+  const todayAppointmentsAll = appointments
+    .filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString() && a.status !== 'CANCELLED')
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  const todayFirstAppointment = todayAppointmentsAll.find(a => a.status !== 'FINISHED' && a.status !== 'NO_SHOW')
+    ?? todayAppointmentsAll[0]
+    ?? null;
+
+  const noShowsNeedingReschedule = appointments
+    .filter(a => {
+      if (a.status !== 'NO_SHOW') return false;
+      const apptDate = new Date(a.start_time);
+      const cutoff = new Date(dashboardNow);
+      cutoff.setDate(cutoff.getDate() - 14);
+      if (apptDate < cutoff) return false;
+      const hasFuture = appointments.some(f =>
+        f.patient_id === a.patient_id &&
+        new Date(f.start_time) > dashboardNow &&
+        f.status !== 'CANCELLED' &&
+        f.status !== 'NO_SHOW'
+      );
+      return !hasFuture;
+    })
+    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+
+  const weekStart = new Date(dashboardNow);
+  weekStart.setDate(dashboardNow.getDate() - 6);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekRevenue = transactions
+    .filter(t => {
+      if (t.type !== 'INCOME') return false;
+      const tDate = t.date?.split('T')[0];
+      if (!tDate) return false;
+      const parsed = new Date(`${tDate}T12:00:00`);
+      return parsed >= weekStart && parsed <= dashboardNow;
+    })
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const pendingReceivablesTotal = installments
+    .filter(i => i.status === 'PENDING' || i.status === 'OVERDUE')
+    .reduce((acc, i) => acc + Number(i.amount), 0);
+
   // Weekly Revenue Data for the Chart
   const weeklyRevenueData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -1774,7 +1823,7 @@ export default function App() {
     return response;
   }, []);  // stable — reads volatile values via refs
 
-  const openAppointmentModal = (prefill?: { patientId: number; patientName: string }) => {
+  const openAppointmentModal = (prefill?: { patientId: number; patientName: string; notes?: string }) => {
     const dentist_id = user?.id ? user.id.toString() : (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}')?.id?.toString() : '');
 
     setAppointmentModalMode('schedule');
@@ -1787,9 +1836,19 @@ export default function App() {
       date: selectedDate.toLocaleDateString('en-CA'),
       time: '',
       duration: '30',
-      notes: ''
+      notes: prefill?.notes || ''
     });
     setIsModalOpen(true);
+  };
+
+  const openScheduleForPatient = (patientId: number, procedure?: string | null) => {
+    const patient = patientMap.get(patientId);
+    if (!patient) return;
+    openAppointmentModal({
+      patientId: patient.id,
+      patientName: patient.name,
+      notes: procedure || '',
+    });
   };
 
   const getTimeFromPreferredSlot = (preferredTime?: string | null) => {
@@ -2730,9 +2789,10 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({ 
           notes: evolutionData.notes, 
-          procedure_performed: evolutionData.procedure,
+          procedure_performed: evolutionData.procedure_performed || evolutionData.procedure,
           materials: evolutionData.materials,
-          observations: evolutionData.observations
+          observations: evolutionData.observations,
+          return_date: evolutionData.return_date || null,
         })
       });
       if (res.ok) {
@@ -3371,10 +3431,17 @@ export default function App() {
                 appointments={appointments}
                 nextAppointments={nextAppointments}
                 todayAppointmentsRemainingCount={todayAppointmentsRemainingCount}
+                todayAppointmentsTotalCount={todayAppointmentsTotalCount}
+                todayFirstAppointment={todayFirstAppointment}
                 totalAppointmentsCount={appointments.length}
                 todayRevenue={dailyRevenue}
+                weekRevenue={weekRevenue}
+                pendingReceivablesTotal={pendingReceivablesTotal}
                 tomorrowUnconfirmedCount={tomorrowUnconfirmedCount}
                 tomorrowUnconfirmedAppointments={tomorrowUnconfirmedAppointments}
+                tomorrowConfirmedCount={tomorrowConfirmedCount}
+                tomorrowTotalCount={tomorrowTotalCount}
+                noShowsNeedingReschedule={noShowsNeedingReschedule}
                 openPatientRecord={openPatientRecord}
                 setIsModalOpen={setIsModalOpen}
                 setIsPatientModalOpen={setIsPatientModalOpen}
@@ -3382,6 +3449,7 @@ export default function App() {
                 sendReminder={sendReminder}
                 onReschedule={openRescheduleAppointment}
                 onSchedulePatient={openScheduleSuggestion}
+                onOpenScheduleForPatient={openScheduleForPatient}
                 onDismissOnboarding={() => updateUserOnboarding('onboarding_done')}
                 onDismissWelcome={() => updateUserOnboarding('welcome_seen')}
                 product={getCurrentProduct()}

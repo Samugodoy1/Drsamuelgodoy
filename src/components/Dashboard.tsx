@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../config';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus } from '../icons';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, AlertCircle } from '../icons';
+import type { PortalActivity } from '../types/portal';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -23,10 +24,21 @@ interface PatientIntelligence {
   urgent_teeth: number[];
 }
 
+interface OverdueReturn {
+  patient_id: number;
+  patient_name: string;
+  phone: string;
+  photo_url: string | null;
+  return_date: string;
+  procedure_performed: string | null;
+  days_overdue: number;
+}
+
 interface DashboardIntelligence {
   needsActionToday: PatientIntelligence[];
   abandonmentRisk: PatientIntelligence[];
   attentionNeeded: PatientIntelligence[];
+  overdueReturns: OverdueReturn[];
   stats: {
     totalPatients: number;
     inTreatment: number;
@@ -66,16 +78,31 @@ interface ReminderAppointment {
   status: string;
 }
 
+interface NoShowNeedingReschedule {
+  id: number;
+  patient_id: number;
+  patient_name: string;
+  start_time: string;
+  notes?: string;
+}
+
 interface DashboardProps {
   user: any;
   patients: any[];
   appointments: any[];
   nextAppointments: any[];
   todayAppointmentsRemainingCount: number;
+  todayAppointmentsTotalCount?: number;
+  todayFirstAppointment?: any | null;
   totalAppointmentsCount: number;
   tomorrowUnconfirmedCount: number;
   tomorrowUnconfirmedAppointments: ReminderAppointment[];
+  tomorrowConfirmedCount?: number;
+  tomorrowTotalCount?: number;
+  noShowsNeedingReschedule?: NoShowNeedingReschedule[];
   todayRevenue: number;
+  weekRevenue?: number;
+  pendingReceivablesTotal?: number;
   openPatientRecord: (id: number) => void;
   setIsModalOpen: (open: boolean) => void;
   setIsPatientModalOpen: (open: boolean) => void;
@@ -83,6 +110,7 @@ interface DashboardProps {
   sendReminder: (appointment: any) => void;
   onReschedule?: (appointment: any) => void;
   onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => void;
+  onOpenScheduleForPatient?: (patientId: number, procedure?: string | null) => void;
   onDismissOnboarding: () => void;
   onDismissWelcome: () => void;
   product: string;
@@ -170,10 +198,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   appointments = [],
   nextAppointments = [],
   todayAppointmentsRemainingCount = 0,
+  todayAppointmentsTotalCount = 0,
+  todayFirstAppointment = null,
   totalAppointmentsCount = 0,
   tomorrowUnconfirmedCount = 0,
   tomorrowUnconfirmedAppointments = [],
+  tomorrowConfirmedCount = 0,
+  tomorrowTotalCount = 0,
+  noShowsNeedingReschedule = [],
   todayRevenue = 0,
+  weekRevenue = 0,
+  pendingReceivablesTotal = 0,
   openPatientRecord,
   setIsModalOpen,
   setIsPatientModalOpen,
@@ -181,6 +216,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   sendReminder,
   onReschedule,
   onSchedulePatient,
+  onOpenScheduleForPatient,
   onDismissOnboarding,
   onDismissWelcome,
   product,
@@ -191,6 +227,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
   const [operationalInsight, setOperationalInsight] = useState<OperationalInsight | null>(null);
+  const [portalActivity, setPortalActivity] = useState<PortalActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -212,13 +249,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         headers['Authorization'] = `Bearer ${token}`;
         headers['x-auth-token'] = token;
       }
-      const [dashRes, schedRes, operationalRes] = await Promise.all([
+      const [dashRes, schedRes, operationalRes, portalRes] = await Promise.all([
         fetch(`${API_URL}/api/intelligence/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
         fetch(`${API_URL}/api/intelligence/scheduling`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
         fetch(`${API_URL}/api/intelligence/operational`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
+        fetch(`${API_URL}/api/portal/activity`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
       ]);
       if (dashRes.ok) {
-        setIntelligence(await dashRes.json());
+        const data = await dashRes.json();
+        setIntelligence({
+          ...data,
+          overdueReturns: Array.isArray(data.overdueReturns) ? data.overdueReturns : [],
+        });
       }
       if (schedRes.ok) {
         const data = await schedRes.json();
@@ -227,6 +269,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (operationalRes.ok) {
         const data = await operationalRes.json();
         if (data?.text) setOperationalInsight(data);
+      }
+      if (portalRes.ok) {
+        const data = await portalRes.json();
+        if (data && typeof data === 'object') setPortalActivity(data);
       }
     } catch (e) {
       console.error('Dashboard intelligence fetch failed:', e);
@@ -279,6 +325,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const hour = new Date().getHours();
     const urgentCount = intelligence?.needsActionToday?.length || 0;
     const abandonCount = intelligence?.abandonmentRisk?.length || 0;
+    const overdueReturnsCount = intelligence?.overdueReturns?.length || 0;
+    const noShowCount = noShowsNeedingReschedule.length;
     const remaining = todayAppointmentsRemainingCount;
     const suggestionsCount = availableSchedulingSuggestions.length;
 
@@ -287,6 +335,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const pick = (arr: string[]) => arr[
       Math.abs([...daySeed].reduce((a, c) => a + c.charCodeAt(0), 0)) % arr.length
     ];
+
+    // Priority 0 — overdue returns (highest value moment from early weeks)
+    if (overdueReturnsCount > 0) {
+      return pick(overdueReturnsCount === 1
+        ? [
+            'Tem um retorno vencido que você marcou e esqueceu.',
+            'Um paciente deveria ter voltado — vale remarcar hoje.',
+          ]
+        : [
+            `${overdueReturnsCount} retornos venceram sem remarcação.`,
+            'Pacientes que você disse que voltariam — ainda sem agendamento.',
+          ]);
+    }
+
+    // Priority 0b — no-shows without reschedule
+    if (noShowCount > 0) {
+      return pick(noShowCount === 1
+        ? ['Um paciente faltou e ainda não foi remarcado.', 'Falta recente sem remarcação — hora de recuperar.']
+        : [`${noShowCount} faltas recentes sem remarcação.`, 'Pacientes que faltaram e sumiram do radar.']);
+    }
 
     // Priority 1 — urgent patients
     if (urgentCount > 0) {
@@ -365,10 +433,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const getInsightCard = (): { text: string; icon: React.ReactNode; accent: string } | null => {
     const abandonCount = intelligence?.abandonmentRisk?.length || 0;
+    const overdueReturnsCount = intelligence?.overdueReturns?.length || 0;
+    const noShowCount = noShowsNeedingReschedule.length;
     const suggestionsCount = availableSchedulingSuggestions.length;
     const remaining = todayAppointmentsRemainingCount;
     const unconfirmed = tomorrowUnconfirmedCount;
     const revenue = todayRevenue || 0;
+
+    // 0 — Retornos vencidos
+    if (overdueReturnsCount >= 2) {
+      return {
+        text: `${overdueReturnsCount} retornos venceram — pacientes que podem sumir se não remarcar.`,
+        icon: <Calendar size={16} />,
+        accent: 'rose',
+      };
+    }
+    if (overdueReturnsCount === 1) {
+      return {
+        text: 'Um retorno venceu e ainda não foi remarcado. Vale ligar hoje.',
+        icon: <Calendar size={16} />,
+        accent: 'rose',
+      };
+    }
+
+    // 0b — Faltas sem remarcação
+    if (noShowCount >= 2) {
+      return {
+        text: `${noShowCount} pacientes faltaram recentemente e ainda não remarcaram.`,
+        icon: <AlertCircle size={16} />,
+        accent: 'rose',
+      };
+    }
+    if (noShowCount === 1) {
+      return {
+        text: 'Um paciente faltou e ainda não foi remarcado.',
+        icon: <AlertCircle size={16} />,
+        accent: 'rose',
+      };
+    }
 
     // 1 — Encaixes inteligentes disponíveis
     if (remaining === 0 && suggestionsCount > 0) {
@@ -436,6 +538,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const insightCard = !loading ? getInsightCard() : null;
+
+  const portalRecentCount = (portalActivity?.recentConfirmations?.length || 0)
+    + (portalActivity?.intakeForms?.length || 0)
+    + (portalActivity?.requests?.filter(r => r.status === 'PENDING').length || 0);
+
+  const attentionItemsCount =
+    (intelligence?.overdueReturns?.length || 0) +
+    noShowsNeedingReschedule.length +
+    tomorrowUnconfirmedCount +
+    (portalPendingCount > 0 ? portalPendingCount : 0);
+
+  const formatFirstAppointmentTime = () => {
+    if (!todayFirstAppointment) return null;
+    return new Date(todayFirstAppointment.start_time).toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+  const firstAppointmentTime = formatFirstAppointmentTime();
 
   const getEffectiveStatus = (appointment: any): string => {
     const now = new Date();
@@ -930,6 +1051,87 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.div>
         )}
 
+        {/* Resumo do dia — visão matinal em 30 segundos */}
+        {(todayAppointmentsTotalCount > 0 || tomorrowTotalCount > 0 || attentionItemsCount > 0) && (
+          <motion.section
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
+            className="rounded-[24px] border border-[#E5E5EA]/80 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-5 space-y-4"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#8E8E93]">Seu dia</p>
+                <p className="text-[17px] font-bold text-[#1C1C1E] mt-1">
+                  {todayAppointmentsTotalCount === 0
+                    ? 'Agenda livre hoje'
+                    : todayAppointmentsTotalCount === 1
+                      ? '1 consulta hoje'
+                      : `${todayAppointmentsTotalCount} consultas hoje`}
+                  {firstAppointmentTime ? ` · primeira às ${firstAppointmentTime}` : ''}
+                </p>
+              </div>
+              {todayAppointmentsRemainingCount > 0 && (
+                <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary shrink-0">
+                  {todayAppointmentsRemainingCount} restante{todayAppointmentsRemainingCount === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {tomorrowTotalCount > 0 && (
+                <div className="rounded-[18px] bg-[#F9FAFB] px-4 py-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#8E8E93]">Amanhã</p>
+                  <p className="text-[14px] font-semibold text-[#1C1C1E] mt-1">
+                    {tomorrowConfirmedCount} confirmada{tomorrowConfirmedCount === 1 ? '' : 's'}
+                    {tomorrowUnconfirmedCount > 0
+                      ? ` · ${tomorrowUnconfirmedCount} aguardando`
+                      : ' · tudo confirmado'}
+                  </p>
+                </div>
+              )}
+
+              {attentionItemsCount > 0 ? (
+                <div className="rounded-[18px] bg-rose-50/70 px-4 py-3.5 border border-rose-100/60">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Precisa de você</p>
+                  <p className="text-[14px] font-semibold text-rose-900 mt-1">
+                    {[
+                      intelligence?.overdueReturns?.length ? `${intelligence.overdueReturns.length} retorno${intelligence.overdueReturns.length === 1 ? '' : 's'}` : null,
+                      noShowsNeedingReschedule.length ? `${noShowsNeedingReschedule.length} falta${noShowsNeedingReschedule.length === 1 ? '' : 's'}` : null,
+                      tomorrowUnconfirmedCount ? `${tomorrowUnconfirmedCount} confirmação${tomorrowUnconfirmedCount === 1 ? '' : 'ões'}` : null,
+                      portalPendingCount ? `${portalPendingCount} portal` : null,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-[18px] bg-emerald-50/70 px-4 py-3.5 border border-emerald-100/60">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Tudo sob controle</p>
+                  <p className="text-[14px] font-semibold text-emerald-900 mt-1">Nada escapando por enquanto</p>
+                </div>
+              )}
+            </div>
+
+            {portalRecentCount > 0 && portalActivity && (
+              <div className="rounded-[18px] bg-blue-50/60 px-4 py-3 border border-blue-100/60">
+                <p className="text-[12px] font-semibold text-blue-900">
+                  {portalActivity.recentConfirmations.length > 0 && (
+                    <span>
+                      {portalActivity.recentConfirmations.length} confirmação{portalActivity.recentConfirmations.length === 1 ? '' : 'ões'} pelo portal
+                    </span>
+                  )}
+                  {portalActivity.intakeForms.length > 0 && (
+                    <span>
+                      {portalActivity.recentConfirmations.length > 0 ? ' · ' : ''}
+                      {portalActivity.intakeForms.length} cadastro{portalActivity.intakeForms.length === 1 ? '' : 's'} preenchido{portalActivity.intakeForms.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  <span className="block text-[11px] font-medium text-blue-700/70 mt-0.5">Desde ontem</span>
+                </p>
+              </div>
+            )}
+          </motion.section>
+        )}
+
         {/* Portal banner */}
         {portalPendingCount > 0 && (
           <motion.button
@@ -1119,7 +1321,91 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.button>
       </div>}
 
-      {/* 3. PRECISAM DA SUA AÇÃO — adaptive: inline for 1, atmosphere for 2+ */}
+      {/* 3. RETORNOS VENCIDOS — prioridade máxima nas primeiras semanas */}
+      {intelligence && intelligence.overdueReturns.length > 0 && (
+        <section className="-mx-5 px-5 py-6 bg-gradient-to-b from-rose-50/90 to-rose-50/20 rounded-[20px] space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Retornos vencidos</h3>
+            </div>
+            <span className="text-[12px] font-bold text-rose-400">{intelligence.overdueReturns.length}</span>
+          </div>
+          <div className="rounded-[20px] overflow-hidden bg-white/80 backdrop-blur-sm border border-rose-100/40 shadow-[0_2px_12px_rgba(244,63,94,0.06)]">
+            {intelligence.overdueReturns.slice(0, 5).map((item) => (
+              <motion.div
+                key={`return-${item.patient_id}`}
+                whileTap={{ backgroundColor: '#F2F2F7' }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center gap-4 p-5 cursor-pointer border-b border-[#C6C6C8]/5 last:border-b-0"
+                onClick={() => openPatientRecord(item.patient_id)}
+              >
+                <div className="w-11 h-11 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-sm overflow-hidden border border-rose-100 shrink-0">
+                  {item.photo_url ? (
+                    <img src={item.photo_url} alt={item.patient_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    (item.patient_name || '?').charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{item.patient_name}</p>
+                  <p className="text-[12px] text-[#8E8E93] mt-0.5 truncate">
+                    Retorno venceu há {item.days_overdue} dia{item.days_overdue === 1 ? '' : 's'}
+                    {item.procedure_performed ? ` · ${item.procedure_performed}` : ''}
+                  </p>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenScheduleForPatient?.(item.patient_id, item.procedure_performed);
+                  }}
+                  className="shrink-0 px-4 py-[10px] rounded-full bg-rose-600 text-white text-[12px] font-bold"
+                >
+                  Remarcar
+                </motion.button>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3b. FALTAS SEM REMARCAÇÃO */}
+      {noShowsNeedingReschedule.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-1 h-5 rounded-full bg-amber-400" />
+              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Faltou e não remarcou</h3>
+            </div>
+            <span className="text-[12px] font-bold text-[#8E8E93]">{noShowsNeedingReschedule.length}</span>
+          </div>
+          <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+            {noShowsNeedingReschedule.slice(0, 5).map((item, index) => (
+              <motion.div
+                key={`noshow-${item.id}`}
+                whileTap={{ backgroundColor: '#F2F2F7' }}
+                transition={{ duration: 0.15 }}
+                onClick={() => onReschedule?.(item)}
+                className={`flex items-center justify-between px-5 py-[16px] transition-colors cursor-pointer ${index !== Math.min(noShowsNeedingReschedule.length, 5) - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{item.patient_name}</p>
+                  <p className="text-[12px] text-[#8E8E93] mt-0.5">
+                    Faltou em {new Date(item.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                    {item.notes ? ` · ${item.notes}` : ''}
+                  </p>
+                </div>
+                <span className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700">
+                  Remarcar
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 4. PRECISAM DA SUA AÇÃO — adaptive: inline for 1, atmosphere for 2+ */}
       {intelligence && intelligence.needsActionToday.length > 0 && (
         intelligence.needsActionToday.length === 1 ? (
           <section className="px-0">
@@ -1395,23 +1681,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
-      {/* 9. FINANCIAL SUMMARY — emerald accent, tappable */}
-      {(todayRevenue || 0) > 0 && (
+      {/* 9. FINANCIAL SUMMARY — funciona cedo, sem gráficos vazios */}
+      {(todayRevenue > 0 || weekRevenue > 0 || todayAppointmentsTotalCount > 0 || pendingReceivablesTotal > 0) && (
         <section className="px-0">
           <motion.button
             whileTap={{ scale: 0.98, opacity: 0.9 }}
             onClick={() => setActiveTab('financeiro')}
             className="w-full flex items-center justify-between bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 rounded-[20px] px-5 py-5 border border-emerald-100/40 text-left transition-all"
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 min-w-0">
               <div className="w-11 h-11 bg-emerald-500 rounded-[14px] flex items-center justify-center shadow-sm shrink-0">
                 <DollarSign size={20} className="text-white" />
               </div>
-              <div>
-                <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Faturamento hoje</p>
-                <p className="text-[22px] font-bold text-emerald-900 leading-tight">
-                  {(todayRevenue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </p>
+              <div className="min-w-0">
+                {todayRevenue > 0 ? (
+                  <>
+                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Faturamento hoje</p>
+                    <p className="text-[22px] font-bold text-emerald-900 leading-tight">
+                      {todayRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </>
+                ) : todayAppointmentsTotalCount > 0 ? (
+                  <>
+                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Financeiro do dia</p>
+                    <p className="text-[16px] font-bold text-emerald-900 leading-tight">
+                      {todayAppointmentsTotalCount} consulta{todayAppointmentsTotalCount === 1 ? '' : 's'} hoje · registre os pagamentos
+                    </p>
+                  </>
+                ) : weekRevenue > 0 ? (
+                  <>
+                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">Esta semana</p>
+                    <p className="text-[22px] font-bold text-emerald-900 leading-tight">
+                      {weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[12px] text-emerald-700/60 font-semibold uppercase tracking-wider">A receber</p>
+                    <p className="text-[22px] font-bold text-emerald-900 leading-tight">
+                      {pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </>
+                )}
+                {(weekRevenue > 0 || pendingReceivablesTotal > 0) && todayRevenue > 0 && (
+                  <p className="text-[12px] text-emerald-700/70 mt-1 font-medium">
+                    {weekRevenue > 0 ? `Semana: ${weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
+                    {weekRevenue > 0 && pendingReceivablesTotal > 0 ? ' · ' : ''}
+                    {pendingReceivablesTotal > 0 ? `Pendente: ${pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
+                  </p>
+                )}
               </div>
             </div>
             <ChevronRight size={16} className="text-emerald-300 shrink-0" />
