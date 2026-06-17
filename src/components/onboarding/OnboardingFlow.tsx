@@ -100,6 +100,10 @@ export function OnboardingFlow({
         throw new Error(data?.error || 'create failed');
       }
       await refreshAppData();
+      // Persist completion now (not only on the final button): the real patient
+      // already exists and the backend has retired the demo, so a refresh/close
+      // before "Ver minha home" must NOT restart the flow nor re-seed demo.
+      await markComplete();
       setStep('done');
     } catch (e: any) {
       setError(e?.message || 'Não consegui criar o paciente. Tente novamente.');
@@ -108,15 +112,9 @@ export function OnboardingFlow({
     }
   };
 
-  // ── Etapa 3 → home ─────────────────────────────────────────────────────────
-  const handleFinish = async () => {
-    setBusy(true);
-    try {
-      await markComplete();
-      goToDashboard();
-    } finally {
-      setBusy(false);
-    }
+  // ── Etapa 3 → home (completion was already persisted at patient creation) ───
+  const handleFinish = () => {
+    goToDashboard();
   };
 
   // ─── Etapa 1: non-blocking chrome over the REAL home ───────────────────────

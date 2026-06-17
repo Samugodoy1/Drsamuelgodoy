@@ -861,6 +861,16 @@ export default function App() {
     activeTab !== 'academy'
   );
 
+  // Once opened, the flow stays mounted for the whole session until the user
+  // clicks through to their home — even after onboarding_completed is persisted
+  // mid-flow (at patient creation). This keeps the closing screen visible while
+  // guaranteeing a refresh/close after creating the real patient won't restart
+  // the flow (and never re-seeds demo onto an account that now has real data).
+  const [onboardingFlowOpen, setOnboardingFlowOpen] = useState(false);
+  useEffect(() => {
+    if (needsClarezaVivaOnboarding) setOnboardingFlowOpen(true);
+  }, [needsClarezaVivaOnboarding]);
+
   // ─── Agenda date navigation helper ───────────────────────────────────
   const navigateDate = useCallback((direction: 'prev' | 'next' | 'today') => {
     if (direction === 'today') { setSelectedDate(new Date()); return; }
@@ -3469,7 +3479,7 @@ export default function App() {
                 portalPendingCount={portalPendingCount}
                 onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
                 dataRefreshKey={dataRefreshKey}
-                suppressOnboarding={needsClarezaVivaOnboarding}
+                suppressOnboarding={onboardingFlowOpen}
               />
             )}
 
@@ -7435,13 +7445,13 @@ export default function App() {
 
       {/* Onboarding "Clareza Viva" — overlays the real home (banner + CTA in
           Etapa 1, full-screen in Etapas 0/2/3). Runs once per user. */}
-      {needsClarezaVivaOnboarding && (
+      {onboardingFlowOpen && (
         <OnboardingFlow
           userName={user?.name || ''}
           apiFetch={apiFetch}
           refreshAppData={refreshAppData}
           markComplete={() => updateUserOnboarding('onboarding_done')}
-          goToDashboard={() => { setActiveTab('dashboard'); navigate('/'); }}
+          goToDashboard={() => { setOnboardingFlowOpen(false); setActiveTab('dashboard'); navigate('/'); }}
         />
       )}
     </div>
