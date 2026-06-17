@@ -55,6 +55,7 @@ import { PatientClinical } from './components/PatientClinical';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
 import { Dashboard } from './components/Dashboard';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { Finance } from './components/Finance';
 import FillAgendaModal, { computeTodayFreeSlotTimes } from './components/FillAgendaModal';
 import { PreAtendimento } from './components/PreAtendimento';
@@ -847,6 +848,18 @@ export default function App() {
   const hasApprovedProductAccess = useCallback((product: Product) => {
     return getProductAccess(product)?.approval_status === 'approved';
   }, [getProductAccess]);
+
+  // ─── Onboarding "Clareza Viva" ───────────────────────────────────────────
+  // Runs once per user. Source of truth is the persisted (backend) flag
+  // user_product_access.onboarding_completed for the odontohub product.
+  const odontohubAccess = getProductAccess(ODONTOHUB_PRODUCT);
+  const needsClarezaVivaOnboarding = Boolean(
+    user &&
+    user.role?.toUpperCase() === 'DENTIST' &&
+    odontohubAccess?.approval_status === 'approved' &&
+    odontohubAccess?.onboarding_completed === false &&
+    activeTab !== 'academy'
+  );
 
   // ─── Agenda date navigation helper ───────────────────────────────────
   const navigateDate = useCallback((direction: 'prev' | 'next' | 'today') => {
@@ -3456,6 +3469,7 @@ export default function App() {
                 portalPendingCount={portalPendingCount}
                 onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
                 dataRefreshKey={dataRefreshKey}
+                suppressOnboarding={needsClarezaVivaOnboarding}
               />
             )}
 
@@ -7418,6 +7432,18 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Onboarding "Clareza Viva" — overlays the real home (banner + CTA in
+          Etapa 1, full-screen in Etapas 0/2/3). Runs once per user. */}
+      {needsClarezaVivaOnboarding && (
+        <OnboardingFlow
+          userName={user?.name || ''}
+          apiFetch={apiFetch}
+          refreshAppData={refreshAppData}
+          markComplete={() => updateUserOnboarding('onboarding_done')}
+          goToDashboard={() => { setActiveTab('dashboard'); navigate('/'); }}
+        />
+      )}
     </div>
         )
       } />

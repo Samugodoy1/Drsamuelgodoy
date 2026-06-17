@@ -117,6 +117,9 @@ interface DashboardProps {
   portalPendingCount?: number;
   onOpenPortalInbox?: () => void;
   dataRefreshKey?: number;
+  /** While the "Clareza Viva" onboarding flow is active, the legacy in-dashboard
+   *  guided onboarding is suppressed so the two don't overlap. */
+  suppressOnboarding?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -223,6 +226,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   portalPendingCount = 0,
   onOpenPortalInbox,
   dataRefreshKey = 0,
+  suppressOnboarding = false,
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
@@ -738,7 +742,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => user?.onboarding_done ?? false);
   const [welcomeSeen, setWelcomeSeen] = useState(() => user?.welcome_seen ?? false);
   const wasInOnboarding = useRef(!activationComplete);
-  const showOnboarding = !onboardingDismissed && (
+  const showOnboarding = !suppressOnboarding && !(user?.onboarding_done) && !onboardingDismissed && (
     !activationComplete || wasInOnboarding.current
   );
 
