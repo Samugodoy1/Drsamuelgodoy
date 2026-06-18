@@ -65,6 +65,7 @@ import { MLInsights } from './components/MLInsights';
 import { SubscriptionManagement } from './components/SubscriptionManagement';
 import AdminEngagement from './components/AdminEngagement';
 import { SubscriptionCallback } from './components/SubscriptionCallback';
+import GoogleSignInButton from './components/GoogleSignInButton';
 import { Academy, AcademyPatients, AcademyAgenda, AcademyStudy, AcademyChecklist } from './components/Academy';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 import {
@@ -1571,6 +1572,39 @@ export default function App() {
         }
       } else {
         setLoginError(data.error || 'Erro ao fazer login');
+      }
+    } catch (error) {
+      setLoginError('Erro de conexão com o servidor');
+    }
+  };
+
+  const handleGoogleLogin = async (credential: string) => {
+    setLoginError('');
+    setRegisterMessage('');
+    try {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: API_URL ? 'include' as const : 'same-origin' as const,
+        body: JSON.stringify({ credential, rememberMe: true, product: getCurrentProduct() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        dataFetchedRef.current = true;
+        adminFetchedRef.current = false;
+        setUser(data.user);
+        setIsRegistering(false);
+        void refreshAppData(data.token);
+        fetchProfile();
+        if (data.user.role?.toUpperCase() === 'ADMIN') {
+          adminFetchedRef.current = true;
+          fetchAdminUsers();
+          apiFetch('/api/admin/update-schema', { product: ODONTOHUB_PRODUCT }).catch(console.error);
+        }
+      } else {
+        setLoginError(data.error || 'Erro ao entrar com Google');
       }
     } catch (error) {
       setLoginError('Erro de conexão com o servidor');
@@ -3221,6 +3255,17 @@ export default function App() {
                   </motion.button>
                   <p className="text-center text-[11px] text-[#C0C7C3] mt-3.5">Ambiente seguro · Dados criptografados</p>
                 </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="h-px flex-1 bg-[#E5E8E7]" />
+                  <span className="text-[12px] text-[#A3AAA7]">ou</span>
+                  <div className="h-px flex-1 bg-[#E5E8E7]" />
+                </div>
+
+                <GoogleSignInButton
+                  onCredential={handleGoogleLogin}
+                  text={isRegistering ? 'signup_with' : 'signin_with'}
+                />
               </form>
 
               {/* Footer links */}
