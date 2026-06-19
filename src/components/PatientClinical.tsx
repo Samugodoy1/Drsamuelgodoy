@@ -3041,6 +3041,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             patientId={patient.id}
             treatmentPlan={patient.treatmentPlan || []}
             lastEvolution={(patient.evolution || [])[0] || null}
+            apiFetch={apiFetch}
             onSave={async (evolution) => {
               const updatedPatient = {
                 ...patient,

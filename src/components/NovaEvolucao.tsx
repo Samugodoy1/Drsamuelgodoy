@@ -4,6 +4,7 @@ import { ChevronLeft, Check, Calendar, Info, ClipboardList, FileText } from '../
 import { useNavigate } from 'react-router-dom';
 import { buildEvolutionDraft } from '../utils/evolutionDraft';
 import { parseClinicalText } from '../utils/clinicalParser';
+import { buildShortcuts, type EvolutionShortcut } from '../utils/evolutionShortcuts';
 import { CLINICAL_PROCEDURES } from '../constants/clinicalProcedures';
 
 interface NovaEvolucaoProps {
@@ -12,6 +13,8 @@ interface NovaEvolucaoProps {
   treatmentPlan?: any[];
   /** Última evolução do paciente (fallback do rascunho). */
   lastEvolution?: any | null;
+  /** Acesso à API para buscar o histórico do dentista (Pilar B). */
+  apiFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   onSave?: (evolution: any) => Promise<void>;
   onClose?: () => void;
 }
@@ -28,6 +31,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
   patientId,
   treatmentPlan = [],
   lastEvolution = null,
+  apiFetch,
   onSave,
   onClose,
 }) => {
@@ -48,6 +52,10 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Pilar B — atalhos aprendidos do próprio dentista.
+  const [shortcuts, setShortcuts] = useState<EvolutionShortcut[]>([]);
+  const [appliedShortcutId, setAppliedShortcutId] = useState<string | null>(null);
+
   const computeReturnDate = (days: number | null): string | null => {
     if (days === null) return null;
     const date = new Date();
@@ -63,6 +71,45 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
     const end = el.value.length;
     el.setSelectionRange(end, end);
   }, []);
+
+  // Busca o histórico do dentista e deriva atalhos. Silencioso em qualquer falha:
+  // se não houver histórico suficiente, simplesmente não mostra nada.
+  useEffect(() => {
+    if (!apiFetch) return;
+    let active = true;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/evolutions/recent?limit=300');
+        if (!res.ok) return;
+        const rows = await res.json();
+        if (!active || !Array.isArray(rows)) return;
+        setShortcuts(buildShortcuts(rows));
+      } catch {
+        /* sem atalhos — sem estado de erro forçado */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [apiFetch]);
+
+  const applyShortcut = (shortcut: EvolutionShortcut) => {
+    setInputText(shortcut.text);
+    setReturnDays(shortcut.returnDays);
+    setReturnOverridden(true);
+    setReturnReason(
+      shortcut.returnDays === null
+        ? 'Sem retorno — padrão que você costuma usar neste caso.'
+        : `Retorno de ${shortcut.returnDays} dias — padrão aprendido do seu uso.`
+    );
+    setAppliedShortcutId(shortcut.id);
+    const el = inputRef.current;
+    if (el) {
+      el.focus();
+      const end = shortcut.text.length;
+      requestAnimationFrame(() => el.setSelectionRange(end, end));
+    }
+  };
 
   const handleReturnSelect = (days: number | null) => {
     setReturnDays(days);
@@ -161,6 +208,54 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
       {/* ── Content ── */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-4 sm:space-y-6">
+
+          {/* ── Atalhos aprendidos do dentista (Pilar B) — só aparecem se houver ── */}
+          {shortcuts.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-2.5 px-1">
+                Seus atalhos
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {shortcuts.map((s) => {
+                  const isApplied = appliedShortcutId === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => applyShortcut(s)}
+                      className={`text-left p-3 rounded-2xl border transition-all ios-press ${
+                        isApplied
+                          ? 'bg-primary/[0.08] border-primary/30 shadow-[0_2px_8px_rgba(12,155,114,0.12)]'
+                          : 'bg-white/95 border-slate-100/80 hover:border-primary/20 shadow-[0_2px_8px_rgba(15,23,42,0.04)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary truncate">
+                          {s.title}
+                        </span>
+                        <span className="text-[9px] font-semibold text-slate-300 shrink-0 tabular-nums">
+                          {s.count}×
+                        </span>
+                      </div>
+                      <p className="text-[12px] font-medium text-slate-600 leading-snug line-clamp-2">
+                        {s.text}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-semibold text-slate-400">
+                        {isApplied ? <Check size={11} className="text-primary" /> : <Calendar size={11} />}
+                        <span>
+                          {isApplied
+                            ? 'Aplicado'
+                            : s.returnDays === null
+                            ? 'Sem retorno'
+                            : `Retorno ${s.returnDays} dias`}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Rótulo honesto de rascunho (nunca fingir autoria) ── */}
           {draft.source !== 'none' && (
