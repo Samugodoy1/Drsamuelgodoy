@@ -3039,6 +3039,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
         <div className="fixed inset-0 bg-white z-[200] overflow-y-auto">
           <NovaEvolucao
             patientId={patient.id}
+            treatmentPlan={patient.treatmentPlan || []}
+            lastEvolution={(patient.evolution || [])[0] || null}
             onSave={async (evolution) => {
               const updatedPatient = {
                 ...patient,
