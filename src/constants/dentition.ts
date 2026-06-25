@@ -57,7 +57,16 @@ export const MIXED_DECIDUOUS_GRID_SLOTS: Record<
 };
 
 /** Ações do menu do dente ocultas em dentes decíduos ou no modo decídua inteiro. */
-export const DECIDUOUS_HIDDEN_TOOTH_ACTION_KEYS = new Set(['implant', 'prosthesis', 'facet']);
+export const DECIDUOUS_HIDDEN_TOOTH_ACTION_KEYS = new Set([
+  'implant',
+  'prosthesis',
+  'facet',
+  'prosthesis-fixed',
+  'prosthesis-removable',
+  'prosthesis-total',
+  'prosthesis-protocol',
+  'prosthesis-core',
+]);
 
 export function inferDentitionFromAge(ageYears: number | null | undefined): DentitionMode {
   if (ageYears == null || !Number.isFinite(ageYears)) return 'permanent';
