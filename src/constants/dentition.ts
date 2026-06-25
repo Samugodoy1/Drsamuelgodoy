@@ -213,6 +213,33 @@ export function getToothRange(from: number, to: number): number[] {
   return [];
 }
 
+/** Ordena uma lista de dentes na ordem anatômica da arcada. */
+export function sortTeethInArchOrder(teeth: number[]): number[] {
+  for (const seq of ARCH_SEQUENCES) {
+    if (teeth.length > 0 && teeth.every((t) => seq.includes(t))) {
+      return [...teeth].sort((a, b) => seq.indexOf(a) - seq.indexOf(b));
+    }
+  }
+  return [...teeth].sort((a, b) => a - b);
+}
+
+/** Todos os dentes pertencem à mesma arcada? (necessário para próteses). */
+export function teethShareArch(teeth: number[]): boolean {
+  if (teeth.length <= 1) return true;
+  return ARCH_SEQUENCES.some((seq) => teeth.every((t) => seq.includes(t)));
+}
+
+/** Os dentes formam um intervalo contíguo dentro de uma arcada? */
+export function isContiguousRange(teeth: number[]): boolean {
+  for (const seq of ARCH_SEQUENCES) {
+    if (teeth.length > 0 && teeth.every((t) => seq.includes(t))) {
+      const idx = teeth.map((t) => seq.indexOf(t)).sort((a, b) => a - b);
+      return idx.every((v, i) => i === 0 || v === idx[i - 1] + 1);
+    }
+  }
+  return false;
+}
+
 /** Dentes da arcada (superior/inferior) para o modo informado. */
 export function getArchTeeth(arch: 'upper' | 'lower', mode: DentitionMode): number[] {
   const layout = getDentitionLayout(mode);

@@ -3,6 +3,7 @@ import {
   type DentitionMode,
   getQuadrantTeethForMode,
   getArchTeeth,
+  isContiguousRange,
 } from '../constants/dentition';
 
 export { TREATMENT_SCOPES, type TreatmentScope } from '../constants/clinicalProcedures';
@@ -132,7 +133,8 @@ export function formatTreatmentAnchor(item: TreatmentPlanItemLike): string {
       const teeth = normalized.region?.teeth || [];
       if (teeth.length === 0) return 'Intervalo de dentes';
       if (teeth.length === 1) return `Dente ${teeth[0]}`;
-      return `Dentes ${teeth[0]}–${teeth[teeth.length - 1]}`;
+      if (isContiguousRange(teeth)) return `Dentes ${teeth[0]}–${teeth[teeth.length - 1]}`;
+      return `Dentes ${teeth.join(', ')}`;
     }
     case TREATMENT_SCOPES.SEXTANT:
       return normalized.region?.sextant ? `Sextante ${normalized.region.sextant}` : 'Sextante';
