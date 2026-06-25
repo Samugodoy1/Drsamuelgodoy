@@ -1806,9 +1806,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   return (
     <div className="min-h-screen bg-[#F7F7F8] pb-24 text-slate-900">
       <div aria-live="polite" className="sr-only">{uploadFeedback || (isSavingAnamnese ? 'Salvando anamnese' : '')}</div>
-      <header className="sticky top-0 z-40 border-b border-slate-100/60 ios-glass-heavy">
+      <header className="sticky top-0 z-40 bg-[#F7F7F8]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-3">
-          <div className="rounded-[26px] border border-slate-200/60 bg-white/95 px-4 py-3.5 sm:px-5 shadow-[0_6px_24px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]">
+          <div className="rounded-[26px] border border-slate-200/60 bg-white px-4 py-3.5 sm:px-5 shadow-[0_6px_24px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]">
 
             {/* ── Row 1: identidade + ações ── */}
             <div className="flex items-center gap-3">
