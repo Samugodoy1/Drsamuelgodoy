@@ -68,6 +68,10 @@ interface OdontogramProps {
   activeQuadrants?: QuadrantId[];
   /** Próteses regionais cobrindo cada dente (faixa colorida tipo "ponte"). */
   prosthesisByTooth?: Record<number, { procedureKey?: string; label: string }>;
+  /** Modo de seleção de dentes (ex.: definir prótese por intervalo). */
+  selectionMode?: boolean;
+  selectedTeeth?: number[];
+  onToggleTooth?: (toothNumber: number) => void;
   priorityToothNumber?: number | null;
   highlightedToothNumber?: number | null;
   highlightedQuadrant?: QuadrantId | null;
@@ -243,6 +247,7 @@ interface ToothProps {
   disabled: boolean;
   compact?: boolean;
   prosthesisBand?: string;
+  isRangeSelected?: boolean;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onHover: (event: React.MouseEvent<HTMLButtonElement>, num: number) => void;
   onLeave: () => void;
@@ -262,6 +267,7 @@ const Tooth: React.FC<ToothProps> = ({
   disabled,
   compact = false,
   prosthesisBand,
+  isRangeSelected = false,
   onClick,
   onHover,
   onLeave,
@@ -288,6 +294,7 @@ const Tooth: React.FC<ToothProps> = ({
           ${isInTreatment && !isPending && !isUrgent ? 'ring-2 ring-emerald-300' : ''}
           ${isCompleted && !isPending && !isUrgent ? 'ring-2 ring-sky-300' : ''}
           ${isPriority ? 'ring-2 ring-slate-900 ring-offset-2 ring-offset-white' : ''}
+          ${isRangeSelected ? 'ring-2 ring-violet-500 ring-offset-1 ring-offset-white scale-[1.06] shadow-[0_6px_14px_rgba(139,92,246,0.25)]' : ''}
           ${selected
             ? 'scale-[1.04] ring-2 ring-slate-900 shadow-[0_10px_18px_rgba(15,23,42,0.08)]'
             : 'hover:scale-[1.02] hover:shadow-[0_8px_16px_rgba(15,23,42,0.08)] active:scale-[0.98]'}
@@ -547,6 +554,9 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   activeToothNumbers = [],
   activeQuadrants = [],
   prosthesisByTooth = {},
+  selectionMode = false,
+  selectedTeeth = [],
+  onToggleTooth,
   priorityToothNumber = null,
   highlightedToothNumber = null,
   highlightedQuadrant = null,
@@ -572,6 +582,7 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   const toothRefs = React.useRef<Record<number, HTMLButtonElement | null>>({});
   const activeToothSet = React.useMemo(() => new Set(activeToothNumbers), [activeToothNumbers]);
   const activeQuadrantSet = React.useMemo(() => new Set(activeQuadrants), [activeQuadrants]);
+  const selectedTeethSet = React.useMemo(() => new Set(selectedTeeth), [selectedTeeth]);
   const visibleLegendItems = React.useMemo(
     () =>
       legendExpanded
@@ -677,6 +688,10 @@ export const Odontogram: React.FC<OdontogramProps> = ({
 
   const handleToothClick = (num: number, event: React.MouseEvent<HTMLButtonElement>) => {
     if (readOnly) return;
+    if (selectionMode) {
+      onToggleTooth?.(num);
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     setHoveredTooth(null);
     setHoverRect(null);
@@ -788,6 +803,7 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         isUrgent={flags.isUrgent}
         isPriority={priorityToothNumber === num}
         prosthesisBand={prosthesis ? getProsthesisColor(prosthesis.procedureKey).band : undefined}
+        isRangeSelected={selectionMode && selectedTeethSet.has(num)}
         disabled={readOnly}
         onClick={(event) => handleToothClick(num, event)}
         onHover={(event, toothNumber) => {

@@ -49,6 +49,8 @@ import {
   resolveSuggestedDentitionMode,
   shouldPromptDentitionUpdate,
   suggestModeToRevealTooth,
+  sortTeethInArchOrder,
+  teethShareArch,
 } from '../constants/dentition';
 import { formatDate } from '../utils/dateUtils';
 import {
@@ -277,6 +279,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     mode: DentitionMode;
   } | null>(null);
   const [scopeProcedureWarning, setScopeProcedureWarning] = useState<string | null>(null);
+  // Seleção de dentes no odontograma para próteses por intervalo (ponte/PPR).
+  const [rangeSelection, setRangeSelection] = useState<{ procedureKey: string; procedure: string } | null>(null);
+  const [selectedRangeTeeth, setSelectedRangeTeeth] = useState<number[]>([]);
   const [selectedTreatmentAction, setSelectedTreatmentAction] = useState<any | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
@@ -968,6 +973,82 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       procedure_performed: 'Início de tratamento',
     }).then(() => onRefreshPatient?.()).catch((error) => {
       console.error('Error persisting scope evolution:', error);
+    });
+  };
+
+  // ── Próteses por intervalo: seleção de dentes direto no odontograma ──
+  const handleStartRangeSelection = (proc: { procedureKey: string; procedure: string }) => {
+    setRangeSelection(proc);
+    setSelectedRangeTeeth([]);
+    setScopeProcedureWarning(null);
+    focusOdontogram();
+  };
+
+  const toggleRangeTooth = (toothNumber: number) => {
+    setSelectedRangeTeeth((prev) =>
+      prev.includes(toothNumber)
+        ? prev.filter((t) => t !== toothNumber)
+        : [...prev, toothNumber]
+    );
+  };
+
+  const cancelRangeSelection = () => {
+    setRangeSelection(null);
+    setSelectedRangeTeeth([]);
+  };
+
+  const confirmRangeSelection = () => {
+    if (!rangeSelection || selectedRangeTeeth.length === 0) return;
+    if (!teethShareArch(selectedRangeTeeth)) {
+      setScopeProcedureWarning('Selecione dentes de uma mesma arcada para a prótese.');
+      window.setTimeout(() => setScopeProcedureWarning(null), 4500);
+      return;
+    }
+    const teeth = sortTeethInArchOrder(selectedRangeTeeth);
+    const { procedureKey, procedure } = rangeSelection;
+    cancelRangeSelection();
+    void handleScopeProcedureSelect({ scope: 'range', procedureKey, procedure, teeth });
+  };
+
+  // ── Mini anotações por prótese (data + texto), salvas no item do plano ──
+  const handleAddProstheticNote = async (treatmentId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const note = {
+      id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      date: new Date().toISOString(),
+      text: trimmed,
+    };
+    const apply = (item: any) =>
+      String(item.id) === String(treatmentId)
+        ? { ...item, prosthetic_notes: [...(item.prosthetic_notes || []), note], updated_at: note.date }
+        : item;
+
+    setOptimisticTreatments((prev) => {
+      if (prev.some((i: any) => String(i.id) === String(treatmentId))) return prev.map(apply);
+      const original = (patient.treatmentPlan || []).find((i: any) => String(i.id) === String(treatmentId));
+      return original ? [apply(original), ...prev] : prev;
+    });
+    await onUpdatePatient({
+      ...patient,
+      treatmentPlan: (patient.treatmentPlan || []).map(apply),
+    });
+  };
+
+  const handleDeleteProstheticNote = async (treatmentId: string, noteId: string) => {
+    const apply = (item: any) =>
+      String(item.id) === String(treatmentId)
+        ? { ...item, prosthetic_notes: (item.prosthetic_notes || []).filter((n: any) => n.id !== noteId) }
+        : item;
+
+    setOptimisticTreatments((prev) => {
+      if (prev.some((i: any) => String(i.id) === String(treatmentId))) return prev.map(apply);
+      const original = (patient.treatmentPlan || []).find((i: any) => String(i.id) === String(treatmentId));
+      return original ? [apply(original), ...prev] : prev;
+    });
+    await onUpdatePatient({
+      ...patient,
+      treatmentPlan: (patient.treatmentPlan || []).map(apply),
     });
   };
 
@@ -1891,8 +1972,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             <h2 className="text-[24px] sm:text-[28px] font-semibold tracking-[-0.02em] text-slate-950">Odontograma</h2>
             <ScopeProcedureMenu
               onSelect={handleScopeProcedureSelect}
+              onStartRangeSelection={handleStartRangeSelection}
               hint={scopeProcedureWarning}
-              dentitionMode={effectiveDentitionMode}
             />
           </div>
 
@@ -1931,6 +2012,38 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             />
           )}
 
+          {rangeSelection && (
+            <div className="mb-2 flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50/80 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-violet-900">
+                  {rangeSelection.procedure}: clique nos dentes
+                </p>
+                <p className="text-[11px] font-medium text-violet-600">
+                  {selectedRangeTeeth.length === 0
+                    ? 'Selecione os dentes que receberão a prótese'
+                    : `${selectedRangeTeeth.length} dente${selectedRangeTeeth.length !== 1 ? 's' : ''}: ${sortTeethInArchOrder(selectedRangeTeeth).join(', ')}`}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={cancelRangeSelection}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRangeSelection}
+                  disabled={selectedRangeTeeth.length === 0}
+                  className="rounded-xl bg-violet-600 px-4 py-2 text-[12px] font-bold text-white transition-all hover:bg-violet-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Confirmar prótese
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-[24px] p-0.5 sm:p-1 ring-1 ring-slate-100/50">
             <Odontogram
               data={mergedOdontogram}
@@ -1943,6 +2056,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               activeToothNumbers={activeToothNumbers}
               activeQuadrants={activeQuadrants}
               prosthesisByTooth={prosthesisByTooth}
+              selectionMode={!!rangeSelection}
+              selectedTeeth={selectedRangeTeeth}
+              onToggleTooth={toggleRangeTooth}
               priorityToothNumber={priorityToothNumber}
               highlightedToothNumber={highlightedToothNumber}
               highlightedQuadrant={highlightedQuadrant}
@@ -2425,11 +2541,13 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             </section>
             )}
 
-            {!isFocusMode && (
+            {!isFocusMode && prostheses.length > 0 && (
               <ControleProtetico
                 prostheses={prostheses}
                 dentitionMode={effectiveDentitionMode}
                 onUpdateStage={handleUpdateProstheticStage}
+                onAddNote={handleAddProstheticNote}
+                onDeleteNote={handleDeleteProstheticNote}
                 onRemove={handleRemoveScopeTreatment}
               />
             )}
