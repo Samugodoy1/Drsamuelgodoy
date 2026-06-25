@@ -37,7 +37,6 @@ import {
   DEFAULT_PROSTHETIC_STAGE_KEY,
   PROSTHETIC_NOTES_FIELD,
   PROSTHETIC_STAGE_FIELD,
-  isActiveProsthesisItem,
   isProsthesisProcedureKey,
   PROSTHESIS_PROCEDURE_LABELS,
 } from '../constants/prosthetics';
@@ -471,11 +470,6 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     [mergedTreatmentPlan]
   );
 
-  const activeProstheses = useMemo(
-    () => prostheses.filter((item: any) => isActiveProsthesisItem(item)),
-    [prostheses]
-  );
-
   const prosthesisByTooth = useMemo(() => {
     const map: Record<number, { procedureKey?: string; label: string }> = {};
     prostheses.forEach((item: any) => {
@@ -845,17 +839,22 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     const isInstalled = stageKey === 'installed';
     const nowIso = new Date().toISOString();
 
-    const apply = (item: any) =>
-      String(item.id) === String(treatmentId)
-        ? {
-            ...item,
-            [PROSTHETIC_STAGE_FIELD]: stageKey,
-            // Instalada = procedimento concluído; demais etapas mantêm em andamento.
-            status: isInstalled ? 'REALIZADO' : 'APROVADO',
-            ...(isInstalled ? { completed_at: nowIso } : {}),
-            updated_at: nowIso,
-          }
-        : item;
+    const apply = (item: any) => {
+      if (String(item.id) !== String(treatmentId)) return item;
+      const next: any = {
+        ...item,
+        [PROSTHETIC_STAGE_FIELD]: stageKey,
+        updated_at: nowIso,
+      };
+      if (isInstalled) {
+        next.status = 'REALIZADO';
+        next.completed_at = nowIso;
+      } else {
+        next.status = 'APROVADO';
+        delete next.completed_at;
+      }
+      return next;
+    };
 
     // Upsert otimista: itens vindos do servidor ainda não estão em optimisticTreatments.
     setOptimisticTreatments((prev) => {
@@ -2551,9 +2550,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             </section>
             )}
 
-            {!isFocusMode && activeProstheses.length > 0 && (
+            {!isFocusMode && prostheses.length > 0 && (
               <ControleProtetico
-                prostheses={activeProstheses}
+                prostheses={prostheses}
                 dentitionMode={effectiveDentitionMode}
                 onUpdateStage={handleUpdateProstheticStage}
                 onAddNote={handleAddProstheticNote}

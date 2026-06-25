@@ -13,11 +13,12 @@ import {
   getProsthesisColor,
   getProstheticStage,
   getProstheticStageIndex,
+  isActiveProsthesisItem,
   type ProstheticNote,
 } from '../constants/prosthetics';
 
 interface ControleProteticoProps {
-  /** Próteses ativas em acompanhamento. */
+  /** Todas as próteses do paciente (ativas e concluídas). */
   prostheses: any[];
   dentitionMode: DentitionMode;
   onUpdateStage: (treatmentId: string, stageKey: string) => Promise<void> | void;
@@ -43,28 +44,50 @@ export const ControleProtetico: React.FC<ControleProteticoProps> = ({
 
   const items = useMemo(
     () =>
-      prostheses.map((raw) => {
-        const normalized = normalizeTreatmentItem(raw);
-        const procedureKey = String(normalized.procedure_key || '');
-        const notes = Array.isArray(raw[PROSTHETIC_NOTES_FIELD])
-          ? (raw[PROSTHETIC_NOTES_FIELD] as ProstheticNote[])
-          : [];
-        return {
-          raw,
-          id: String(raw.id),
-          procedureKey,
-          label:
-            PROSTHESIS_PROCEDURE_LABELS[procedureKey as keyof typeof PROSTHESIS_PROCEDURE_LABELS] ||
-            raw.procedure ||
-            'Prótese',
-          anchor: formatTreatmentAnchor(raw),
-          stageKey: String(raw[PROSTHETIC_STAGE_FIELD] || PROSTHETIC_STAGES[0].key),
-          color: getProsthesisColor(procedureKey),
-          notes,
-        };
-      }),
+      prostheses
+        .map((raw) => {
+          const normalized = normalizeTreatmentItem(raw);
+          const procedureKey = String(normalized.procedure_key || '');
+          const notes = Array.isArray(raw[PROSTHETIC_NOTES_FIELD])
+            ? (raw[PROSTHETIC_NOTES_FIELD] as ProstheticNote[])
+            : [];
+          const stageKey = String(raw[PROSTHETIC_STAGE_FIELD] || PROSTHETIC_STAGES[0].key);
+          const isActive = isActiveProsthesisItem(raw);
+          return {
+            raw,
+            id: String(raw.id),
+            procedureKey,
+            label:
+              PROSTHESIS_PROCEDURE_LABELS[procedureKey as keyof typeof PROSTHESIS_PROCEDURE_LABELS] ||
+              raw.procedure ||
+              'Prótese',
+            anchor: formatTreatmentAnchor(raw),
+            stageKey,
+            isActive,
+            completedAt: raw.completed_at ? String(raw.completed_at) : null,
+            color: getProsthesisColor(procedureKey),
+            notes,
+          };
+        })
+        .sort((a, b) => {
+          if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+          return 0;
+        }),
     [prostheses]
   );
+
+  const activeCount = items.filter((item) => item.isActive).length;
+  const installedCount = items.length - activeCount;
+
+  const headerSubtitle = (() => {
+    if (activeCount > 0 && installedCount > 0) {
+      return `${activeCount} em acompanhamento · ${installedCount} instalada${installedCount !== 1 ? 's' : ''}`;
+    }
+    if (activeCount > 0) {
+      return `${activeCount} prótese${activeCount !== 1 ? 's' : ''} em acompanhamento`;
+    }
+    return `${installedCount} prótese${installedCount !== 1 ? 's' : ''} instalada${installedCount !== 1 ? 's' : ''}`;
+  })();
 
   const setStage = async (id: string, stageKey: string, currentStageKey: string) => {
     if (stageKey === currentStageKey || savingId) return;
@@ -99,7 +122,7 @@ export const ControleProtetico: React.FC<ControleProteticoProps> = ({
         <div>
           <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900">Controle protético</h3>
           <p className="text-[11px] text-slate-400 mt-0.5 font-medium tabular-nums">
-            {items.length} prótese{items.length !== 1 ? 's' : ''} em acompanhamento
+            {headerSubtitle}
           </p>
         </div>
       </div>
@@ -115,14 +138,25 @@ export const ControleProtetico: React.FC<ControleProteticoProps> = ({
           return (
             <div
               key={item.id}
-              className="rounded-[18px] border border-slate-200/70 bg-white p-3.5 shadow-[0_1px_4px_rgba(15,23,42,0.03)]"
+              className={`rounded-[18px] border p-3.5 shadow-[0_1px_4px_rgba(15,23,42,0.03)] ${
+                item.isActive
+                  ? 'border-slate-200/70 bg-white'
+                  : 'border-emerald-100/80 bg-emerald-50/20'
+              }`}
             >
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="min-w-0 flex items-center gap-2">
                   <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${item.color.dot}`} />
                   <div className="min-w-0">
                     <p className="text-[14px] font-bold text-slate-900 leading-snug truncate">{item.label}</p>
-                    <p className="text-[11px] text-slate-400 font-medium">{item.anchor}</p>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      {item.anchor}
+                      {item.completedAt && !item.isActive && (
+                        <span className="ml-1.5 text-emerald-600">
+                          · Instalada em {formatNoteDate(item.completedAt)}
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

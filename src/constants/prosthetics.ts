@@ -98,7 +98,8 @@ export const isActiveProsthesisItem = (item: {
 }): boolean => {
   const status = String(item.status || '').toUpperCase();
   const stage = String(item[PROSTHETIC_STAGE_FIELD] || DEFAULT_PROSTHETIC_STAGE_KEY);
-  return ACTIVE_PROSTHESIS_STATUSES.has(status) && stage !== 'installed';
+  if (stage === 'installed' || status === 'REALIZADO') return false;
+  return ACTIVE_PROSTHESIS_STATUSES.has(status);
 };
 
 export const getProstheticStage = (key?: string | null): ProstheticStage =>
