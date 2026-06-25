@@ -5,7 +5,9 @@ export const TREATMENT_SCOPES = {
   TOOTH: 'tooth',
   QUADRANT: 'quadrant',
   PATIENT: 'patient',
-  /** Reservados para evolução futura (sextante, arcada, boca inteira). */
+  /** Intervalo de dentes (de X a Y) — usado por ponte e prótese parcial removível. */
+  RANGE: 'range',
+  /** Reservados para evolução futura (sextante, boca inteira). */
   SEXTANT: 'sextant',
   ARCH: 'arch',
   MOUTH: 'mouth',
@@ -65,38 +67,27 @@ export const CLINICAL_PROCEDURES: Record<string, ProcedureDefinition> = {
   },
   prosthesis_fixed: {
     key: 'prosthesis_fixed',
-    label: 'Pr. Fixa',
-    scope: TREATMENT_SCOPES.TOOTH,
+    label: 'Prótese Fixa',
+    scope: TREATMENT_SCOPES.RANGE,
     defaultValue: 1800,
-    odontogram: { actionKey: 'prosthesis-fixed', toothStatus: 'prosthesis_fixed', category: 'procedure' },
   },
   prosthesis_removable: {
     key: 'prosthesis_removable',
-    label: 'Pr. Removível',
-    scope: TREATMENT_SCOPES.TOOTH,
+    label: 'Prótese Removível',
+    scope: TREATMENT_SCOPES.RANGE,
     defaultValue: 1500,
-    odontogram: { actionKey: 'prosthesis-removable', toothStatus: 'prosthesis_removable', category: 'procedure' },
   },
   prosthesis_total: {
     key: 'prosthesis_total',
-    label: 'Pr. Total',
-    scope: TREATMENT_SCOPES.TOOTH,
+    label: 'Prótese Total',
+    scope: TREATMENT_SCOPES.ARCH,
     defaultValue: 2000,
-    odontogram: { actionKey: 'prosthesis-total', toothStatus: 'prosthesis_total', category: 'procedure' },
   },
   prosthesis_protocol: {
     key: 'prosthesis_protocol',
-    label: 'Protocolo',
-    scope: TREATMENT_SCOPES.TOOTH,
+    label: 'Protocolo s/ Implante',
+    scope: TREATMENT_SCOPES.ARCH,
     defaultValue: 8000,
-    odontogram: { actionKey: 'prosthesis-protocol', toothStatus: 'prosthesis_protocol', category: 'procedure' },
-  },
-  prosthesis_core: {
-    key: 'prosthesis_core',
-    label: 'Núcleo',
-    scope: TREATMENT_SCOPES.TOOTH,
-    defaultValue: 350,
-    odontogram: { actionKey: 'prosthesis-core', toothStatus: 'prosthesis_core', category: 'procedure' },
   },
   decay: {
     key: 'decay',
@@ -131,6 +122,16 @@ export const PATIENT_SCOPE_PROCEDURES = Object.values(CLINICAL_PROCEDURES).filte
 
 export const QUADRANT_SCOPE_PROCEDURES = Object.values(CLINICAL_PROCEDURES).filter(
   (p) => p.scope === TREATMENT_SCOPES.QUADRANT
+);
+
+/** Próteses de arcada inteira (protocolo, prótese total). */
+export const ARCH_SCOPE_PROCEDURES = Object.values(CLINICAL_PROCEDURES).filter(
+  (p) => p.scope === TREATMENT_SCOPES.ARCH
+);
+
+/** Próteses por intervalo de dentes (ponte fixa, prótese parcial removível). */
+export const RANGE_SCOPE_PROCEDURES = Object.values(CLINICAL_PROCEDURES).filter(
+  (p) => p.scope === TREATMENT_SCOPES.RANGE
 );
 
 export function getProcedureDefinition(

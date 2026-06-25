@@ -32,9 +32,14 @@ import { NovaEvolucao } from './NovaEvolucao';
 import { DentitionIndicator, DentitionRevealHint } from './DentitionIndicator';
 import { Odontogram } from './Odontogram';
 import { OdontogramActiveSummary } from './OdontogramActiveSummary';
-import { ControleProtetico, type ProstheticControlPayload } from './ControleProtetico';
-import { PROSTHETIC_CONTROL_PROCEDURE } from '../constants/prosthetics';
-import { ScopeProcedureMenu } from './ScopeProcedureMenu';
+import { ControleProtetico } from './ControleProtetico';
+import {
+  DEFAULT_PROSTHETIC_STAGE_KEY,
+  PROSTHETIC_STAGE_FIELD,
+  isProsthesisProcedureKey,
+  PROSTHESIS_PROCEDURE_LABELS,
+} from '../constants/prosthetics';
+import { ScopeProcedureMenu, type ScopeProcedureSelection } from './ScopeProcedureMenu';
 import {
   type DentitionMode,
   type DentitionSource,
@@ -63,6 +68,7 @@ import {
   isActiveTreatmentStatus,
   normalizeTreatmentItem,
   resolveQuadrant,
+  getTeethForScope,
   type QuadrantId,
 } from '../utils/treatmentPlanScope';
 
@@ -440,6 +446,37 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     [mergedTreatmentPlan]
   );
 
+  // Próteses (ativas ou já instaladas) para o controle protético e a faixa do odontograma.
+  const prostheses = useMemo(
+    () =>
+      mergedTreatmentPlan.filter((item: any) => {
+        const normalized = normalizeTreatmentItem(item);
+        const status = String(item.status || '').toUpperCase();
+        return (
+          isProsthesisProcedureKey(normalized.procedure_key) &&
+          status !== 'CANCELADO' &&
+          status !== 'REMOVIDO'
+        );
+      }),
+    [mergedTreatmentPlan]
+  );
+
+  const prosthesisByTooth = useMemo(() => {
+    const map: Record<number, { procedureKey?: string; label: string }> = {};
+    prostheses.forEach((item: any) => {
+      const normalized = normalizeTreatmentItem(item);
+      const teeth = getTeethForScope(normalized, effectiveDentitionMode);
+      const label =
+        PROSTHESIS_PROCEDURE_LABELS[
+          normalized.procedure_key as keyof typeof PROSTHESIS_PROCEDURE_LABELS
+        ] || item.procedure || 'Prótese';
+      teeth.forEach((t) => {
+        map[t] = { procedureKey: normalized.procedure_key, label };
+      });
+    });
+    return map;
+  }, [prostheses, effectiveDentitionMode]);
+
   const moveReorderItem = (fromIndex: number, toIndex: number) => {
     setReorderItems((current) => {
       if (
@@ -788,53 +825,49 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     }
   };
 
-  const handleRegisterProstheticControl = async (payload: ProstheticControlPayload) => {
-    const ts = Date.now();
-    const evolutionId = `evo-prosth-${ts}-${Math.random().toString(36).slice(2, 8)}`;
+  /** Atualiza a etapa do controle protético de uma prótese (item do plano). */
+  const handleUpdateProstheticStage = async (treatmentId: string, stageKey: string) => {
+    const isInstalled = stageKey === 'installed';
     const nowIso = new Date().toISOString();
 
-    const notes =
-      `Dente ${payload.toothNumber} · ${payload.label} · ${payload.conditionLabel}` +
-      (payload.observation ? ` — ${payload.observation}` : '');
-    const procedureTitle = `${PROSTHETIC_CONTROL_PROCEDURE} · Dente ${payload.toothNumber}`;
+    const apply = (item: any) =>
+      String(item.id) === String(treatmentId)
+        ? {
+            ...item,
+            [PROSTHETIC_STAGE_FIELD]: stageKey,
+            // Instalada = procedimento concluído; demais etapas mantêm em andamento.
+            status: isInstalled ? 'REALIZADO' : 'APROVADO',
+            ...(isInstalled ? { completed_at: nowIso } : {}),
+            updated_at: nowIso,
+          }
+        : item;
 
-    const entry = {
-      id: evolutionId,
-      date: nowIso,
-      notes,
-      procedure: procedureTitle,
-      procedure_performed: PROSTHETIC_CONTROL_PROCEDURE,
-      materials: '',
-      observations: `Elementos: ${payload.toothNumber}`,
-      return_date: payload.nextControlDate || null,
-      event_type: 'OBSERVATION',
-    };
+    // Upsert otimista: itens vindos do servidor ainda não estão em optimisticTreatments.
+    setOptimisticTreatments((prev) => {
+      if (prev.some((i: any) => String(i.id) === String(treatmentId))) {
+        return prev.map(apply);
+      }
+      const original = (patient.treatmentPlan || []).find(
+        (i: any) => String(i.id) === String(treatmentId)
+      );
+      return original ? [apply(original), ...prev] : prev;
+    });
 
-    // Mesmo fluxo da Nova Evolução: atualização otimista local + persistência
-    // autoritativa (que recarrega o paciente). Evita duplicar o registro.
     await onUpdatePatient({
       ...patient,
-      evolution: [entry, ...(patient.evolution || [])],
+      treatmentPlan: (patient.treatmentPlan || []).map(apply),
     });
-    await onAddEvolution(entry);
   };
 
-  const handleScopeProcedureSelect = async ({
-    procedureKey,
-    procedure,
-    scope,
-    quadrant,
-  }: {
-    procedureKey: string;
-    procedure: string;
-    scope: 'patient' | 'quadrant';
-    quadrant?: QuadrantId;
-  }) => {
+  const handleScopeProcedureSelect = async (selection: ScopeProcedureSelection) => {
+    const { procedureKey, procedure, scope } = selection;
+    const quadrant = selection.scope === 'quadrant' ? selection.quadrant : undefined;
     const ts = Date.now();
     const treatmentId = `tp-${ts}-${Math.random().toString(36).slice(2, 9)}`;
     const evolutionId = `evo-scope-${ts}-${Math.random().toString(36).slice(2, 8)}`;
     const nowIso = new Date().toISOString();
     const def = CLINICAL_PROCEDURES[procedureKey];
+    const isProsthesis = isProsthesisProcedureKey(procedureKey);
 
     if (scope === 'patient') {
       const duplicateCount = treatmentInProgress.filter((item: any) => {
@@ -870,8 +903,24 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       }
     }
 
+    const regionFields =
+      selection.scope === 'quadrant'
+        ? { quadrant: selection.quadrant, region: { quadrant: selection.quadrant } }
+        : selection.scope === 'arch'
+          ? { region: { arch: selection.arch } }
+          : selection.scope === 'range'
+            ? { region: { teeth: selection.teeth } }
+            : {};
+
     const anchorLabel =
-      scope === 'quadrant' && quadrant ? `quadrante ${quadrant}` : 'paciente';
+      selection.scope === 'quadrant'
+        ? `quadrante ${selection.quadrant}`
+        : selection.scope === 'arch'
+          ? `arcada ${selection.arch === 'upper' ? 'superior' : 'inferior'}`
+          : selection.scope === 'range'
+            ? `dentes ${selection.teeth[0]}–${selection.teeth[selection.teeth.length - 1]}`
+            : 'paciente';
+
     const newTreatment: any = {
       id: treatmentId,
       procedure,
@@ -881,9 +930,8 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       status: 'PLANEJADO',
       requires_prepayment: true,
       created_at: nowIso,
-      ...(scope === 'quadrant' && quadrant
-        ? { quadrant, region: { quadrant } }
-        : {}),
+      ...regionFields,
+      ...(isProsthesis ? { [PROSTHETIC_STAGE_FIELD]: DEFAULT_PROSTHETIC_STAGE_KEY } : {}),
     };
 
     const evolutionNotes = `Início de tratamento (${anchorLabel}): ${procedure}.`;
@@ -1302,10 +1350,13 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
   const handleRemoveScopeTreatment = async (treatment: any) => {
     const normalized = normalizeTreatmentItem(treatment);
-    if (
-      normalized.scope !== TREATMENT_SCOPES.PATIENT &&
-      normalized.scope !== TREATMENT_SCOPES.QUADRANT
-    ) {
+    const removableScopes: string[] = [
+      TREATMENT_SCOPES.PATIENT,
+      TREATMENT_SCOPES.QUADRANT,
+      TREATMENT_SCOPES.ARCH,
+      TREATMENT_SCOPES.RANGE,
+    ];
+    if (!removableScopes.includes(normalized.scope)) {
       return;
     }
 
@@ -1841,6 +1892,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             <ScopeProcedureMenu
               onSelect={handleScopeProcedureSelect}
               hint={scopeProcedureWarning}
+              dentitionMode={effectiveDentitionMode}
             />
           </div>
 
@@ -1890,6 +1942,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               treatments={mergedTreatmentPlan}
               activeToothNumbers={activeToothNumbers}
               activeQuadrants={activeQuadrants}
+              prosthesisByTooth={prosthesisByTooth}
               priorityToothNumber={priorityToothNumber}
               highlightedToothNumber={highlightedToothNumber}
               highlightedQuadrant={highlightedQuadrant}
@@ -2374,9 +2427,10 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
             {!isFocusMode && (
               <ControleProtetico
-                odontogram={mergedOdontogram}
-                evolutions={mergedEvolutions}
-                onRegisterControl={handleRegisterProstheticControl}
+                prostheses={prostheses}
+                dentitionMode={effectiveDentitionMode}
+                onUpdateStage={handleUpdateProstheticStage}
+                onRemove={handleRemoveScopeTreatment}
               />
             )}
           </div>

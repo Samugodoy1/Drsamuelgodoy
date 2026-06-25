@@ -2,6 +2,7 @@ import { TREATMENT_SCOPES, type TreatmentScope, getProcedureDefinition } from '.
 import {
   type DentitionMode,
   getQuadrantTeethForMode,
+  getArchTeeth,
 } from '../constants/dentition';
 
 export { TREATMENT_SCOPES, type TreatmentScope } from '../constants/clinicalProcedures';
@@ -14,6 +15,8 @@ export interface TreatmentRegion {
   sextant?: 1 | 2 | 3 | 4 | 5 | 6;
   arch?: 'upper' | 'lower';
   mouth?: boolean;
+  /** Intervalo de dentes (de X a Y), em ordem da arcada — usado por próteses range. */
+  teeth?: number[];
 }
 
 export interface TreatmentPlanItemLike {
@@ -70,6 +73,7 @@ export function inferScope(item: TreatmentPlanItemLike): TreatmentScope {
   const quadrant = resolveQuadrant(item);
   if (quadrant) return TREATMENT_SCOPES.QUADRANT;
 
+  if (item.region?.teeth && item.region.teeth.length > 0) return TREATMENT_SCOPES.RANGE;
   if (item.region?.sextant) return TREATMENT_SCOPES.SEXTANT;
   if (item.region?.arch) return TREATMENT_SCOPES.ARCH;
   if (item.region?.mouth) return TREATMENT_SCOPES.MOUTH;
@@ -123,6 +127,12 @@ export function formatTreatmentAnchor(item: TreatmentPlanItemLike): string {
     case TREATMENT_SCOPES.QUADRANT: {
       const q = resolveQuadrant(normalized);
       return q ? `Quadrante ${q}` : 'Quadrante';
+    }
+    case TREATMENT_SCOPES.RANGE: {
+      const teeth = normalized.region?.teeth || [];
+      if (teeth.length === 0) return 'Intervalo de dentes';
+      if (teeth.length === 1) return `Dente ${teeth[0]}`;
+      return `Dentes ${teeth[0]}–${teeth[teeth.length - 1]}`;
     }
     case TREATMENT_SCOPES.SEXTANT:
       return normalized.region?.sextant ? `Sextante ${normalized.region.sextant}` : 'Sextante';
@@ -233,6 +243,12 @@ export function getTeethForScope(
   if (normalized.scope === TREATMENT_SCOPES.QUADRANT) {
     const q = resolveQuadrant(normalized);
     return q ? getQuadrantTeeth(q, dentitionMode) : [];
+  }
+  if (normalized.scope === TREATMENT_SCOPES.RANGE) {
+    return normalized.region?.teeth ? [...normalized.region.teeth] : [];
+  }
+  if (normalized.scope === TREATMENT_SCOPES.ARCH) {
+    return normalized.region?.arch ? getArchTeeth(normalized.region.arch, dentitionMode) : [];
   }
   return [];
 }

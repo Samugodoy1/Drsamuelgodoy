@@ -1,78 +1,89 @@
-import type { ToothStatus } from '../utils/toothStatusDerivation';
-
 /**
- * Próteses disponíveis no odontograma e no controle protético.
+ * Próteses e controle protético.
  *
- * Mantém em um único lugar a relação entre o status do dente, o rótulo exibido
- * e a chave de ação usada pelo menu do odontograma — para que o odontograma e o
- * painel de "Controle Protético" nunca saiam de sincronia.
+ * Próteses são registradas como itens do plano de tratamento com escopo
+ * regional (arcada ou intervalo de dentes), nunca por dente isolado:
+ *  - Prótese Fixa (ponte) e Prótese Parcial Removível → escopo `range`
+ *    (de um dente a outro), exibidas no odontograma como uma faixa.
+ *  - Prótese Total e Protocolo → escopo `arch` (arcada superior/inferior).
+ *
+ * O "controle protético" acompanha cada prótese pelas etapas do trabalho no
+ * laboratório (moldagem → enviada → aguardando → instalada).
  */
-export interface ProsthesisType {
-  /** Status persistido no odontograma. */
-  status: ToothStatus;
-  /** Chave de ação usada no menu do odontograma e no plano de tratamento. */
-  actionKey: string;
-  /** Rótulo curto exibido no menu do odontograma. */
-  shortLabel: string;
-  /** Rótulo legível exibido no controle protético / histórico. */
-  label: string;
-}
 
-/** Tipos de prótese que podem ser registrados diretamente pelo odontograma. */
-export const PROSTHESIS_TYPES: ProsthesisType[] = [
-  { status: 'prosthesis_fixed', actionKey: 'prosthesis-fixed', shortLabel: 'Pr. Fixa', label: 'Prótese Fixa' },
-  { status: 'prosthesis_removable', actionKey: 'prosthesis-removable', shortLabel: 'Pr. Removível', label: 'Prótese Removível' },
-  { status: 'prosthesis_total', actionKey: 'prosthesis-total', shortLabel: 'Pr. Total', label: 'Prótese Total' },
-  { status: 'prosthesis_protocol', actionKey: 'prosthesis-protocol', shortLabel: 'Protocolo', label: 'Protocolo s/ Implante' },
-  { status: 'prosthesis_core', actionKey: 'prosthesis-core', shortLabel: 'Núcleo', label: 'Núcleo / Pino' },
-];
+/** Chaves de procedimento consideradas próteses. */
+export const PROSTHESIS_PROCEDURE_KEYS = [
+  'prosthesis_fixed',
+  'prosthesis_removable',
+  'prosthesis_total',
+  'prosthesis_protocol',
+] as const;
 
-/**
- * Status do odontograma considerados trabalhos protéticos passíveis de
- * acompanhamento no controle protético (inclui coroa, faceta e implante, que já
- * existiam no odontograma, além dos novos tipos de prótese).
- */
-export const PROSTHESIS_TOOTH_STATUSES: ToothStatus[] = [
-  'crown',
-  'facet',
-  'implant',
-  'prosthesis',
-  ...PROSTHESIS_TYPES.map((p) => p.status),
-];
+export type ProsthesisProcedureKey = (typeof PROSTHESIS_PROCEDURE_KEYS)[number];
 
-const PROSTHESIS_STATUS_SET = new Set<string>(PROSTHESIS_TOOTH_STATUSES);
+const PROSTHESIS_KEY_SET = new Set<string>(PROSTHESIS_PROCEDURE_KEYS);
 
-export const isProsthesisStatus = (status?: string | null): boolean =>
-  !!status && PROSTHESIS_STATUS_SET.has(status);
+export const isProsthesisProcedureKey = (key?: string | null): boolean =>
+  !!key && PROSTHESIS_KEY_SET.has(key);
 
-/** Rótulos legíveis por status protético (usado no controle protético). */
-export const PROSTHESIS_STATUS_LABELS: Record<string, string> = {
-  crown: 'Coroa',
-  facet: 'Faceta',
-  implant: 'Implante',
-  prosthesis: 'Prótese',
-  ...Object.fromEntries(PROSTHESIS_TYPES.map((p) => [p.status, p.label])),
+/** Rótulos legíveis por chave de prótese. */
+export const PROSTHESIS_PROCEDURE_LABELS: Record<ProsthesisProcedureKey, string> = {
+  prosthesis_fixed: 'Prótese Fixa',
+  prosthesis_removable: 'Prótese Removível',
+  prosthesis_total: 'Prótese Total',
+  prosthesis_protocol: 'Protocolo s/ Implante',
 };
 
-/** Procedimento usado para registrar controles protéticos na evolução clínica. */
-export const PROSTHETIC_CONTROL_PROCEDURE = 'Controle Protético';
+/** Cores usadas na faixa do odontograma e nos cartões do controle protético. */
+export interface ProsthesisColor {
+  band: string;
+  dot: string;
+  chip: string;
+}
 
-/** Intervalo padrão (em dias) sugerido até o próximo controle protético. */
-export const DEFAULT_PROSTHETIC_CONTROL_INTERVAL_DAYS = 180;
+export const PROSTHESIS_PROCEDURE_COLORS: Record<string, ProsthesisColor> = {
+  prosthesis_fixed: { band: 'bg-violet-400', dot: 'bg-violet-500', chip: 'bg-violet-50 text-violet-700 border-violet-200' },
+  prosthesis_removable: { band: 'bg-sky-400', dot: 'bg-sky-500', chip: 'bg-sky-50 text-sky-700 border-sky-200' },
+  prosthesis_total: { band: 'bg-indigo-400', dot: 'bg-indigo-500', chip: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  prosthesis_protocol: { band: 'bg-fuchsia-400', dot: 'bg-fuchsia-500', chip: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },
+};
 
-export interface ProstheticControlCondition {
+export const DEFAULT_PROSTHESIS_COLOR: ProsthesisColor = {
+  band: 'bg-violet-400',
+  dot: 'bg-violet-500',
+  chip: 'bg-violet-50 text-violet-700 border-violet-200',
+};
+
+export const getProsthesisColor = (procedureKey?: string | null): ProsthesisColor =>
+  (procedureKey && PROSTHESIS_PROCEDURE_COLORS[procedureKey]) || DEFAULT_PROSTHESIS_COLOR;
+
+/** Campo (em treatment_plan JSONB) que guarda a etapa atual do controle protético. */
+export const PROSTHETIC_STAGE_FIELD = 'prosthetic_stage';
+
+export interface ProstheticStage {
   key: string;
   label: string;
+  short: string;
+  /** Etapa final = prótese entregue/instalada. */
+  terminal?: boolean;
   dotClass: string;
   toneClass: string;
 }
 
-/** Avaliações possíveis ao registrar um controle protético. */
-export const PROSTHETIC_CONTROL_CONDITIONS: ProstheticControlCondition[] = [
-  { key: 'stable', label: 'Estável', dotClass: 'bg-emerald-500', toneClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { key: 'adjust', label: 'Ajuste necessário', dotClass: 'bg-amber-500', toneClass: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { key: 'problem', label: 'Intercorrência', dotClass: 'bg-rose-500', toneClass: 'bg-rose-50 text-rose-700 border-rose-200' },
+/** Pipeline do trabalho protético, na ordem do processo. */
+export const PROSTHETIC_STAGES: ProstheticStage[] = [
+  { key: 'molding', label: 'Aguardando moldagem', short: 'Moldagem', dotClass: 'bg-slate-400', toneClass: 'bg-slate-50 text-slate-600 border-slate-200' },
+  { key: 'sent', label: 'Enviada ao protético', short: 'Enviada', dotClass: 'bg-amber-500', toneClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'awaiting', label: 'Aguardando protético', short: 'Aguardando', dotClass: 'bg-sky-500', toneClass: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { key: 'installed', label: 'Prótese instalada', short: 'Instalada', dotClass: 'bg-emerald-500', toneClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', terminal: true },
 ];
 
-export const getProstheticControlCondition = (key?: string | null) =>
-  PROSTHETIC_CONTROL_CONDITIONS.find((c) => c.key === key);
+export const DEFAULT_PROSTHETIC_STAGE_KEY = PROSTHETIC_STAGES[0].key;
+
+export const getProstheticStage = (key?: string | null): ProstheticStage =>
+  PROSTHETIC_STAGES.find((s) => s.key === key) || PROSTHETIC_STAGES[0];
+
+export const getProstheticStageIndex = (key?: string | null): number => {
+  const idx = PROSTHETIC_STAGES.findIndex((s) => s.key === key);
+  return idx < 0 ? 0 : idx;
+};

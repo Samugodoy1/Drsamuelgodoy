@@ -57,16 +57,7 @@ export const MIXED_DECIDUOUS_GRID_SLOTS: Record<
 };
 
 /** Ações do menu do dente ocultas em dentes decíduos ou no modo decídua inteiro. */
-export const DECIDUOUS_HIDDEN_TOOTH_ACTION_KEYS = new Set([
-  'implant',
-  'prosthesis',
-  'facet',
-  'prosthesis-fixed',
-  'prosthesis-removable',
-  'prosthesis-total',
-  'prosthesis-protocol',
-  'prosthesis-core',
-]);
+export const DECIDUOUS_HIDDEN_TOOTH_ACTION_KEYS = new Set(['implant', 'prosthesis', 'facet']);
 
 export function inferDentitionFromAge(ageYears: number | null | undefined): DentitionMode {
   if (ageYears == null || !Number.isFinite(ageYears)) return 'permanent';
@@ -193,6 +184,46 @@ export function getAllTeethInMode(mode: DentitionMode): number[] {
     return rows;
   };
   return [...collect(layout.upper), ...collect(layout.lower)];
+}
+
+/**
+ * Sequências completas de cada arcada, em ordem anatômica contínua (de um lado
+ * ao outro, cruzando a linha média). Usadas para resolver um intervalo de
+ * dentes "de X a Y" (ponte / prótese parcial removível).
+ */
+export const ARCH_SEQUENCES: number[][] = [
+  [...PERMANENT.upperRight, ...PERMANENT.upperLeft],
+  [...PERMANENT.lowerRight, ...PERMANENT.lowerLeft],
+  [...DECIDUOUS.upperRight, ...DECIDUOUS.upperLeft],
+  [...DECIDUOUS.lowerRight, ...DECIDUOUS.lowerLeft],
+];
+
+/**
+ * Retorna os dentes entre dois elementos (inclusive), na ordem da arcada.
+ * Os dois dentes precisam pertencer à mesma arcada; caso contrário, retorna [].
+ */
+export function getToothRange(from: number, to: number): number[] {
+  for (const seq of ARCH_SEQUENCES) {
+    const i = seq.indexOf(from);
+    const j = seq.indexOf(to);
+    if (i === -1 || j === -1) continue;
+    const [start, end] = i <= j ? [i, j] : [j, i];
+    return seq.slice(start, end + 1);
+  }
+  return [];
+}
+
+/** Dentes da arcada (superior/inferior) para o modo informado. */
+export function getArchTeeth(arch: 'upper' | 'lower', mode: DentitionMode): number[] {
+  const layout = getDentitionLayout(mode);
+  const block = layout[arch];
+  const rows: number[] = [];
+  (['right', 'left'] as const).forEach((side) => {
+    const b = block[side];
+    if (b.permanent) rows.push(...b.permanent);
+    if (b.deciduous) rows.push(...b.deciduous);
+  });
+  return rows;
 }
 
 export function resolveEffectiveDentitionMode(

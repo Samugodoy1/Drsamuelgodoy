@@ -74,7 +74,10 @@ export const OdontogramActiveSummary: React.FC<OdontogramActiveSummaryProps> = (
             const isHighlighted = highlightedTreatmentId === item.id;
             const quadrant = item.quadrant ?? item.region?.quadrant;
             const isRemovableScope =
-              item.scope === TREATMENT_SCOPES.PATIENT || item.scope === TREATMENT_SCOPES.QUADRANT;
+              item.scope === TREATMENT_SCOPES.PATIENT ||
+              item.scope === TREATMENT_SCOPES.QUADRANT ||
+              item.scope === TREATMENT_SCOPES.ARCH ||
+              item.scope === TREATMENT_SCOPES.RANGE;
 
             const handleRowClick = () => {
               if (item.scope === TREATMENT_SCOPES.TOOTH && item.tooth_number) {
