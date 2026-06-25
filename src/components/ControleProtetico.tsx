@@ -248,15 +248,14 @@ export const ControleProtetico: React.FC<ControleProteticoProps> = ({
                         void submitNote(item.id);
                       }
                     }}
-                    placeholder="Escrever anotação (adaptação, cor, ajuste...)"
                     rows={1}
-                    className="min-h-[38px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400 focus:bg-white"
+                    className="min-h-[40px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-base text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
                   />
                   <button
                     type="button"
                     onClick={() => submitNote(item.id)}
                     disabled={!draft.trim() || savingNoteId === item.id}
-                    className="flex h-[38px] shrink-0 items-center gap-1 rounded-xl bg-slate-950 px-3 text-[12px] font-semibold text-white transition-all hover:bg-slate-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-[40px] shrink-0 items-center gap-1 rounded-xl bg-slate-950 px-3 text-[13px] font-semibold text-white transition-all hover:bg-slate-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Plus size={12} />
                     Anotar
