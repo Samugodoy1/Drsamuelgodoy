@@ -304,8 +304,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     suggestion => !suggestionConflictsWithAppointments(suggestion, appointments)
   );
 
-  const nextPatient = nextAppointments[0];
-  const otherAppointments = nextAppointments.slice(1, 5);
 
   const openReminderModal = () => {
     if (tomorrowUnconfirmedAppointments.length === 0) return;
@@ -551,49 +549,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
     noShowsNeedingReschedule.length +
     (portalPendingCount > 0 ? portalPendingCount : 0);
 
-  const formatFirstAppointmentTime = () => {
-    if (!todayFirstAppointment) return null;
-    return new Date(todayFirstAppointment.start_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-  const firstAppointmentTime = formatFirstAppointmentTime();
-
   const getDaySummaryTitle = (): string => {
-    if (todayAppointmentsTotalCount === 0) {
-      if (tomorrowUnconfirmedCount > 0) {
-        return tomorrowUnconfirmedCount === 1
-          ? '1 lembrete para enviar'
-          : `${tomorrowUnconfirmedCount} lembretes para enviar`;
-      }
-      return 'Agenda livre hoje';
+    if (tomorrowUnconfirmedCount > 0) {
+      return tomorrowUnconfirmedCount === 1
+        ? '1 lembrete para enviar'
+        : `${tomorrowUnconfirmedCount} lembretes para enviar`;
     }
-    if (todayAppointmentsTotalCount === 1) return '1 consulta hoje';
-    return `${todayAppointmentsTotalCount} consultas hoje`;
+    if (attentionItemsForSummary > 0) {
+      return attentionItemsForSummary === 1
+        ? '1 item precisa de atenção'
+        : `${attentionItemsForSummary} itens precisam de atenção`;
+    }
+    if (portalRecentCount > 0) {
+      return 'Atividade no portal';
+    }
+    if (tomorrowTotalCount > 0) {
+      return `Amanhã: ${tomorrowTotalCount} confirmada${tomorrowTotalCount === 1 ? '' : 's'}`;
+    }
+    return 'Resumo do dia';
   };
 
   const getDaySummarySubtitle = (): string => {
     const parts: string[] = [];
 
-    if (firstAppointmentTime && todayAppointmentsRemainingCount > 0) {
-      parts.push(`primeira às ${firstAppointmentTime}`);
-    } else if (todayAppointmentsRemainingCount > 0) {
-      parts.push(`${todayAppointmentsRemainingCount} restante${todayAppointmentsRemainingCount === 1 ? '' : 's'}`);
-    }
-
-    if (tomorrowTotalCount > 0 && tomorrowUnconfirmedCount === 0) {
-      parts.push(`amanhã: ${tomorrowTotalCount} confirmada${tomorrowTotalCount === 1 ? '' : 's'}`);
-    }
-
-    if (tomorrowUnconfirmedCount > 0 && todayAppointmentsTotalCount > 0) {
-      parts.push(
-        tomorrowUnconfirmedCount === 1
-          ? '1 consulta de amanhã sem confirmação'
-          : `${tomorrowUnconfirmedCount} consultas de amanhã sem confirmação`
-      );
-    } else if (tomorrowUnconfirmedCount > 0) {
-      parts.push('Consultas de amanhã sem confirmação');
+    if (tomorrowUnconfirmedCount === 0 && tomorrowTotalCount > 0) {
+      parts.push(`Todas as ${tomorrowTotalCount} consulta${tomorrowTotalCount === 1 ? '' : 's'} de amanhã confirmadas`);
     }
 
     if (attentionItemsForSummary > 0) {
@@ -628,11 +608,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const showDaySummary =
-    todayAppointmentsTotalCount > 0 ||
-    tomorrowTotalCount > 0 ||
     tomorrowUnconfirmedCount > 0 ||
     attentionItemsForSummary > 0 ||
-    portalRecentCount > 0;
+    portalRecentCount > 0 ||
+    tomorrowTotalCount > 0;
 
   const showFinancialSummary = todayRevenue > 0 || weekRevenue > 0 || pendingReceivablesTotal > 0;
 
@@ -644,7 +623,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setActiveTab('agenda');
   };
 
-  const daySummaryIcon = tomorrowUnconfirmedCount > 0 && todayAppointmentsTotalCount === 0
+  const daySummaryIcon = tomorrowUnconfirmedCount > 0
     ? MessageCircle
     : Calendar;
 
@@ -678,6 +657,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const m = diffMin % 60;
     return m > 0 ? `em ${h}h ${m}min` : `em ${h}h`;
   };
+
+  const HERO_NEXT_THRESHOLD_MIN = 15;
+
+  const isTodayActiveAppointment = (appointment: any) =>
+    new Date(appointment.start_time).toDateString() === now.toDateString() &&
+    appointment.status !== 'CANCELLED' &&
+    appointment.status !== 'FINISHED';
+
+  const todayActiveAppointments = appointments.filter(isTodayActiveAppointment);
+
+  const inProgressAppointment = todayActiveAppointments.find(
+    (appointment) =>
+      appointment.status === 'IN_PROGRESS' || getEffectiveStatus(appointment) === 'IN_PROGRESS'
+  );
+
+  const upcomingTodayAppointments = todayActiveAppointments
+    .filter((appointment) => new Date(appointment.start_time).getTime() > now.getTime())
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  const nextUpcomingAppointment = upcomingTodayAppointments[0] ?? null;
+
+  const heroPatient = (() => {
+    if (inProgressAppointment) {
+      if (nextUpcomingAppointment) {
+        const minsToNext =
+          (new Date(nextUpcomingAppointment.start_time).getTime() - now.getTime()) / 60_000;
+        if (minsToNext > HERO_NEXT_THRESHOLD_MIN) return inProgressAppointment;
+        return nextUpcomingAppointment;
+      }
+      return inProgressAppointment;
+    }
+    return nextAppointments[0] ?? nextUpcomingAppointment ?? null;
+  })();
+
+  const heroIsAttending =
+    !!inProgressAppointment && heroPatient?.id === inProgressAppointment.id;
+
+  const otherAppointments = upcomingTodayAppointments
+    .filter((appointment) => appointment.id !== heroPatient?.id)
+    .slice(0, 4);
 
   // ─── Intelligence patient row ───────────────────────────────────────────
 
@@ -1168,18 +1187,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* 2. HERO — PRÓXIMO ATENDIMENTO (protagonista absoluto) */}
-      {nextPatient ? (() => {
-        const effectiveStatus = getEffectiveStatus(nextPatient);
+      {heroPatient ? (() => {
+        const effectiveStatus = getEffectiveStatus(heroPatient);
         const isInProgress = effectiveStatus === 'IN_PROGRESS';
         const isFinished = effectiveStatus === 'FINISHED';
-        const badge = getStatusBadge(nextPatient);
-        const countdown = getCountdown(nextPatient);
+        const badge = getStatusBadge(heroPatient);
+        const countdown = getCountdown(heroPatient);
         const gradientClass = isInProgress
           ? 'from-blue-600 via-blue-500 to-blue-400'
           : isFinished
           ? 'from-slate-500 via-slate-400 to-slate-400'
           : 'from-[#1E4430] via-[#264E36] to-[#3A6B4E]';
-        const startFormatted = new Date(nextPatient.start_time)
+        const startFormatted = new Date(heroPatient.start_time)
           .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         return (
@@ -1196,23 +1215,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
-                      Próximo atendimento
+                      {heroIsAttending ? 'Atendendo' : 'Próximo atendimento'}
                     </span>
                     <h2 className="text-[36px] sm:text-[40px] font-bold text-white leading-[1.1] tracking-[-0.025em] mt-1.5 break-words">
-                      {nextPatient.patient_name}
+                      {heroPatient.patient_name}
                     </h2>
                   </div>
                   {/* avatar */}
-                  {nextPatient.photo_url ? (
+                  {heroPatient.photo_url ? (
                     <img
-                      src={nextPatient.photo_url}
-                      alt={nextPatient.patient_name}
+                      src={heroPatient.photo_url}
+                      alt={heroPatient.patient_name}
                       referrerPolicy="no-referrer"
                       className="w-16 h-16 rounded-[22px] object-cover border-2 border-white/20 shrink-0 mt-1 shadow-lg"
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-[22px] bg-white/15 border border-white/20 flex items-center justify-center shrink-0 mt-1 font-bold text-[26px] text-white shadow-inner">
-                      {(nextPatient.patient_name || '?').charAt(0).toUpperCase()}
+                      {(heroPatient.patient_name || '?').charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
@@ -1234,7 +1253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div>
                     <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.12em]">Procedimento</span>
                     <p className="text-[18px] font-semibold text-white mt-0.5 leading-snug line-clamp-2">
-                      {nextPatient.notes || 'Avaliação Geral'}
+                      {heroPatient.notes || 'Avaliação Geral'}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
@@ -1251,7 +1270,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <motion.button
                   whileTap={{ scale: 0.98, opacity: 0.92 }}
                   transition={{ duration: 0.18, ease: 'easeOut' }}
-                  onClick={() => openPatientRecord(nextPatient.patient_id)}
+                  onClick={() => openPatientRecord(heroPatient.patient_id)}
                   className="w-full py-[20px] rounded-[26px] text-[18px] font-bold bg-white shadow-[0_8px_32px_rgba(0,0,0,0.18)] transition-all"
                   style={{ color: isInProgress ? '#1E6ED6' : isFinished ? '#374151' : '#1E4430' }}
                 >
@@ -1261,7 +1280,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <motion.button
                     whileTap={{ scale: 0.98, opacity: 0.9 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    onClick={() => sendReminder(nextPatient)}
+                    onClick={() => sendReminder(heroPatient)}
                     className="flex items-center justify-center gap-2 px-5 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
                   >
                     <MessageCircle size={16} />
@@ -1270,7 +1289,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <motion.button
                     whileTap={{ scale: 0.98, opacity: 0.9 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    onClick={() => onReschedule?.(nextPatient)}
+                    onClick={() => onReschedule?.(heroPatient)}
                     className="flex items-center justify-center gap-2 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
                   >
                     Reagendar
@@ -1311,7 +1330,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* 2b. QUICK ACTIONS — anchored to hero (only when hero is visible) */}
-      {nextPatient && <div className="-mt-4 flex items-center justify-end gap-2 px-0.5">
+      {heroPatient && <div className="-mt-4 flex items-center justify-end gap-2 px-0.5">
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => setActiveTab('pacientes')}
