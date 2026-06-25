@@ -1747,7 +1747,7 @@ export default function App() {
   ).length;
 
   const nextAppointments = appointments
-    .filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString() && new Date(a.start_time) >= dashboardNow && a.status !== 'FINISHED' && a.status !== 'CANCELLED')
+    .filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString() && new Date(a.start_time) >= dashboardNow && a.status !== 'FINISHED' && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
     .slice(0, 5);
 
@@ -3516,6 +3516,7 @@ export default function App() {
                 setActiveTab={setActiveTab}
                 sendReminder={sendReminder}
                 onReschedule={openRescheduleAppointment}
+                onMarkNoShow={(appointment) => updateStatus(appointment.id, 'NO_SHOW')}
                 onSchedulePatient={openScheduleSuggestion}
                 onOpenScheduleForPatient={openScheduleForPatient}
                 onDismissOnboarding={() => updateUserOnboarding('onboarding_done')}

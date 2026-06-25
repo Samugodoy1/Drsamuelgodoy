@@ -109,6 +109,7 @@ interface DashboardProps {
   setActiveTab: (tab: any) => void;
   sendReminder: (appointment: any) => void;
   onReschedule?: (appointment: any) => void;
+  onMarkNoShow?: (appointment: any) => void;
   onSchedulePatient?: (patientId: number, date: string, startTime: string, endTime: string, procedure?: string | null) => void;
   onOpenScheduleForPatient?: (patientId: number, procedure?: string | null) => void;
   onDismissOnboarding: () => void;
@@ -218,6 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setActiveTab,
   sendReminder,
   onReschedule,
+  onMarkNoShow,
   onSchedulePatient,
   onOpenScheduleForPatient,
   onDismissOnboarding,
@@ -628,7 +630,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     : Calendar;
 
   const getEffectiveStatus = (appointment: any): string => {
-    const now = new Date();
+    if (appointment.status === 'NO_SHOW') return 'NO_SHOW';
+    if (appointment.status === 'CANCELLED') return 'CANCELLED';
     const startTime = new Date(appointment.start_time);
     const endTime = new Date(appointment.end_time);
     if (now >= endTime) return 'FINISHED';
@@ -640,7 +643,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const status = getEffectiveStatus(appointment);
     switch (status) {
       case 'CONFIRMED': return { label: 'Confirmado', className: 'bg-[#F0F9F4] text-[#2B8A56]' };
-      case 'IN_PROGRESS': return { label: 'Em atendimento', className: 'bg-[#EAF4FF] text-[#1E6ED6]' };
+      case 'IN_PROGRESS': return { label: 'Em atendimento', className: 'bg-[#EAF4FF] text-[#1A365D]' };
+      case 'NO_SHOW': return { label: 'Faltou', className: 'bg-[#FDECEF] text-[#C53030]' };
       case 'FINISHED': return { label: 'Finalizado', className: 'bg-[#F9FAFB] text-[#9CA3AF]' };
       case 'CANCELLED': return { label: 'Cancelado', className: 'bg-[#FDECEF] text-[#C53030]' };
       default: return { label: 'Agendado', className: 'bg-[#F9FAFB] text-[#6B7280]' };
@@ -663,7 +667,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const isTodayActiveAppointment = (appointment: any) =>
     new Date(appointment.start_time).toDateString() === now.toDateString() &&
     appointment.status !== 'CANCELLED' &&
-    appointment.status !== 'FINISHED';
+    appointment.status !== 'FINISHED' &&
+    appointment.status !== 'NO_SHOW';
 
   const todayActiveAppointments = appointments.filter(isTodayActiveAppointment);
 
@@ -671,6 +676,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     (appointment) =>
       appointment.status === 'IN_PROGRESS' || getEffectiveStatus(appointment) === 'IN_PROGRESS'
   );
+
+  const todayNoShowAppointment = appointments
+    .filter(
+      (appointment) =>
+        appointment.status === 'NO_SHOW' &&
+        new Date(appointment.start_time).toDateString() === now.toDateString() &&
+        new Date(appointment.start_time).getTime() <= now.getTime()
+    )
+    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())[0] ?? null;
 
   const upcomingTodayAppointments = todayActiveAppointments
     .filter((appointment) => new Date(appointment.start_time).getTime() > now.getTime())
@@ -688,11 +702,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
       return inProgressAppointment;
     }
+    if (todayNoShowAppointment) {
+      if (nextUpcomingAppointment) {
+        const minsToNext =
+          (new Date(nextUpcomingAppointment.start_time).getTime() - now.getTime()) / 60_000;
+        if (minsToNext > HERO_NEXT_THRESHOLD_MIN) return todayNoShowAppointment;
+        return nextUpcomingAppointment;
+      }
+      return todayNoShowAppointment;
+    }
     return nextAppointments[0] ?? nextUpcomingAppointment ?? null;
   })();
 
   const heroIsAttending =
     !!inProgressAppointment && heroPatient?.id === inProgressAppointment.id;
+
+  const heroIsNoShow =
+    !!todayNoShowAppointment && heroPatient?.id === todayNoShowAppointment.id;
 
   const otherAppointments = upcomingTodayAppointments
     .filter((appointment) => appointment.id !== heroPatient?.id)
@@ -1190,16 +1216,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {heroPatient ? (() => {
         const effectiveStatus = getEffectiveStatus(heroPatient);
         const isInProgress = effectiveStatus === 'IN_PROGRESS';
+        const isNoShow = effectiveStatus === 'NO_SHOW';
         const isFinished = effectiveStatus === 'FINISHED';
         const badge = getStatusBadge(heroPatient);
         const countdown = getCountdown(heroPatient);
         const gradientClass = isInProgress
-          ? 'from-blue-600 via-blue-500 to-blue-400'
+          ? 'from-[#0F2744] via-[#1A365D] to-[#234876]'
+          : isNoShow
+          ? 'from-[#4A1C1C] via-[#6B2D2D] to-[#7A3535]'
           : isFinished
           ? 'from-slate-500 via-slate-400 to-slate-400'
           : 'from-[#1E4430] via-[#264E36] to-[#3A6B4E]';
+        const ctaColor = isInProgress
+          ? '#1A365D'
+          : isNoShow
+          ? '#9B2C2C'
+          : isFinished
+          ? '#374151'
+          : '#1E4430';
         const startFormatted = new Date(heroPatient.start_time)
           .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const heroLabel = heroIsAttending
+          ? 'Atendendo'
+          : heroIsNoShow
+          ? 'Faltou'
+          : 'Próximo atendimento';
 
         return (
           <motion.section
@@ -1215,7 +1256,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
-                      {heroIsAttending ? 'Atendendo' : 'Próximo atendimento'}
+                      {heroLabel}
                     </span>
                     <h2 className="text-[36px] sm:text-[40px] font-bold text-white leading-[1.1] tracking-[-0.025em] mt-1.5 break-words">
                       {heroPatient.patient_name}
@@ -1241,9 +1282,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${badge.className}`}>
                     {badge.label}
                   </span>
-                  {!isFinished && (
+                  {!isFinished && !isNoShow && (
                     <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/15 text-white">
                       {countdown}
+                    </span>
+                  )}
+                  {isNoShow && (
+                    <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/15 text-white">
+                      Não compareceu
                     </span>
                   )}
                 </div>
@@ -1270,11 +1316,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <motion.button
                   whileTap={{ scale: 0.98, opacity: 0.92 }}
                   transition={{ duration: 0.18, ease: 'easeOut' }}
-                  onClick={() => openPatientRecord(heroPatient.patient_id)}
+                  onClick={() =>
+                    isNoShow
+                      ? onReschedule?.(heroPatient)
+                      : openPatientRecord(heroPatient.patient_id)
+                  }
                   className="w-full py-[20px] rounded-[26px] text-[18px] font-bold bg-white shadow-[0_8px_32px_rgba(0,0,0,0.18)] transition-all"
-                  style={{ color: isInProgress ? '#1E6ED6' : isFinished ? '#374151' : '#1E4430' }}
+                  style={{ color: ctaColor }}
                 >
-                  {isFinished ? 'Ver prontuário' : isInProgress ? 'Atender agora' : 'Atender'}
+                  {isFinished ? 'Ver prontuário' : isNoShow ? 'Remarcar consulta' : isInProgress ? 'Atender agora' : 'Atender'}
                 </motion.button>
                 <div className="grid grid-cols-2 gap-3">
                   <motion.button
@@ -1289,10 +1339,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <motion.button
                     whileTap={{ scale: 0.98, opacity: 0.9 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    onClick={() => onReschedule?.(heroPatient)}
+                    onClick={() =>
+                      isInProgress
+                        ? onMarkNoShow?.(heroPatient)
+                        : onReschedule?.(heroPatient)
+                    }
                     className="flex items-center justify-center gap-2 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
                   >
-                    Reagendar
+                    {isInProgress ? 'Paciente faltou' : 'Reagendar'}
                   </motion.button>
                 </div>
               </div>
