@@ -60,6 +60,15 @@ export const getProsthesisColor = (procedureKey?: string | null): ProsthesisColo
 /** Campo (em treatment_plan JSONB) que guarda a etapa atual do controle protético. */
 export const PROSTHETIC_STAGE_FIELD = 'prosthetic_stage';
 
+/** Campo (em treatment_plan JSONB) com anotações do laboratório / protético. */
+export const PROSTHETIC_NOTES_FIELD = 'prosthetic_notes';
+
+export interface ProstheticNote {
+  id: string;
+  text: string;
+  created_at: string;
+}
+
 export interface ProstheticStage {
   key: string;
   label: string;
@@ -79,6 +88,18 @@ export const PROSTHETIC_STAGES: ProstheticStage[] = [
 ];
 
 export const DEFAULT_PROSTHETIC_STAGE_KEY = PROSTHETIC_STAGES[0].key;
+
+const ACTIVE_PROSTHESIS_STATUSES = new Set(['APROVADO', 'PENDENTE', 'PLANEJADO']);
+
+/** Prótese em acompanhamento (não instalada / não concluída). */
+export const isActiveProsthesisItem = (item: {
+  status?: string;
+  [key: string]: unknown;
+}): boolean => {
+  const status = String(item.status || '').toUpperCase();
+  const stage = String(item[PROSTHETIC_STAGE_FIELD] || DEFAULT_PROSTHETIC_STAGE_KEY);
+  return ACTIVE_PROSTHESIS_STATUSES.has(status) && stage !== 'installed';
+};
 
 export const getProstheticStage = (key?: string | null): ProstheticStage =>
   PROSTHETIC_STAGES.find((s) => s.key === key) || PROSTHETIC_STAGES[0];

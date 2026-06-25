@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, ChevronLeft } from '../icons';
 import {
   PATIENT_SCOPE_PROCEDURES,
@@ -6,14 +6,10 @@ import {
   ARCH_SCOPE_PROCEDURES,
   RANGE_SCOPE_PROCEDURES,
 } from '../constants/clinicalProcedures';
-import {
-  type DentitionMode,
-  getAllTeethInMode,
-  getToothRange,
-} from '../constants/dentition';
+import type { DentitionMode } from '../constants/dentition';
 import type { QuadrantId } from '../utils/treatmentPlanScope';
 
-type MenuView = 'closed' | 'list' | 'quadrant' | 'arch' | 'range';
+type MenuView = 'closed' | 'list' | 'quadrant' | 'arch';
 
 export type ScopeProcedureSelection =
   | { scope: 'patient'; procedureKey: string; procedure: string }
@@ -23,33 +19,24 @@ export type ScopeProcedureSelection =
 
 export interface ScopeProcedureMenuProps {
   onSelect: (payload: ScopeProcedureSelection) => void;
+  /** Abre seleção de dentes no odontograma (próteses por intervalo). */
+  onRequestRangePick?: (payload: { procedureKey: string; procedure: string }) => void;
   hint?: string | null;
   dentitionMode?: DentitionMode;
 }
 
 export const ScopeProcedureMenu: React.FC<ScopeProcedureMenuProps> = ({
   onSelect,
+  onRequestRangePick,
   hint,
-  dentitionMode = 'permanent',
 }) => {
   const [view, setView] = useState<MenuView>('closed');
   const [pendingProc, setPendingProc] = useState<{ procedureKey: string; procedure: string } | null>(null);
-  const [rangeFrom, setRangeFrom] = useState<number | ''>('');
-  const [rangeTo, setRangeTo] = useState<number | ''>('');
   const rootRef = useRef<HTMLDivElement | null>(null);
-
-  const teeth = useMemo(() => getAllTeethInMode(dentitionMode as DentitionMode), [dentitionMode]);
-
-  const rangeTeeth = useMemo(() => {
-    if (rangeFrom === '' || rangeTo === '') return [];
-    return getToothRange(Number(rangeFrom), Number(rangeTo));
-  }, [rangeFrom, rangeTo]);
 
   const close = () => {
     setView('closed');
     setPendingProc(null);
-    setRangeFrom('');
-    setRangeTo('');
   };
 
   useEffect(() => {
@@ -80,6 +67,13 @@ export const ScopeProcedureMenu: React.FC<ScopeProcedureMenuProps> = ({
     procedure: string,
     target: 'quadrant' | 'arch' | 'range'
   ) => {
+    if (target === 'range') {
+      if (onRequestRangePick) {
+        onRequestRangePick({ procedureKey, procedure });
+        close();
+        return;
+      }
+    }
     setPendingProc({ procedureKey, procedure });
     setView(target);
   };
@@ -93,12 +87,6 @@ export const ScopeProcedureMenu: React.FC<ScopeProcedureMenuProps> = ({
   const pickArch = (arch: 'upper' | 'lower') => {
     if (!pendingProc) return;
     onSelect({ scope: 'arch', ...pendingProc, arch });
-    close();
-  };
-
-  const confirmRange = () => {
-    if (!pendingProc || rangeTeeth.length === 0) return;
-    onSelect({ scope: 'range', ...pendingProc, teeth: rangeTeeth });
     close();
   };
 
@@ -137,7 +125,7 @@ export const ScopeProcedureMenu: React.FC<ScopeProcedureMenuProps> = ({
               {RANGE_SCOPE_PROCEDURES.map((proc) => (
                 <button key={proc.key} type="button" onClick={() => pickRegionalProcedure(proc.key, proc.label, 'range')} className={itemClass}>
                   {proc.label}
-                  <span className="ml-1 text-[11px] font-normal text-slate-400">(de um dente a outro)</span>
+                  <span className="ml-1 text-[11px] font-normal text-slate-400">(selecionar dentes)</span>
                 </button>
               ))}
               {ARCH_SCOPE_PROCEDURES.map((proc) => (
@@ -176,63 +164,6 @@ export const ScopeProcedureMenu: React.FC<ScopeProcedureMenuProps> = ({
               <p className="px-2 pb-1.5 text-[10px] font-medium text-slate-400">Arcada — {pendingProc.procedure}</p>
               <button type="button" onClick={() => pickArch('upper')} className={itemClass}>Arcada superior</button>
               <button type="button" onClick={() => pickArch('lower')} className={itemClass}>Arcada inferior</button>
-            </div>
-          )}
-
-          {view === 'range' && pendingProc && (
-            <div className="p-2">
-              <button type="button" onClick={() => setView('list')} className="mb-1 flex items-center gap-1 px-1 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-700">
-                <ChevronLeft size={12} /> Voltar
-              </button>
-              <p className="px-1 pb-2 text-[10px] font-medium text-slate-400">Intervalo — {pendingProc.procedure}</p>
-              <div className="flex items-center gap-2 px-1">
-                <label className="flex-1">
-                  <span className="mb-1 block text-[10px] font-semibold text-slate-400">De</span>
-                  <select
-                    value={rangeFrom}
-                    onChange={(e) => setRangeFrom(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[13px] text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option value="">—</option>
-                    {teeth.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex-1">
-                  <span className="mb-1 block text-[10px] font-semibold text-slate-400">Até</span>
-                  <select
-                    value={rangeTo}
-                    onChange={(e) => setRangeTo(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[13px] text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option value="">—</option>
-                    {teeth.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              {rangeFrom !== '' && rangeTo !== '' && rangeTeeth.length === 0 && (
-                <p className="mt-2 px-1 text-[10px] leading-snug text-rose-600">
-                  Os dois dentes precisam estar na mesma arcada.
-                </p>
-              )}
-              {rangeTeeth.length > 0 && (
-                <p className="mt-2 px-1 text-[11px] text-slate-500">
-                  {rangeTeeth.length} dente{rangeTeeth.length !== 1 ? 's' : ''}: {rangeTeeth.join(', ')}
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={confirmRange}
-                disabled={rangeTeeth.length === 0}
-                className="mt-2 w-full rounded-lg bg-slate-950 px-3 py-2 text-[13px] font-semibold text-white transition-all hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Adicionar
-              </button>
             </div>
           )}
         </div>

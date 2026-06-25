@@ -35,7 +35,9 @@ import { OdontogramActiveSummary } from './OdontogramActiveSummary';
 import { ControleProtetico } from './ControleProtetico';
 import {
   DEFAULT_PROSTHETIC_STAGE_KEY,
+  PROSTHETIC_NOTES_FIELD,
   PROSTHETIC_STAGE_FIELD,
+  isActiveProsthesisItem,
   isProsthesisProcedureKey,
   PROSTHESIS_PROCEDURE_LABELS,
 } from '../constants/prosthetics';
@@ -48,7 +50,9 @@ import {
   resolveEffectiveDentitionMode,
   resolveSuggestedDentitionMode,
   shouldPromptDentitionUpdate,
+  sortTeethInArchOrder,
   suggestModeToRevealTooth,
+  validateProsthesisTeethSelection,
 } from '../constants/dentition';
 import { formatDate } from '../utils/dateUtils';
 import {
@@ -277,6 +281,12 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     mode: DentitionMode;
   } | null>(null);
   const [scopeProcedureWarning, setScopeProcedureWarning] = useState<string | null>(null);
+  const [pendingRangeProsthesis, setPendingRangeProsthesis] = useState<{
+    procedureKey: string;
+    procedure: string;
+  } | null>(null);
+  const [rangeSelectedTeeth, setRangeSelectedTeeth] = useState<number[]>([]);
+  const [rangePickError, setRangePickError] = useState<string | null>(null);
   const [selectedTreatmentAction, setSelectedTreatmentAction] = useState<any | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
@@ -459,6 +469,11 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
         );
       }),
     [mergedTreatmentPlan]
+  );
+
+  const activeProstheses = useMemo(
+    () => prostheses.filter((item: any) => isActiveProsthesisItem(item)),
+    [prostheses]
   );
 
   const prosthesisByTooth = useMemo(() => {
@@ -856,6 +871,70 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     await onUpdatePatient({
       ...patient,
       treatmentPlan: (patient.treatmentPlan || []).map(apply),
+    });
+  };
+
+  const handleAddProstheticNote = async (treatmentId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const note = {
+      id: `pn-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      text: trimmed,
+      created_at: new Date().toISOString(),
+    };
+
+    const apply = (item: any) => {
+      if (String(item.id) !== String(treatmentId)) return item;
+      const existing = Array.isArray(item[PROSTHETIC_NOTES_FIELD]) ? item[PROSTHETIC_NOTES_FIELD] : [];
+      return { ...item, [PROSTHETIC_NOTES_FIELD]: [note, ...existing], updated_at: note.created_at };
+    };
+
+    setOptimisticTreatments((prev) => {
+      if (prev.some((i: any) => String(i.id) === String(treatmentId))) {
+        return prev.map(apply);
+      }
+      const original = (patient.treatmentPlan || []).find(
+        (i: any) => String(i.id) === String(treatmentId)
+      );
+      return original ? [apply(original), ...prev] : prev;
+    });
+
+    await onUpdatePatient({
+      ...patient,
+      treatmentPlan: (patient.treatmentPlan || []).map(apply),
+    });
+  };
+
+  const cancelRangeProsthesisPick = () => {
+    setPendingRangeProsthesis(null);
+    setRangeSelectedTeeth([]);
+    setRangePickError(null);
+  };
+
+  const handleRangeToothToggle = (toothNumber: number) => {
+    setRangePickError(null);
+    setRangeSelectedTeeth((prev) =>
+      prev.includes(toothNumber)
+        ? prev.filter((t) => t !== toothNumber)
+        : [...prev, toothNumber]
+    );
+  };
+
+  const confirmRangeProsthesisPick = async () => {
+    if (!pendingRangeProsthesis) return;
+    const sorted = sortTeethInArchOrder(rangeSelectedTeeth, effectiveDentitionMode);
+    const validation = validateProsthesisTeethSelection(sorted, effectiveDentitionMode);
+    if (!validation.ok) {
+      setRangePickError(validation.message || 'Seleção inválida.');
+      return;
+    }
+    const { procedureKey, procedure } = pendingRangeProsthesis;
+    cancelRangeProsthesisPick();
+    await handleScopeProcedureSelect({
+      scope: 'range',
+      procedureKey,
+      procedure,
+      teeth: sorted,
     });
   };
 
@@ -1820,9 +1899,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             </div>
 
             {/* ── Row 2: tira de contexto — próximo passo ── */}
-            <div className="mt-3">
+            <div className="mt-3 pt-3 border-t border-slate-100/80">
               {primaryTreatment ? (
-                <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-gradient-to-r from-slate-50 to-slate-50/60 border border-slate-200/60 transition-all duration-300 hover:border-slate-300/70">
+                <div className="flex items-center gap-3">
                   <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-breathe ${resolveProcedureCategory(primaryTreatment.procedure).dotCls}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400 mb-0.5">Próximo passo</p>
@@ -1848,7 +1927,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   </button>
                 </div>
               ) : upcomingAppointment ? (
-                <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-gradient-to-r from-sky-50 to-sky-50/60 border border-sky-200/60 transition-all duration-300 hover:border-sky-300/70">
+                <div className="flex items-center gap-3">
                   <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0 animate-breathe" />
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-sky-500 mb-0.5">Próxima consulta</p>
@@ -1862,7 +1941,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-[14px] bg-slate-50 border border-slate-200/60">
+                <div className="flex items-center gap-3">
                   <div className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0" />
                   <p className="text-[13px] text-slate-500 flex-1 font-medium">Nenhum tratamento ativo · comece pelo odontograma</p>
                   <button
@@ -1891,10 +1970,54 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             <h2 className="text-[24px] sm:text-[28px] font-semibold tracking-[-0.02em] text-slate-950">Odontograma</h2>
             <ScopeProcedureMenu
               onSelect={handleScopeProcedureSelect}
+              onRequestRangePick={(payload) => {
+                setPendingRangeProsthesis(payload);
+                setRangeSelectedTeeth([]);
+                setRangePickError(null);
+                odontogramRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
               hint={scopeProcedureWarning}
               dentitionMode={effectiveDentitionMode}
             />
           </div>
+
+          {pendingRangeProsthesis && (
+            <div className="mb-3 rounded-2xl border border-violet-200/80 bg-violet-50/60 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-violet-600">
+                  Selecione os dentes
+                </p>
+                <p className="text-[13px] font-semibold text-slate-900 mt-0.5">
+                  {pendingRangeProsthesis.procedure}
+                </p>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  {rangeSelectedTeeth.length === 0
+                    ? 'Toque nos dentes que receberão a prótese.'
+                    : `${rangeSelectedTeeth.length} dente${rangeSelectedTeeth.length !== 1 ? 's' : ''} selecionado${rangeSelectedTeeth.length !== 1 ? 's' : ''}`}
+                </p>
+                {rangePickError && (
+                  <p className="text-[12px] text-rose-600 mt-1 font-medium">{rangePickError}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={cancelRangeProsthesisPick}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmRangeProsthesisPick()}
+                  disabled={rangeSelectedTeeth.length < 2}
+                  className="px-3.5 py-2 rounded-xl bg-violet-600 text-white text-[12px] font-semibold hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="mb-2 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -1943,6 +2066,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               activeToothNumbers={activeToothNumbers}
               activeQuadrants={activeQuadrants}
               prosthesisByTooth={prosthesisByTooth}
+              rangePickMode={!!pendingRangeProsthesis}
+              rangeSelectedTeeth={rangeSelectedTeeth}
+              onRangeToothToggle={handleRangeToothToggle}
               priorityToothNumber={priorityToothNumber}
               highlightedToothNumber={highlightedToothNumber}
               highlightedQuadrant={highlightedQuadrant}
@@ -2425,11 +2551,12 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             </section>
             )}
 
-            {!isFocusMode && (
+            {!isFocusMode && activeProstheses.length > 0 && (
               <ControleProtetico
-                prostheses={prostheses}
+                prostheses={activeProstheses}
                 dentitionMode={effectiveDentitionMode}
                 onUpdateStage={handleUpdateProstheticStage}
+                onAddNote={handleAddProstheticNote}
                 onRemove={handleRemoveScopeTreatment}
               />
             )}

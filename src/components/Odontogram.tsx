@@ -68,6 +68,10 @@ interface OdontogramProps {
   activeQuadrants?: QuadrantId[];
   /** Próteses regionais cobrindo cada dente (faixa colorida tipo "ponte"). */
   prosthesisByTooth?: Record<number, { procedureKey?: string; label: string }>;
+  /** Modo de seleção de dentes para prótese por intervalo. */
+  rangePickMode?: boolean;
+  rangeSelectedTeeth?: number[];
+  onRangeToothToggle?: (toothNumber: number) => void;
   priorityToothNumber?: number | null;
   highlightedToothNumber?: number | null;
   highlightedQuadrant?: QuadrantId | null;
@@ -240,6 +244,7 @@ interface ToothProps {
   isPending: boolean;
   isUrgent: boolean;
   isPriority: boolean;
+  rangeSelected?: boolean;
   disabled: boolean;
   compact?: boolean;
   prosthesisBand?: string;
@@ -259,6 +264,7 @@ const Tooth: React.FC<ToothProps> = ({
   isPending,
   isUrgent,
   isPriority,
+  rangeSelected = false,
   disabled,
   compact = false,
   prosthesisBand,
@@ -288,7 +294,8 @@ const Tooth: React.FC<ToothProps> = ({
           ${isInTreatment && !isPending && !isUrgent ? 'ring-2 ring-emerald-300' : ''}
           ${isCompleted && !isPending && !isUrgent ? 'ring-2 ring-sky-300' : ''}
           ${isPriority ? 'ring-2 ring-slate-900 ring-offset-2 ring-offset-white' : ''}
-          ${selected
+          ${rangeSelected ? 'ring-2 ring-violet-500 bg-violet-50/80 shadow-[0_0_0_3px_rgba(139,92,246,0.15)]' : ''}
+          ${selected && !rangeSelected
             ? 'scale-[1.04] ring-2 ring-slate-900 shadow-[0_10px_18px_rgba(15,23,42,0.08)]'
             : 'hover:scale-[1.02] hover:shadow-[0_8px_16px_rgba(15,23,42,0.08)] active:scale-[0.98]'}
         `}
@@ -547,6 +554,9 @@ export const Odontogram: React.FC<OdontogramProps> = ({
   activeToothNumbers = [],
   activeQuadrants = [],
   prosthesisByTooth = {},
+  rangePickMode = false,
+  rangeSelectedTeeth = [],
+  onRangeToothToggle,
   priorityToothNumber = null,
   highlightedToothNumber = null,
   highlightedQuadrant = null,
@@ -579,6 +589,8 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         : legendItems.filter((item) => COMPACT_LEGEND_KEYS.has(item.key)),
     [legendExpanded]
   );
+
+  const rangeSelectedSet = React.useMemo(() => new Set(rangeSelectedTeeth), [rangeSelectedTeeth]);
 
   const getToothStatus = React.useCallback((num: number): ToothStatus => {
     return data[num]?.status || 'healthy';
@@ -677,6 +689,10 @@ export const Odontogram: React.FC<OdontogramProps> = ({
 
   const handleToothClick = (num: number, event: React.MouseEvent<HTMLButtonElement>) => {
     if (readOnly) return;
+    if (rangePickMode && onRangeToothToggle) {
+      onRangeToothToggle(num);
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     setHoveredTooth(null);
     setHoverRect(null);
@@ -781,6 +797,7 @@ export const Odontogram: React.FC<OdontogramProps> = ({
         compact={compact}
         status={toothStatus}
         selected={(selectedTooth === num && isMenuOpen) || highlightedToothNumber === num}
+        rangeSelected={rangeSelectedSet.has(num)}
         isInTreatment={flags.isInTreatment}
         hasDiagnosis={['decay', 'fracture'].includes(toothStatus)}
         isCompleted={flags.isCompleted}

@@ -213,6 +213,35 @@ export function getToothRange(from: number, to: number): number[] {
   return [];
 }
 
+export function getArchSequencesForMode(mode: DentitionMode): number[][] {
+  if (mode === 'deciduous') return ARCH_SEQUENCES.slice(2);
+  if (mode === 'mixed') return ARCH_SEQUENCES;
+  return ARCH_SEQUENCES.slice(0, 2);
+}
+
+export function sortTeethInArchOrder(teeth: number[], mode: DentitionMode = 'permanent'): number[] {
+  for (const seq of getArchSequencesForMode(mode)) {
+    const picked = teeth.filter((t) => seq.includes(t));
+    if (picked.length === teeth.length) {
+      return picked.sort((a, b) => seq.indexOf(a) - seq.indexOf(b));
+    }
+  }
+  return [...teeth].sort((a, b) => a - b);
+}
+
+export function validateProsthesisTeethSelection(
+  teeth: number[],
+  mode: DentitionMode = 'permanent'
+): { ok: boolean; message?: string } {
+  if (teeth.length < 2) {
+    return { ok: false, message: 'Selecione pelo menos 2 dentes.' };
+  }
+  for (const seq of getArchSequencesForMode(mode)) {
+    if (teeth.every((t) => seq.includes(t))) return { ok: true };
+  }
+  return { ok: false, message: 'Os dentes precisam estar na mesma arcada.' };
+}
+
 /** Dentes da arcada (superior/inferior) para o modo informado. */
 export function getArchTeeth(arch: 'upper' | 'lower', mode: DentitionMode): number[] {
   const layout = getDentitionLayout(mode);
