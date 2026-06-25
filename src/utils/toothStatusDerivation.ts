@@ -12,6 +12,11 @@ export type ToothStatus =
   | 'wear'
   | 'facet'
   | 'prosthesis'
+  | 'prosthesis_fixed'
+  | 'prosthesis_removable'
+  | 'prosthesis_total'
+  | 'prosthesis_protocol'
+  | 'prosthesis_core'
   | 'missing';
 
 export interface ToothFlags {

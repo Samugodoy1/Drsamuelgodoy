@@ -32,6 +32,8 @@ import { NovaEvolucao } from './NovaEvolucao';
 import { DentitionIndicator, DentitionRevealHint } from './DentitionIndicator';
 import { Odontogram } from './Odontogram';
 import { OdontogramActiveSummary } from './OdontogramActiveSummary';
+import { ControleProtetico, type ProstheticControlPayload } from './ControleProtetico';
+import { PROSTHETIC_CONTROL_PROCEDURE } from '../constants/prosthetics';
 import { ScopeProcedureMenu } from './ScopeProcedureMenu';
 import {
   type DentitionMode,
@@ -195,6 +197,8 @@ const resolveProcedureCategory = (title: string) => {
     return { label: 'Profilaxia', dotCls: 'bg-emerald-500', tagCls: 'bg-emerald-50 text-emerald-700', borderCls: 'border-l-emerald-400' };
   if (/avalia|consulta|retorno|anamnese|revisão|revisao/.test(lower))
     return { label: 'Consulta', dotCls: 'bg-sky-500', tagCls: 'bg-sky-50 text-sky-700', borderCls: 'border-l-sky-400' };
+  if (/pr[óo]tese|prot[ée]tic|protocolo|coroa|ponte|n[úu]cleo|faceta|implante/.test(lower))
+    return { label: 'Prótese', dotCls: 'bg-violet-500', tagCls: 'bg-violet-50 text-violet-700', borderCls: 'border-l-violet-400' };
   return { label: 'Evolução', dotCls: 'bg-slate-400', tagCls: 'bg-slate-100 text-slate-600', borderCls: 'border-l-slate-300' };
 };
 
@@ -542,14 +546,17 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     };
   }, [isReorderMode]);
 
-  const timelineItems = useMemo(() => {
-    const mergedEvolutions = [
+  const mergedEvolutions = useMemo(
+    () => [
       ...optimisticEvolutions,
       ...(patient?.evolution || []).filter(
         (e: any) => !optimisticEvolutions.some((opt) => opt.id === e.id)
       ),
-    ];
+    ],
+    [patient?.evolution, optimisticEvolutions]
+  );
 
+  const timelineItems = useMemo(() => {
     const evolutionEvents = mergedEvolutions
       .map((e: any) => {
         const eventType = resolveClinicalEventType(e);
@@ -572,7 +579,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     return evolutionEvents.sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [patient?.evolution, optimisticEvolutions]);
+  }, [mergedEvolutions]);
 
   const mergedOdontogram = useMemo(
     () => ({
@@ -779,6 +786,37 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || 'Falha ao salvar evolução clínica');
     }
+  };
+
+  const handleRegisterProstheticControl = async (payload: ProstheticControlPayload) => {
+    const ts = Date.now();
+    const evolutionId = `evo-prosth-${ts}-${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+
+    const notes =
+      `Dente ${payload.toothNumber} · ${payload.label} · ${payload.conditionLabel}` +
+      (payload.observation ? ` — ${payload.observation}` : '');
+    const procedureTitle = `${PROSTHETIC_CONTROL_PROCEDURE} · Dente ${payload.toothNumber}`;
+
+    const entry = {
+      id: evolutionId,
+      date: nowIso,
+      notes,
+      procedure: procedureTitle,
+      procedure_performed: PROSTHETIC_CONTROL_PROCEDURE,
+      materials: '',
+      observations: `Elementos: ${payload.toothNumber}`,
+      return_date: payload.nextControlDate || null,
+      event_type: 'OBSERVATION',
+    };
+
+    // Mesmo fluxo da Nova Evolução: atualização otimista local + persistência
+    // autoritativa (que recarrega o paciente). Evita duplicar o registro.
+    await onUpdatePatient({
+      ...patient,
+      evolution: [entry, ...(patient.evolution || [])],
+    });
+    await onAddEvolution(entry);
   };
 
   const handleScopeProcedureSelect = async ({
@@ -2332,6 +2370,14 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                 </div>
               )}
             </section>
+            )}
+
+            {!isFocusMode && (
+              <ControleProtetico
+                odontogram={mergedOdontogram}
+                evolutions={mergedEvolutions}
+                onRegisterControl={handleRegisterProstheticControl}
+              />
             )}
           </div>
 

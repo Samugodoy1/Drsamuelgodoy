@@ -10,6 +10,7 @@ import {
 } from '../constants/dentition';
 import { deriveToothFlagsPure } from '../utils/toothStatusDerivation';
 import { normalizeTreatmentItem, type QuadrantId } from '../utils/treatmentPlanScope';
+import { PROSTHESIS_TYPES } from '../constants/prosthetics';
 
 export type ToothStatus = 
   | 'healthy' 
@@ -22,9 +23,14 @@ export type ToothStatus =
   | 'extraction_done' 
   | 'extraction_needed' 
   | 'fracture' 
-  | 'wear' 
-  | 'facet' 
-  | 'prosthesis' 
+  | 'wear'
+  | 'facet'
+  | 'prosthesis'
+  | 'prosthesis_fixed'
+  | 'prosthesis_removable'
+  | 'prosthesis_total'
+  | 'prosthesis_protocol'
+  | 'prosthesis_core'
   | 'missing';
 
 interface ToothRecord {
@@ -85,6 +91,7 @@ const URGENT_STATUSES: Set<ToothStatus> = new Set([
 // Conditions that represent completed procedures
 const COMPLETED_STATUSES: Set<ToothStatus> = new Set([
   'filling', 'crown', 'root_canal_done', 'extraction_done', 'implant', 'prosthesis', 'facet',
+  'prosthesis_fixed', 'prosthesis_removable', 'prosthesis_total', 'prosthesis_protocol', 'prosthesis_core',
 ]);
 
 const statusColors: Record<ToothStatus, string> = {
@@ -101,6 +108,11 @@ const statusColors: Record<ToothStatus, string> = {
   wear: 'bg-amber-50 border-amber-200 text-amber-800',
   facet: 'bg-emerald-50 border-emerald-200 text-emerald-800',
   prosthesis: 'bg-sky-50 border-sky-200 text-sky-800',
+  prosthesis_fixed: 'bg-violet-50 border-violet-200 text-violet-800',
+  prosthesis_removable: 'bg-violet-50 border-violet-200 text-violet-800',
+  prosthesis_total: 'bg-violet-50 border-violet-200 text-violet-800',
+  prosthesis_protocol: 'bg-indigo-50 border-indigo-200 text-indigo-800',
+  prosthesis_core: 'bg-sky-50 border-sky-200 text-sky-800',
   missing: 'bg-slate-100 border-slate-300 text-slate-500',
 };
 
@@ -118,6 +130,11 @@ const statusLabels: Record<ToothStatus, string> = {
   wear: 'Desgaste',
   facet: 'Faceta',
   prosthesis: 'Prótese',
+  prosthesis_fixed: 'Prótese Fixa',
+  prosthesis_removable: 'Prótese Removível',
+  prosthesis_total: 'Prótese Total',
+  prosthesis_protocol: 'Protocolo s/ Implante',
+  prosthesis_core: 'Núcleo / Pino',
   missing: 'Ausente',
 };
 
@@ -171,12 +188,21 @@ const diagnosisActions = [
   { key: 'fracture', label: 'Fratura', status: 'fracture' as ToothStatus, category: 'diagnosis' as const },
 ];
 
+// Próteses disponíveis no menu do odontograma (derivadas da fonte única).
+const prosthesisActions = PROSTHESIS_TYPES.map((p) => ({
+  key: p.actionKey,
+  label: p.shortLabel,
+  status: p.status,
+  category: 'procedure' as const,
+}));
+
 const procedureActions = [
   { key: 'filling', label: 'Restauracao', status: 'filling' as ToothStatus, category: 'procedure' as const },
   { key: 'root-canal', label: 'Canal', status: 'root_canal_needed' as ToothStatus, category: 'procedure' as const },
   { key: 'extraction', label: 'Extracao', status: 'extraction_needed' as ToothStatus, category: 'procedure' as const },
   { key: 'crown', label: 'Coroa', status: 'crown' as ToothStatus, category: 'procedure' as const },
   { key: 'implant', label: 'Implante', status: 'implant' as ToothStatus, category: 'procedure' as const },
+  ...prosthesisActions,
 ];
 
 const continuationActions = [
@@ -185,6 +211,7 @@ const continuationActions = [
   { key: 'extraction', label: 'Extracao', status: 'extraction_done' as ToothStatus, category: 'procedure' as const },
   { key: 'crown', label: 'Coroa', status: 'crown' as ToothStatus, category: 'procedure' as const },
   { key: 'implant', label: 'Implante', status: 'implant' as ToothStatus, category: 'procedure' as const },
+  ...prosthesisActions,
 ];
 
 const COMPACT_LEGEND_KEYS = new Set(['attention', 'in-progress', 'done']);
@@ -384,7 +411,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
               <X size={18} />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 pb-2">
+          <div className="grid grid-cols-2 gap-2 pb-2 max-h-[55vh] overflow-y-auto">
             {actions.map((action) => (
               <button
                 key={action.key}
@@ -452,7 +479,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
       <div
         ref={menuRef}
         style={{ top, left }}
-        className="pointer-events-auto absolute w-[240px] rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_36px_rgba(15,23,42,0.14)] transition-all duration-200"
+        className="pointer-events-auto absolute w-[240px] max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_36px_rgba(15,23,42,0.14)] transition-all duration-200"
       >
         <p className="px-1 text-sm font-semibold text-slate-900">Dente {selectedTooth}</p>
         {hasTreatment && (
