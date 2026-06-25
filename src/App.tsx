@@ -89,6 +89,13 @@ import {
   matchesPatientListFilter,
 } from './utils/patientAttentionCopy';
 import { formatAllergieLabel, formatMedicationLabel, hasRecordedAllergie } from './utils/anamnesisUtils';
+import {
+  getAllowedAppointmentStatuses,
+  getEffectiveSelectableStatus,
+  formatStatusOptionLabel,
+  isAppointmentStatusAllowed,
+  type AppointmentStatus,
+} from './utils/appointmentStatus';
 
 // Types
 interface Patient {
@@ -368,6 +375,63 @@ const StatusBadge = ({ app, now }: { app: Appointment; now: Date }) => {
       {icon}
       {label}
     </span>
+  );
+};
+
+const getStatusSelectClassName = (status: AppointmentStatus, compact = false) => {
+  const base = compact
+    ? 'px-2 py-1 text-base bg-white border border-slate-200 rounded font-medium focus:ring-2 focus:ring-primary/20 outline-none'
+    : 'px-3 py-2 border rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0 appearance-none cursor-pointer transition-colors';
+
+  switch (status) {
+    case 'CONFIRMED':
+      return `${base} bg-emerald-50 border-emerald-200 text-emerald-700`;
+    case 'IN_PROGRESS':
+      return `${base} bg-blue-50 border-blue-200 text-blue-700`;
+    case 'FINISHED':
+      return `${base} bg-slate-100 border-slate-200 text-slate-500`;
+    case 'CANCELLED':
+      return `${base} bg-rose-50 border-rose-200 text-rose-600`;
+    case 'NO_SHOW':
+      return `${base} bg-amber-50 border-amber-200 text-amber-700`;
+    default:
+      return compact ? base : `${base} bg-white border-slate-200 text-slate-700`;
+  }
+};
+
+const AppointmentStatusSelect = ({
+  appointment,
+  now,
+  onChange,
+  className,
+  withPrefix = false,
+  compact = false,
+  ariaLabel,
+}: {
+  appointment: Appointment;
+  now: Date;
+  onChange: (status: Appointment['status']) => void;
+  className?: string;
+  withPrefix?: boolean;
+  compact?: boolean;
+  ariaLabel?: string;
+}) => {
+  const allowed = getAllowedAppointmentStatuses(appointment, now);
+  const selectValue = getEffectiveSelectableStatus(appointment, now);
+
+  return (
+    <select
+      value={selectValue}
+      onChange={(e) => onChange(e.target.value as Appointment['status'])}
+      aria-label={ariaLabel}
+      className={className ?? getStatusSelectClassName(selectValue, compact)}
+    >
+      {allowed.map((status) => (
+        <option key={status} value={status}>
+          {formatStatusOptionLabel(status, withPrefix)}
+        </option>
+      ))}
+    </select>
   );
 };
 
@@ -2696,6 +2760,10 @@ export default function App() {
   const updateStatus = async (id: number, status: Appointment['status']) => {
     const previousApp = appointments.find(a => a.id === id);
     const previousStatus = previousApp?.status;
+    if (previousApp && !isAppointmentStatusAllowed(previousApp, status, now)) {
+      showNotification('Status inválido para o horário desta consulta.', 'error');
+      return;
+    }
     try {
       const res = await apiFetch(`/api/appointments/${id}/status`, {
         method: 'PATCH',
@@ -3754,26 +3822,13 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                <select
-                                    value={app.status}
-                                    onChange={(e) => updateStatus(app.id, e.target.value as Appointment['status'])}
-                                    aria-label={`Status de ${app.patient_name}`}
-                                    className={`px-3 py-2 border rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none whitespace-nowrap shrink-0 appearance-none cursor-pointer transition-colors ${
-                                      app.status === 'CONFIRMED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                                      app.status === 'IN_PROGRESS' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                                      app.status === 'FINISHED' ? 'bg-slate-100 border-slate-200 text-slate-500' :
-                                      app.status === 'CANCELLED' ? 'bg-rose-50 border-rose-200 text-rose-600' :
-                                      app.status === 'NO_SHOW' ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                                      'bg-white border-slate-200 text-slate-700'
-                                    }`}
-                                  >
-                                    <option value="SCHEDULED">⏳ Agendado</option>
-                                    <option value="CONFIRMED">✓ Confirmado</option>
-                                    <option value="IN_PROGRESS">● Atendendo</option>
-                                    <option value="FINISHED">✓ Finalizado</option>
-                                    <option value="CANCELLED">✕ Cancelado</option>
-                                    <option value="NO_SHOW">⊘ Faltou</option>
-                                  </select>
+                                <AppointmentStatusSelect
+                                  appointment={app}
+                                  now={now}
+                                  withPrefix
+                                  ariaLabel={`Status de ${app.patient_name}`}
+                                  onChange={(status) => updateStatus(app.id, status)}
+                                />
                               </div>
 
                               {/* Action buttons */}
@@ -4446,21 +4501,15 @@ export default function App() {
                                     <div className="border-t border-slate-100 pt-6 space-y-4">
                                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ações</p>
                                       <div className="space-y-3">
-                                        <select
-                                          value={weekSheetSelectedAppointment.status}
-                                          onChange={(e) => {
-                                            updateStatus(weekSheetSelectedAppointment.id, e.target.value as Appointment['status']);
+                                        <AppointmentStatusSelect
+                                          appointment={weekSheetSelectedAppointment}
+                                          now={now}
+                                          className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                          onChange={(status) => {
+                                            updateStatus(weekSheetSelectedAppointment.id, status);
                                             setWeekSheetSelectedAppointment(null);
                                           }}
-                                          className="w-full px-4 py-3 text-base bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                        >
-                                          <option value="SCHEDULED">Agendado</option>
-                                          <option value="CONFIRMED">Confirmado</option>
-                                          <option value="IN_PROGRESS">Atendendo</option>
-                                          <option value="FINISHED">Finalizado</option>
-                                          <option value="CANCELLED">Cancelado</option>
-                                          <option value="NO_SHOW">Faltou</option>
-                                        </select>
+                                        />
 
                                         <button
                                           onClick={() => {
@@ -4753,21 +4802,15 @@ export default function App() {
 
                                               {/* Status and actions */}
                                               <div className="flex items-center gap-2 mt-3">
-                                                <select
-                                                  value={app.status}
-                                                  onChange={(e) => {
-                                                    updateStatus(app.id, e.target.value as Appointment['status']);
+                                                <AppointmentStatusSelect
+                                                  appointment={app}
+                                                  now={now}
+                                                  compact
+                                                  onChange={(status) => {
+                                                    updateStatus(app.id, status);
                                                     setMonthSheetSelectedDay(null);
                                                   }}
-                                                  className="px-2 py-1 text-base bg-white border border-slate-200 rounded font-medium focus:ring-2 focus:ring-primary/20 outline-none"
-                                                >
-                                                  <option value="SCHEDULED">Agendado</option>
-                                                  <option value="CONFIRMED">Confirmado</option>
-                                                  <option value="IN_PROGRESS">Atendendo</option>
-                                                  <option value="FINISHED">Finalizado</option>
-                                                  <option value="CANCELLED">Cancelado</option>
-                                                  <option value="NO_SHOW">Faltou</option>
-                                                </select>
+                                                />
                                                 <button
                                                   onClick={() => sendReminder(app)}
                                                   className="p-1.5 text-primary bg-primary/5 hover:bg-primary/10 rounded-full transition-all"
