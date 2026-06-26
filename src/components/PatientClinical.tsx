@@ -46,6 +46,7 @@ import {
   PROSTHESIS_PROCEDURE_LABELS,
 } from '../constants/prosthetics';
 import { ScopeProcedureMenu, type ScopeProcedureSelection } from './ScopeProcedureMenu';
+import { OrthodonticSection } from '../orthodontics';
 import {
   type DentitionMode,
   type DentitionSource,
@@ -2023,6 +2024,16 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-6">
+
+        {/* Ortodontia — só aparece quando o paciente tem tratamento ortodôntico ativo */}
+        {patient?.id != null && (
+          <OrthodonticSection
+            apiFetch={apiFetch}
+            patientId={Number(patient.id)}
+            odontogram={patient?.odontogram}
+            toothHistory={patient?.toothHistory}
+          />
+        )}
 
         <section ref={odontogramRef} className="rounded-[30px] p-4 sm:p-5 border border-slate-200/60 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-500 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-3 mb-1">

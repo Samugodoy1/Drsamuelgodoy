@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../config';
 import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, AlertCircle } from '../icons';
 import type { PortalActivity } from '../types/portal';
+import { OrthodonticDashboardCards } from '../orthodontics';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -291,6 +292,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     void fetchIntelligence();
   }, [fetchIntelligence]);
+
+  // apiFetch mínimo para o domínio ortodôntico (mesma autenticação do dashboard)
+  const orthoApiFetch = useCallback((url: string, init?: any) => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'x-product': product,
+      ...(init?.headers || {}),
+    };
+    if (token && token !== 'null') {
+      headers['Authorization'] = `Bearer ${token}`;
+      headers['x-auth-token'] = token;
+    }
+    return fetch(`${API_URL}${url}`, {
+      ...init,
+      headers,
+      credentials: API_URL ? ('include' as const) : ('same-origin' as const),
+    });
+  }, [product]);
 
   useEffect(() => {
     if (skipRefreshKeyEffectRef.current) {
@@ -1120,6 +1141,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="flex flex-col gap-10 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-10 px-5 max-w-2xl mx-auto">
+      {/* Cartões ortodônticos — só aparecem quando há algo que exige ação */}
+      <OrthodonticDashboardCards apiFetch={orthoApiFetch} onOpenPatient={openPatientRecord} />
+
       {/* 1. HEADER + CONTEXTO PRÉ-HERO */}
       <div className="space-y-5">
         {/* Saudação — caption level */}
