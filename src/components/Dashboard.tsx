@@ -682,7 +682,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       (appointment) =>
         appointment.status === 'NO_SHOW' &&
         new Date(appointment.start_time).toDateString() === now.toDateString() &&
-        new Date(appointment.start_time).getTime() <= now.getTime()
+        new Date(appointment.start_time).getTime() <= now.getTime() &&
+        // Only spotlight the no-show while its time slot is still running. Once the
+        // consultation period ends, the red "Faltou" hero should disappear instead
+        // of lingering for the rest of the day.
+        new Date(appointment.end_time).getTime() > now.getTime()
     )
     .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())[0] ?? null;
 
