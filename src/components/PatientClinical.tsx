@@ -9,11 +9,15 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Clock3,
   CreditCard,
+  Download,
   FileText,
   GripVertical,
+  Image,
   Info,
   Lock,
   Loader2,
@@ -24,6 +28,7 @@ import {
   User,
   UserRound,
   WalletCards,
+  X,
   Zap,
 } from '../icons';
 import { AnimatePresence, motion } from 'motion/react';
@@ -296,6 +301,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [isUploadingClinicalImage, setIsUploadingClinicalImage] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [reorderItems, setReorderItems] = useState<any[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -1523,6 +1529,60 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
   };
 
   const patientFiles = patient?.files || [];
+
+  // Treatment image gallery — chronological timeline grouped by month.
+  // patientFiles arrives newest-first from the API, so groups stay reverse-chronological:
+  // the dentist sees the current state of the case first, history flows below.
+  const isImageFile = (file: any) => {
+    const type = String(file?.file_type || '').toLowerCase();
+    if (type === 'image') return true;
+    if (type === 'pdf' || type === 'document') return false;
+    const url = String(file?.file_url || '').toLowerCase();
+    return /\.(jpe?g|png|webp|gif|heic|bmp|avif)(\?|$)/.test(url);
+  };
+  const clinicalImages = useMemo(() => patientFiles.filter(isImageFile), [patientFiles]);
+  const imageIndexById = useMemo(() => {
+    const map = new Map<any, number>();
+    clinicalImages.forEach((f: any, i: number) => map.set(f.id, i));
+    return map;
+  }, [clinicalImages]);
+  const imageTimeline = useMemo(() => {
+    const groups: { key: string; label: string; files: any[] }[] = [];
+    const byKey = new Map<string, { key: string; label: string; files: any[] }>();
+    patientFiles.forEach((file: any) => {
+      const d = file?.created_at ? new Date(file.created_at) : null;
+      const valid = d && !Number.isNaN(d.getTime());
+      const key = valid ? `${d!.getFullYear()}-${d!.getMonth()}` : 'sem-data';
+      let group = byKey.get(key);
+      if (!group) {
+        const raw = valid ? d!.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Sem data';
+        const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+        group = { key, label, files: [] };
+        byKey.set(key, group);
+        groups.push(group);
+      }
+      group.files.push(file);
+    });
+    return groups;
+  }, [patientFiles]);
+
+  // Lightbox keyboard navigation — Esc closes, arrows move through the timeline.
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxIndex(null);
+      else if (e.key === 'ArrowRight') setLightboxIndex((i) => (i === null ? i : Math.min(clinicalImages.length - 1, i + 1)));
+      else if (e.key === 'ArrowLeft') setLightboxIndex((i) => (i === null ? i : Math.max(0, i - 1)));
+    };
+    document.addEventListener('keydown', handler);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [lightboxIndex, clinicalImages.length]);
+
   const financialTotal = mergedTreatmentPlan.reduce((acc: number, item: any) => acc + (Number(item.value) || 0), 0);
   const completedTotal = mergedTreatmentPlan
     .filter((item: any) => String(item.status || '').toUpperCase() === 'REALIZADO')
@@ -3061,51 +3121,100 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
             )}
 
             {infoTab === 'imagens' && (
-              <div className="space-y-3">
-                <div className="p-3.5 rounded-[18px] bg-slate-50 border border-slate-200/70">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Anexos clínicos</p>
-                    <button
-                      type="button"
-                      onClick={() => clinicalImageInputRef.current?.click()}
-                      disabled={isUploadingClinicalImage}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
-                    >
-                      <Camera size={12} />
-                {isUploadingClinicalImage ? 'Enviando...' : 'Adicionar imagem / RX'}
-                    </button>
+              <div className="space-y-4">
+                {/* Cabeçalho — linha do tempo do tratamento */}
+                <div className="flex items-end justify-between gap-2 px-0.5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">Linha do tempo</p>
+                    <p className="text-[12px] text-slate-500 mt-0.5">
+                      {clinicalImages.length > 0
+                        ? `${clinicalImages.length} ${clinicalImages.length === 1 ? 'imagem' : 'imagens'} do tratamento`
+                        : 'Fotos e RX do tratamento'}
+                    </p>
                   </div>
-                  <input
-                    ref={clinicalImageInputRef}
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleClinicalImageUpload}
-                    className="hidden"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => clinicalImageInputRef.current?.click()}
+                    disabled={isUploadingClinicalImage}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-[11px] font-semibold text-white shadow-[0_2px_8px_rgba(15,23,42,0.15)] transition-all hover:bg-slate-800 disabled:opacity-60 ios-press"
+                  >
+                    {isUploadingClinicalImage ? <Loader2 size={12} className="animate-spin" /> : <Plus size={13} />}
+                    {isUploadingClinicalImage ? 'Enviando' : 'Adicionar'}
+                  </button>
                 </div>
+                <input
+                  ref={clinicalImageInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleClinicalImageUpload}
+                  className="hidden"
+                />
 
                 {patientFiles.length > 0 ? (
-                  patientFiles.slice(0, 6).map((file: any) => (
-                    <a
-                      key={file.id}
-                      href={file.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-3 rounded-[18px] bg-slate-50/80 border border-slate-200/60 transition-all duration-300 ease-out hover:bg-white hover:border-slate-300 hover:shadow-[0_4px_16px_rgba(15,23,42,0.06)] hover:translate-y-[-1px] ios-press-gentle"
-                    >
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
-                        {(file.file_url || '').toLowerCase().endsWith('.pdf')
-                          ? <FileText size={16} />
-                          : <Camera size={16} />}
+                  <div className="space-y-5">
+                    {imageTimeline.map((group) => (
+                      <div key={group.key}>
+                        {/* Divisor de mês */}
+                        <div className="mb-2 flex items-center gap-2 px-0.5">
+                          <Calendar size={11} className="text-slate-300" />
+                          <p className="text-[11px] font-bold text-slate-500">{group.label}</p>
+                          <span className="text-[10px] font-semibold text-slate-300">{group.files.length}</span>
+                          <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        {/* Grade de miniaturas */}
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {group.files.map((file: any) => {
+                            if (isImageFile(file)) {
+                              const idx = imageIndexById.get(file.id) ?? 0;
+                              return (
+                                <button
+                                  key={file.id}
+                                  type="button"
+                                  onClick={() => setLightboxIndex(idx)}
+                                  title={file.description || 'Imagem clínica'}
+                                  className="group relative aspect-square overflow-hidden rounded-[14px] border border-slate-200/70 bg-slate-100 ios-press-gentle"
+                                >
+                                  <img
+                                    src={file.file_url}
+                                    alt={file.description || 'Imagem clínica'}
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer"
+                                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+                                  />
+                                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/0 to-transparent opacity-0 transition-opacity duration-300 group-hover:from-slate-900/25 group-hover:opacity-100" />
+                                </button>
+                              );
+                            }
+                            return (
+                              <a
+                                key={file.id}
+                                href={file.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={file.description || 'Documento'}
+                                className="group flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[14px] border border-slate-200/70 bg-slate-50 p-2 text-center transition-all hover:border-slate-300 hover:bg-white hover:shadow-[0_4px_16px_rgba(15,23,42,0.06)] ios-press-gentle"
+                              >
+                                <FileText size={20} className="text-rose-400" />
+                                <span className="line-clamp-2 text-[9px] font-semibold leading-tight text-slate-500">{file.description || 'PDF'}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-slate-800 truncate">{file.description || 'Arquivo clínico'}</p>
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">{file.created_at ? formatDate(file.created_at) : 'Data n/i'}</p>
-                      </div>
-                    </a>
-                  ))
+                    ))}
+                  </div>
                 ) : (
-                  <div className="p-8 rounded-[20px] text-center text-sm text-slate-500 bg-slate-50 border border-slate-200/70">Sem imagens ou RX ainda</div>
+                  <button
+                    type="button"
+                    onClick={() => clinicalImageInputRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[20px] border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center transition-colors hover:bg-slate-50"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-300">
+                      <Image size={22} />
+                    </div>
+                    <p className="text-[13px] font-semibold text-slate-600">Sem imagens ainda</p>
+                    <p className="max-w-[210px] text-[11px] text-slate-400">Adicione fotos e RX para acompanhar a evolução do tratamento ao longo do tempo.</p>
+                  </button>
                 )}
 
                 {uploadFeedback && (
@@ -3460,6 +3569,93 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
           </div>
         );
       })()}
+
+      {/* Visualizador de imagens em tela cheia — navegação pela linha do tempo */}
+      <AnimatePresence>
+        {lightboxIndex !== null && clinicalImages[lightboxIndex] && (() => {
+          const current = clinicalImages[lightboxIndex];
+          const total = clinicalImages.length;
+          const hasPrev = lightboxIndex > 0;
+          const hasNext = lightboxIndex < total - 1;
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 backdrop-blur-xl"
+              onClick={() => setLightboxIndex(null)}
+            >
+              {/* Barra superior — contexto da imagem */}
+              <div
+                className="flex items-center justify-between gap-3 px-5 pt-5 pb-3 text-white/90"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold">{current.description || 'Imagem clínica'}</p>
+                  <p className="text-[11px] text-white/50">
+                    {current.created_at ? `${formatDate(current.created_at)} · ` : ''}{lightboxIndex + 1} de {total}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <a
+                    href={current.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label="Abrir / baixar"
+                  >
+                    <Download size={16} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(null)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label="Fechar"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Palco da imagem */}
+              <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-6">
+                {hasPrev && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i === null ? i : i - 1)); }}
+                    className="absolute left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label="Imagem anterior"
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
+                )}
+                <motion.img
+                  key={current.id}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  src={current.file_url}
+                  alt={current.description || 'Imagem clínica'}
+                  referrerPolicy="no-referrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl"
+                />
+                {hasNext && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i === null ? i : i + 1)); }}
+                    className="absolute right-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label="Próxima imagem"
+                  >
+                    <ChevronRight size={22} />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
 
     </div>
   );
