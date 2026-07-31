@@ -129,39 +129,40 @@ export function OnboardingFlow({
       <>
         {/* Faixa fixa, discreta, NÃO bloqueante */}
         <motion.div
-          initial={{ y: -48, opacity: 0 }}
+          initial={{ y: -40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, ease: easing }}
-          className="fixed top-0 inset-x-0 z-[120] flex justify-center px-3 pt-3 pointer-events-none"
+          className="fixed top-0 inset-x-0 z-[120] flex justify-center px-3 pt-[max(8px,env(safe-area-inset-top))] pointer-events-none"
         >
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#1B4D3E] text-white/95 shadow-lg shadow-black/10 px-4 py-2.5 max-w-[640px] w-full">
-            <span className="text-[15px] leading-none">🟢</span>
-            <p className="text-[13px] font-medium leading-snug">
-              Esta é uma demonstração. É assim que o OdontoHub vai funcionar com seus pacientes reais.
+          <div className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-[#1B4D3E] text-white/95 shadow-md shadow-black/10 px-3 py-1.5 max-w-[440px] w-full">
+            <span className="text-[11px] leading-none shrink-0">🟢</span>
+            <p className="text-[11.5px] font-medium leading-tight">
+              Demonstração — é assim que o OdontoHub vai funcionar com seus pacientes reais.
             </p>
           </div>
         </motion.div>
 
-        {/* Rodapé fixo: "Gostou? Agora é a sua vez." */}
+        {/* Rodapé fixo: "Gostou? Agora é a sua vez." — acima do menu inferior */}
         <motion.div
-          initial={{ y: 64, opacity: 0 }}
+          initial={{ y: 56, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, ease: easing, delay: 0.15 }}
-          className="fixed bottom-0 inset-x-0 z-[120] flex justify-center px-3 pb-4 pointer-events-none"
+          className="fixed bottom-0 inset-x-0 z-[120] flex justify-center px-3 pb-[calc(84px+env(safe-area-inset-bottom))] pointer-events-none"
         >
-          <div className="pointer-events-auto flex flex-col sm:flex-row sm:items-center gap-3 rounded-[20px] bg-white shadow-xl shadow-black/10 border border-slate-100 px-5 py-4 max-w-[640px] w-full">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-[16px] bg-white/95 backdrop-blur-sm shadow-lg shadow-black/10 border border-slate-100 px-4 py-2.5 max-w-[460px] w-full">
             <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-semibold text-slate-900">Gostou? Agora é a sua vez.</p>
-              <p className="text-[13px] text-slate-500 mt-0.5">
-                Criar seu primeiro paciente remove a demonstração e deixa a home sua.
+              <p className="text-[13px] font-semibold text-slate-900 leading-tight">Gostou? Agora é a sua vez.</p>
+              <p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">
+                Criar seu primeiro paciente remove a demonstração.
               </p>
             </div>
             <button
               onClick={() => setStep('form')}
-              className="shrink-0 inline-flex items-center justify-center gap-2 bg-primary text-white rounded-[14px] font-semibold px-5 py-3 hover:opacity-95 active:scale-[0.98] transition-all"
+              aria-label="Criar meu primeiro paciente"
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 bg-primary text-white rounded-[12px] font-semibold text-[13px] px-3.5 py-2.5 hover:opacity-95 active:scale-[0.98] transition-all"
             >
-              Criar meu primeiro paciente
-              <ArrowRight size={18} />
+              Criar paciente
+              <ArrowRight size={16} />
             </button>
           </div>
         </motion.div>
