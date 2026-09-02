@@ -1233,10 +1233,10 @@ export function Finance({
 
   return (
     <>
-    <div className="max-w-screen-xl mx-auto pt-10 px-2 pb-32 md:pb-10 space-y-10 bg-white rounded-[36px] min-h-full">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between px-2">
+    <div className="max-w-screen-xl mx-auto pt-2 md:pt-4 px-1 pb-8 md:pb-10 space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between px-1">
         <div className="space-y-1">
-          <h2 className="text-[28px] font-bold tracking-tight text-[#1d1d1f]">Financeiro</h2>
+          <h2 className="apple-display-ink text-[28px] sm:text-[32px]">Financeiro</h2>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -1268,7 +1268,7 @@ export function Finance({
       </div>
 
       {/* ─── Sub-tab Navigation ──────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 px-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-[#f5f5f7] overflow-x-auto no-scrollbar">
         {([
           { key: 'geral' as const, label: 'Geral', icon: <DollarSign size={14} /> },
           { key: 'nf' as const, label: 'Notas Fiscais', icon: <FileCheck size={14} /> },
@@ -1279,10 +1279,10 @@ export function Finance({
           <button
             key={tab.key}
             onClick={() => setSubTab(tab.key)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-all duration-200 ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-normal whitespace-nowrap transition-all duration-200 ${
               subTab === tab.key
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                ? 'bg-white text-[#1d1d1f]'
+                : 'text-[#86868b] hover:text-[#1d1d1f]'
             }`}
           >
             {tab.icon}
@@ -1306,7 +1306,7 @@ export function Finance({
                 <AlertTriangle size={18} className="text-amber-600" />
                 {currency(pendingTotal)} parado esperando cobrança
               </p>
-              <p className="text-[48px] md:text-[56px] leading-[0.95] font-bold tracking-[-0.04em] text-slate-900">{currency(monthRevenue)}</p>
+              <p className="text-[48px] md:text-[56px] leading-[0.95] font-semibold tracking-[-0.04em] text-[#1d1d1f]">{currency(monthRevenue)}</p>
               <p className="text-[13px] leading-relaxed text-amber-700/80 font-medium">
                 {pendingPatientCount} paciente{pendingPatientCount !== 1 ? 's' : ''} com pendência · Cobrar agora aumenta seu mês
               </p>
@@ -1336,7 +1336,7 @@ export function Finance({
                 {financeAnalysis.headlineIcon === 'chart' && <TrendingUp size={18} />}
                 {financeAnalysis.headline}
               </p>
-              <p className="text-[48px] md:text-[56px] leading-[0.95] font-bold tracking-[-0.04em] text-slate-900">{currency(monthRevenue)}</p>
+              <p className="text-[48px] md:text-[56px] leading-[0.95] font-semibold tracking-[-0.04em] text-[#1d1d1f]">{currency(monthRevenue)}</p>
               <p className="text-[13px] leading-relaxed text-slate-500 font-medium">{financeAnalysis.subtitle}</p>
             </div>
             {financeAnalysis.ctaAction && financeAnalysis.ctaLabel && (
@@ -1438,8 +1438,8 @@ export function Finance({
             }}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
               filterDate === todayKey
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-[#1d1d1f] text-white'
+                : 'bg-[#f5f5f7] text-[#6e6e73] hover:text-[#1d1d1f]'
             }`}
           >
             <CalendarDays size={14} />
@@ -1453,8 +1453,8 @@ export function Finance({
             }}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
               filterDate === yesterdayKey
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-[#1d1d1f] text-white'
+                : 'bg-[#f5f5f7] text-[#6e6e73] hover:text-[#1d1d1f]'
             }`}
           >
             Ontem
@@ -1468,8 +1468,8 @@ export function Finance({
             }}
             className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 cursor-pointer ${
               filterDate && filterDate !== todayKey && filterDate !== yesterdayKey
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-[#1d1d1f] text-white'
+                : 'bg-[#f5f5f7] text-[#6e6e73] hover:text-[#1d1d1f]'
             }`}
           >
             <CalendarDays size={14} />
@@ -1502,10 +1502,10 @@ export function Finance({
               }}
               className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
                 filterPatientId
-                  ? 'bg-slate-900 text-white shadow-sm'
+                  ? 'bg-[#1d1d1f] text-white'
                   : patientSearchOpen
-                    ? 'bg-white text-slate-800 border border-slate-300 shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-white text-[#1d1d1f]'
+                    : 'bg-[#f5f5f7] text-[#6e6e73] hover:text-[#1d1d1f]'
               }`}
             >
               <UserRound size={14} />
@@ -1737,7 +1737,7 @@ export function Finance({
               </button>
               <button
                 onClick={() => setShowInvoiceForm(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2.5 text-[13px] font-semibold hover:bg-slate-800 transition-colors"
+                className="apple-btn text-[15px] py-2 px-4 gap-2"
               >
                 <Plus size={14} /> Emitir NF
               </button>
@@ -2215,7 +2215,7 @@ export function Finance({
             </div>
             <button
               onClick={() => setShowInsuranceForm(true)}
-              className="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2.5 text-[13px] font-semibold hover:bg-slate-800 transition-colors"
+              className="apple-btn text-[15px] py-2 px-4 gap-2"
             >
               <Plus size={14} /> Novo Convênio
             </button>
@@ -2433,7 +2433,7 @@ export function Finance({
               </button>
               <button
                 onClick={() => setShowPixForm(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2.5 text-[13px] font-semibold hover:bg-slate-800 transition-colors"
+                className="apple-btn text-[15px] py-2 px-4 gap-2"
               >
                 <Zap size={14} /> Gerar Pix
               </button>
@@ -2626,12 +2626,12 @@ export function Finance({
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
-            className="relative bg-white/80 backdrop-blur-2xl w-full sm:max-w-md rounded-t-[28px] sm:rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] sm:max-h-fit overflow-y-auto border border-white/20"
+            className="relative bg-white w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] overflow-hidden max-h-[90vh] sm:max-h-fit overflow-y-auto"
           >
             <div className="px-5 pt-5 pb-3 border-b border-slate-100/50">
               <div className="flex justify-between items-center gap-4">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Movimentação</p>
+                  <p className="text-[13px] text-[#86868b]">Movimentação</p>
                   <h2 className="mt-1 text-lg font-semibold text-slate-900 truncate">
                     {selectedTransaction.procedure || selectedTransaction.description}
                   </h2>
