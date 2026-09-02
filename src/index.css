@@ -355,6 +355,15 @@
   .clinic-cc-jiggle:nth-child(2n) { animation-duration: 0.28s; }
   .clinic-cc-jiggle:nth-child(3n) { animation-duration: 0.22s; animation-delay: -0.08s; }
 
+  @keyframes clinic-cc-live {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.86); }
+  }
+
+  .clinic-cc-live-dot {
+    animation: clinic-cc-live 1.6s ease-in-out infinite;
+  }
+
   @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
     .liquid-glass-tabbar,
     .ios-glass {

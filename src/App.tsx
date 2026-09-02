@@ -1867,6 +1867,17 @@ export default function App() {
     .filter(i => i.status === 'PENDING' || i.status === 'OVERDUE')
     .reduce((acc, i) => acc + Number(i.amount), 0);
 
+  const controlCenterSnapshot = {
+    appointments,
+    todayRevenue: dailyRevenue,
+    weekRevenue,
+    pendingReceivables: pendingReceivablesTotal,
+    portalPendingCount,
+    noShowRescheduleCount: noShowsNeedingReschedule.length,
+    patientCount: patients.length,
+    freeSlotCount: todayFreeSlotsCount,
+  };
+
   // Weekly Revenue Data for the Chart
   const weeklyRevenueData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -3087,6 +3098,8 @@ export default function App() {
               profile={profile}
               isAdmin={user?.role?.toUpperCase() === 'ADMIN'}
               onLogout={handleLogout}
+              snapshot={controlCenterSnapshot}
+              onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
             />
             <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col">
               <ClinicalPageRoute 
@@ -3348,6 +3361,8 @@ export default function App() {
         profile={profile}
         isAdmin={user?.role?.toUpperCase() === 'ADMIN'}
         onLogout={handleLogout}
+        snapshot={controlCenterSnapshot}
+        onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
       />
 
       {/* Main Content */}
