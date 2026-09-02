@@ -1339,26 +1339,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </motion.section>
         );
       })() : (
-        <section className="space-y-5">
-          <div className="w-16 h-16 bg-[#f5f5f7] rounded-full flex items-center justify-center text-[#86868b] mx-auto">
+        <section className="flex flex-col items-center space-y-5 text-center">
+          <div className="w-16 h-16 bg-[#f5f5f7] rounded-full flex items-center justify-center text-[#86868b]">
             <Calendar size={32} />
           </div>
-          <div className="space-y-1.5 text-center">
-            <p className="text-[19px] font-bold text-[#1d1d1f]">Agenda livre</p>
-            <p className="text-[14px] text-[#86868b]">
+          <div className="space-y-1.5">
+            <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Agenda livre</p>
+            <p className="text-[15px] text-[#86868b]">
               {availableSchedulingSuggestions.length > 0
                 ? `${availableSchedulingSuggestions.length} paciente${availableSchedulingSuggestions.length === 1 ? '' : 's'} aguardando encaixe`
                 : 'Nenhuma consulta por agora'}
             </p>
           </div>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2.5 apple-btn w-full mx-auto max-w-xs"
-          >
-            <CalendarPlus size={18} />
-            Agendar consulta
-          </motion.button>
+          <div className="flex w-full justify-center">
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setIsModalOpen(true)}
+              className="apple-btn gap-2.5"
+            >
+              <CalendarPlus size={18} />
+              Agendar consulta
+            </motion.button>
+          </div>
           <button
             onClick={() => setActiveTab('agenda')}
             className="block text-[17px] text-[#2997ff] text-center mx-auto mt-3"

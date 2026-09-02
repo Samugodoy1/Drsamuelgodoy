@@ -313,6 +313,48 @@
       0 1px 4px rgba(0, 0, 0, 0.06);
   }
 
+  .clinic-control-rail {
+    background: linear-gradient(
+      180deg,
+      rgba(236, 236, 240, 0.78) 0%,
+      rgba(242, 242, 247, 0.58) 100%
+    );
+    -webkit-backdrop-filter: blur(52px) saturate(190%);
+    backdrop-filter: blur(52px) saturate(190%);
+    box-shadow: inset -0.5px 0 0 rgba(0, 0, 0, 0.06);
+  }
+
+  .clinic-cc-tile {
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow:
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.95),
+      0 1px 3px rgba(0, 0, 0, 0.04);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+  }
+
+  .clinic-cc-tile-on {
+    background: #1d1d1f;
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .clinic-cc-tile-add {
+    background: rgba(255, 255, 255, 0.38);
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  @keyframes clinic-cc-jiggle {
+    0% { transform: rotate(-0.7deg) translateY(0); }
+    50% { transform: rotate(0.7deg) translateY(-0.5px); }
+    100% { transform: rotate(-0.7deg) translateY(0); }
+  }
+
+  .clinic-cc-jiggle {
+    animation: clinic-cc-jiggle 0.24s ease-in-out infinite;
+  }
+  .clinic-cc-jiggle:nth-child(2n) { animation-duration: 0.28s; }
+  .clinic-cc-jiggle:nth-child(3n) { animation-duration: 0.22s; animation-delay: -0.08s; }
+
   @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
     .liquid-glass-tabbar,
     .ios-glass {
