@@ -1126,14 +1126,14 @@ export function Finance({
             y: isActive ? -4 : 0,
           }}
           transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ y: isActive ? -5 : -2, scale: isActive ? 1.024 : 0.995, opacity: 1 }}
-          whileTap={{ scale: isActive ? 1.01 : 0.99 }}
+          whileHover={undefined}
+          whileTap={{ scale: 0.99 }}
           className={`w-full flex items-center gap-3 cursor-pointer rounded-[24px] border transition-all duration-200 ${
             isActive
-              ? 'px-4 py-4 bg-[linear-gradient(135deg,#ffffff_0%,#f4f7fb_100%)] border-slate-200 shadow-[0_16px_36px_rgba(15,23,42,0.10)]'
+              ? 'px-4 py-4 bg-white border-slate-200 '
               : isFeatured
-                ? 'px-4 py-4 bg-[linear-gradient(135deg,#ffffff_0%,#f4f7fb_100%)] border-slate-200 shadow-[0_12px_26px_rgba(15,23,42,0.06)] hover:shadow-[0_16px_30px_rgba(15,23,42,0.08)]'
-                : 'px-3.5 py-3 bg-white/92 border-slate-100 shadow-[0_4px_14px_rgba(15,23,42,0.035)] hover:bg-white hover:border-slate-200 hover:shadow-[0_8px_18px_rgba(15,23,42,0.05)]'
+                ? 'px-4 py-4 bg-white border-slate-200'
+                : 'px-3.5 py-3 bg-white/92 border-slate-100  hover:bg-white hover:border-slate-200'
           }`}
           role="button"
           tabIndex={0}
@@ -1233,10 +1233,10 @@ export function Finance({
 
   return (
     <>
-    <div className="max-w-screen-xl mx-auto pt-10 px-2 pb-32 md:pb-10 space-y-10 bg-[linear-gradient(180deg,#f8f9fb_0%,#fbfcfd_100%)] rounded-[36px] min-h-full">
+    <div className="max-w-screen-xl mx-auto pt-10 px-2 pb-32 md:pb-10 space-y-10 bg-white rounded-[36px] min-h-full">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between px-2">
         <div className="space-y-1">
-          <h2 className="text-[28px] font-bold tracking-tight text-[#1C1C1E]">Financeiro</h2>
+          <h2 className="text-[28px] font-bold tracking-tight text-[#1d1d1f]">Financeiro</h2>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -1293,10 +1293,10 @@ export function Finance({
 
       {subTab === 'geral' && (<>
       <section
-        className={`rounded-[32px] px-5 py-6 md:px-7 md:py-7 border shadow-[0_16px_40px_rgba(15,23,42,0.06)] ${
+        className={`rounded-[28px] px-5 py-6 md:px-7 md:py-7 border  ${
           pendingTotal > 0
-            ? 'bg-[linear-gradient(135deg,#fff8eb_0%,#fff2d8_100%)] border-amber-100'
-            : 'bg-[linear-gradient(135deg,#ffffff_0%,#f2f6f3_100%)] border-slate-100'
+            ? 'bg-white border-amber-100'
+            : 'bg-white border-slate-100'
         }`}
       >
         {pendingTotal > 0 ? (
@@ -1368,7 +1368,7 @@ export function Finance({
             {visiblePendingGroups.map((group) => (
               <div
                 key={group.patientId}
-                className="rounded-[24px] border border-slate-100 bg-white/88 px-5 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+                className="rounded-[24px] border border-slate-100 bg-white/88 px-5 py-5 "
               >
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0 flex-1 space-y-3.5">
@@ -1514,7 +1514,7 @@ export function Finance({
             </button>
 
             {patientSearchOpen && !filterPatientId && (
-              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-2xl border border-slate-200 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.12)] overflow-hidden">
+              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-2xl border border-slate-200 bg-white  overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-100">
                   <Search size={14} className="text-slate-400 shrink-0" />
                   <input
@@ -1669,7 +1669,7 @@ export function Finance({
                 <motion.div
                   whileHover={{ y: -2, scale: 1.004 }}
                   whileTap={{ scale: 0.993 }}
-                  className="rounded-[24px] border border-slate-100 bg-white/92 px-4 py-4 flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between transition-all duration-200 shadow-[0_6px_18px_rgba(15,23,42,0.04)] hover:shadow-[0_10px_22px_rgba(15,23,42,0.06)] hover:border-rose-100"
+                  className="rounded-[24px] border border-slate-100 bg-white/92 px-4 py-4 flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between transition-all duration-200  hover: hover:border-rose-100"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-800 truncate text-[15px] leading-snug">
@@ -1873,7 +1873,7 @@ export function Finance({
               const isCancellable = inv.status === 'AUTHORIZED' || inv.status === 'INTERNAL' || inv.status === 'ISSUED';
 
               return (
-              <div key={inv.id} className="rounded-[20px] border border-slate-100 bg-white/90 px-5 py-4 flex items-center justify-between gap-4 shadow-[0_4px_14px_rgba(15,23,42,0.035)]">
+              <div key={inv.id} className="rounded-[20px] border border-slate-100 bg-white/90 px-5 py-4 flex items-center justify-between gap-4 ">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconColor}`}>
                     <FileText size={16} />
@@ -1882,10 +1882,10 @@ export function Finance({
                     <div className="flex items-center gap-2">
                       <p className="text-[14px] font-semibold text-slate-800 truncate">{inv.invoice_number} — {inv.description}</p>
                       {inv.nfse_numero && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider shrink-0">NFS-e {inv.nfse_numero}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-normal shrink-0">NFS-e {inv.nfse_numero}</span>
                       )}
                       {inv.status === 'INTERNAL' && (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider shrink-0">Interna</span>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-normal shrink-0">Interna</span>
                       )}
                     </div>
                     <p className="text-[12px] text-slate-400">
@@ -1900,7 +1900,7 @@ export function Finance({
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-[14px] font-bold text-slate-900">{currency(Number(inv.amount))}</span>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${st.bg} ${st.text}`}>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-normal ${st.bg} ${st.text}`}>
                     {st.label}
                   </span>
                   {inv.nfse_link_visualizacao && (
@@ -2275,7 +2275,7 @@ export function Finance({
           <div className="space-y-3">
             {insurancePlans.length === 0 && <p className="text-center text-slate-400 text-sm py-8">Nenhum convênio cadastrado.</p>}
             {insurancePlans.map(plan => (
-              <div key={plan.id} className="rounded-[24px] border border-slate-100 bg-white/90 px-5 py-5 shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
+              <div key={plan.id} className="rounded-[24px] border border-slate-100 bg-white/90 px-5 py-5 ">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
@@ -2285,7 +2285,7 @@ export function Finance({
                       <div className="flex items-center gap-2">
                         <p className="text-[16px] font-semibold text-slate-900">{plan.name}</p>
                         {plan.ans_code && (
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider">ANS {plan.ans_code}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-normal">ANS {plan.ans_code}</span>
                         )}
                       </div>
                       {plan.operator_name && <p className="text-[13px] text-slate-500 mt-0.5">{plan.operator_name}</p>}
@@ -2298,7 +2298,7 @@ export function Finance({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={`w-2.5 h-2.5 rounded-full ${plan.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${plan.active ? 'bg-primary' : 'bg-slate-300'}`} />
                     <button onClick={() => handleDeleteInsurance(plan.id)} className="text-slate-300 hover:text-rose-500 transition-colors">
                       <Trash2 size={14} />
                     </button>
@@ -2359,12 +2359,12 @@ export function Finance({
               </div>
             )}
             {delinquencyRecords.filter(d => d.status !== 'PAID' && d.status !== 'WRITTEN_OFF').map(record => (
-              <div key={record.id} className="rounded-[24px] border border-slate-100 bg-white/90 px-5 py-5 shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
+              <div key={record.id} className="rounded-[24px] border border-slate-100 bg-white/90 px-5 py-5 ">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-[16px] font-semibold text-slate-900">{record.patient_name}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-normal ${
                         record.days_overdue > 60 ? 'bg-rose-100 text-rose-700' :
                         record.days_overdue > 30 ? 'bg-amber-100 text-amber-700' :
                         'bg-orange-100 text-orange-700'
@@ -2542,7 +2542,7 @@ export function Finance({
           <div className="space-y-4">
             {pixPayments.length === 0 && <p className="text-center text-slate-400 text-sm py-8">Nenhuma cobrança Pix gerada.</p>}
             {pixPayments.map(pix => (
-              <div key={pix.id} className="rounded-[24px] border border-slate-100 bg-white/90 px-5 py-5 shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
+              <div key={pix.id} className="rounded-[24px] border border-slate-100 bg-white/90 px-5 py-5 ">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-center gap-2">
@@ -2552,7 +2552,7 @@ export function Finance({
                         <Zap size={14} />
                       </div>
                       <p className="text-[16px] font-bold text-slate-900">{currency(Number(pix.amount))}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-normal ${
                         pix.status === 'PAID' ? 'bg-emerald-50 text-emerald-700' : pix.status === 'PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'
                       }`}>
                         {pix.status === 'PAID' ? 'Pago' : pix.status === 'PENDING' ? 'Aguardando' : pix.status === 'EXPIRED' ? 'Expirado' : 'Cancelado'}
@@ -2656,7 +2656,7 @@ export function Finance({
                     </p>
                   </div>
                   <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold ${selectedTransaction.type === 'EXPENSE' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                    <span className={`w-2 h-2 rounded-full ${selectedTransaction.type === 'EXPENSE' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                    <span className={`w-2 h-2 rounded-full ${selectedTransaction.type === 'EXPENSE' ? 'bg-rose-500' : 'bg-primary'}`} />
                     {selectedTransaction.type === 'EXPENSE' ? 'Saída' : 'Entrada'}
                   </span>
                 </div>

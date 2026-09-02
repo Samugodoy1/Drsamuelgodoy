@@ -164,7 +164,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
   const returnDate = returnDays !== null ? computeReturnDate(returnDays) : null;
 
   return (
-    <div className="fixed inset-0 bg-[#F7F7F8] z-50 flex flex-col font-sans antialiased">
+    <div className="fixed inset-0 bg-[#f5f5f7] z-50 flex flex-col font-sans antialiased">
       {/* ── Header ── */}
       <header className="ios-glass-heavy border-b border-slate-100/60 px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between shrink-0 safe-area-top shadow-[0_1px_3px_rgba(15,23,42,0.03)]">
         <div className="flex items-center gap-3 min-w-0">
@@ -192,7 +192,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
           <button
             onClick={handleSave}
             disabled={isSaving || inputText.trim() === ''}
-            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 px-5 sm:px-6 rounded-xl flex items-center gap-2 transition-all ios-press text-xs sm:text-sm shadow-[0_2px_8px_rgba(12,155,114,0.25)]"
+            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 px-5 sm:px-6 rounded-xl flex items-center gap-2 transition-all ios-press text-xs sm:text-sm shadow-[0_2px_8px_rgba(0,113,227,0.25)]"
           >
             {saved ? (
               <Check size={16} />
@@ -225,7 +225,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
                       onClick={() => applyShortcut(s)}
                       className={`text-left p-3 rounded-2xl border transition-all ios-press ${
                         isApplied
-                          ? 'bg-primary/[0.08] border-primary/30 shadow-[0_2px_8px_rgba(12,155,114,0.12)]'
+                          ? 'bg-primary/[0.08] border-primary/30 shadow-[0_2px_8px_rgba(0,113,227,0.12)]'
                           : 'bg-white/95 border-slate-100/80 hover:border-primary/20 shadow-[0_2px_8px_rgba(15,23,42,0.04)]'
                       }`}
                     >
@@ -343,7 +343,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
             transition={{ type: 'spring', damping: 22, stiffness: 300 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl text-white px-6 py-3.5 rounded-2xl shadow-[0_8px_30px_rgba(15,23,42,0.3)] flex items-center gap-2.5 z-[60]"
           >
-            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
               <Check size={11} className="text-white" />
             </div>
             <span className="text-[13px] font-semibold">Evolução confirmada e registrada</span>

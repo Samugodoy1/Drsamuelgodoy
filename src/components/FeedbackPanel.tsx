@@ -15,10 +15,10 @@ interface FeedbackPanelProps {
 const typeConfig = {
   success: {
     icon: CheckCircle2,
-    bgColor: 'from-[#34C759]/10 to-[#0C9B72]/10',
-    borderColor: 'border-[#0C9B72]/20',
-    accentColor: '#0C9B72',
-    textColor: 'text-[#0C9B72]',
+    bgColor: 'from-[#30d158]/10 to-[#0071e3]/10',
+    borderColor: 'border-[#0071e3]/20',
+    accentColor: '#0071e3',
+    textColor: 'text-[#0071e3]',
   },
   warning: {
     icon: AlertCircle,
@@ -29,17 +29,17 @@ const typeConfig = {
   },
   info: {
     icon: Info,
-    bgColor: 'from-[#007AFF]/10 to-[#5AC8FA]/10',
-    borderColor: 'border-[#007AFF]/20',
-    accentColor: '#007AFF',
-    textColor: 'text-[#007AFF]',
+    bgColor: 'from-[#0071e3]/10 to-[#5AC8FA]/10',
+    borderColor: 'border-[#0071e3]/20',
+    accentColor: '#0071e3',
+    textColor: 'text-[#0071e3]',
   },
   loading: {
     icon: Clock,
-    bgColor: 'from-[#8E8E93]/10 to-[#C7C7CC]/10',
-    borderColor: 'border-[#8E8E93]/20',
-    accentColor: '#8E8E93',
-    textColor: 'text-[#8E8E93]',
+    bgColor: 'from-[#86868b]/10 to-[#C7C7CC]/10',
+    borderColor: 'border-[#86868b]/20',
+    accentColor: '#86868b',
+    textColor: 'text-[#86868b]',
   },
 };
 
@@ -99,20 +99,20 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({
                   {title}
                 </h3>
                 {timestamp && (
-                  <span className="text-[12px] text-[#8E8E93] whitespace-nowrap">
+                  <span className="text-[12px] text-[#86868b] whitespace-nowrap">
                     {timestamp}
                   </span>
                 )}
               </div>
 
               {message && (
-                <p className="text-[#8E8E93] text-[13px] mt-1">
+                <p className="text-[#86868b] text-[13px] mt-1">
                   {message}
                 </p>
               )}
 
               {details && (
-                <div className="mt-2 text-[13px] text-[#8E8E93]">
+                <div className="mt-2 text-[13px] text-[#86868b]">
                   {details}
                 </div>
               )}
@@ -125,7 +125,7 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({
                   setIsVisible(false);
                   onClose();
                 }}
-                className="shrink-0 text-[#8E8E93] hover:text-[#1C1C1E] transition-colors p-1"
+                className="shrink-0 text-[#86868b] hover:text-[#1d1d1f] transition-colors p-1"
               >
                 <span className="text-[18px]">×</span>
               </button>

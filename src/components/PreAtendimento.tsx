@@ -244,7 +244,7 @@ export function PreAtendimento() {
   ];
 
   if (loading) return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white flex items-center justify-center">
+    <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         <p className="text-slate-500 font-medium">Carregando...</p>
@@ -253,8 +253,8 @@ export function PreAtendimento() {
   );
 
   if (error && !sessionToken) return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-white flex items-center justify-center px-6">
-      <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+    <div className="min-h-screen from-red-50 to-white flex items-center justify-center px-6">
+      <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center">
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertCircle size={32} className="text-red-500" />
         </div>
@@ -265,16 +265,16 @@ export function PreAtendimento() {
   );
 
   if (submitted) return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white flex items-center justify-center px-6">
+    <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center"
+        className="bg-white rounded-2xl p-8 max-w-md w-full text-center"
       >
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle2 size={40} className="text-emerald-600" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Tudo Pronto!</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Tudo pronto.</h2>
         <p className="text-slate-500 mb-2">Sua ficha de pré-atendimento foi enviada com sucesso.</p>
         <p className="text-slate-400 text-sm">
           {clinic?.clinic_name || 'A clínica'} já recebeu seus dados. Seu atendimento será muito mais rápido!
@@ -287,7 +287,7 @@ export function PreAtendimento() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50/30">
+    <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
@@ -314,14 +314,14 @@ export function PreAtendimento() {
           {steps.map((s, i) => (
             <div key={i} className="flex-1 flex items-center gap-1">
               <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-                i <= step ? 'bg-emerald-500' : 'bg-slate-200'
+                i <= step ? 'bg-primary' : 'bg-slate-200'
               }`} />
             </div>
           ))}
         </div>
         <div className="flex items-center gap-2 mb-6">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            step < steps.length ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-500 text-white'
+            step < steps.length ? 'bg-emerald-100 text-emerald-600' : 'bg-primary text-white'
           }`}>
             {React.createElement(steps[Math.min(step, steps.length - 1)].icon, { size: 16 })}
           </div>
@@ -402,7 +402,7 @@ export function PreAtendimento() {
               <div className="space-y-5">
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados do Paciente</p>
+                    <p className="text-xs font-normal text-slate-400">Dados do Paciente</p>
                     <p className="text-sm text-slate-500 mt-1">Complete as informações pessoais do paciente.</p>
                   </div>
                   <div>
@@ -437,7 +437,7 @@ export function PreAtendimento() {
 
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Contato de Emergência</p>
+                    <p className="text-xs font-normal text-slate-400">Contato de Emergência</p>
                     <p className="text-sm text-slate-500 mt-1">Pessoa a ser contatada em caso de urgência.</p>
                   </div>
                   <FormField
@@ -458,7 +458,7 @@ export function PreAtendimento() {
 
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Convênio</p>
+                    <p className="text-xs font-normal text-slate-400">Convênio</p>
                     <p className="text-sm text-slate-500 mt-1">Informações do plano de saúde, se houver.</p>
                   </div>
                   <FormField
@@ -482,7 +482,7 @@ export function PreAtendimento() {
                 <p className="text-sm text-slate-500 mb-4">
                   Envie exames, radiografias ou outros documentos relevantes para a consulta.
                 </p>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-8 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors">
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-8 cursor-pointer hover:border-primary hover:bg-[#f5f5f7] transition-colors">
                   <Upload size={32} className="text-slate-400 mb-2" />
                   <span className="text-sm text-slate-500 font-medium">Clique para selecionar arquivos</span>
                   <span className="text-xs text-slate-400 mt-1">PDF, imagens, até 50MB cada</span>
@@ -570,7 +570,7 @@ export function PreAtendimento() {
                       onClick={() => setSignatureMode('draw')}
                       className={`flex-1 h-11 rounded-xl text-sm font-semibold transition-colors ${
                         signatureMode === 'draw'
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-primary text-white'
                           : 'bg-slate-100 text-slate-600'
                       }`}
                     >
@@ -581,7 +581,7 @@ export function PreAtendimento() {
                       onClick={() => setSignatureMode('type')}
                       className={`flex-1 h-11 rounded-xl text-sm font-semibold transition-colors ${
                         signatureMode === 'type'
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-primary text-white'
                           : 'bg-slate-100 text-slate-600'
                       }`}
                     >
@@ -618,7 +618,7 @@ export function PreAtendimento() {
                         value={typedSignature}
                         onChange={(e) => setTypedSignature(e.target.value)}
                         placeholder="Digite seu nome completo"
-                        className="w-full px-4 py-3 h-[52px] bg-white border border-slate-200 rounded-xl text-lg text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                        className="w-full px-4 py-3 h-[52px] bg-white border border-slate-200 rounded-xl text-lg text-slate-800 placeholder-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                         style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive" }}
                       />
                       <p className="text-sm text-slate-500 mt-2 text-center">
@@ -700,8 +700,8 @@ export function PreAtendimento() {
               submitting
                 ? 'bg-slate-100 text-slate-400 cursor-wait'
                 : step === steps.length - 1
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  ? 'bg-primary text-white hover:bg-[#0077ed] '
+                  : 'bg-primary text-white hover:bg-[#0077ed]'
             }`}
           >
             {submitting ? (
@@ -732,7 +732,7 @@ function FormField({ label, placeholder, value, onChange, multiline = false, typ
   type?: string;
   inputMode?: string;
 }) {
-  const baseClass = "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-base text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100";
+  const baseClass = "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-base text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15";
 
   return (
     <div>
@@ -771,7 +771,7 @@ function ConsentCheckbox({ checked, onChange, title, description }: {
     }`}>
       <div className="pt-0.5">
         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-          checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'
+          checked ? 'bg-primary border-emerald-500' : 'border-slate-300'
         }`}>
           {checked && <CheckCircle2 size={14} className="text-white" />}
         </div>

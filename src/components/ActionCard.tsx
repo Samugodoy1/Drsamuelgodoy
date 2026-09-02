@@ -11,43 +11,35 @@ interface ActionCTAButton {
 
 interface ActionCardProps {
   icon: React.ReactNode;
-  label: string; // Ex: "Sua Próxima Consulta"
-  title: string; // Ex: "Terça, 10 de Junho"
-  subtitle?: string; // Ex: "10:30 com Dr(a). Samuel"
-  additionalInfo?: React.ReactNode; // Info extra
+  label: string;
+  title: string;
+  subtitle?: string;
+  additionalInfo?: React.ReactNode;
   primaryAction: ActionCTAButton;
   secondaryActions?: ActionCTAButton[];
   variant?: 'info' | 'success' | 'warning' | 'danger' | 'neutral';
   className?: string;
 }
 
-const variantStyles = {
-  info: 'from-[#007AFF]/5 to-[#5AC8FA]/5 border-[#007AFF]/20',
-  success: 'from-[#34C759]/5 to-[#0C9B72]/5 border-[#0C9B72]/20',
-  warning: 'from-[#FF9500]/5 to-[#FF8C00]/5 border-[#FF9500]/20',
-  danger: 'from-[#FF3B30]/5 to-[#FF1744]/5 border-[#FF3B30]/30',
-  neutral: 'from-white to-[#F9FAFB] border-white/80',
-};
-
-const variants_ColorAccent = {
-  info: '#007AFF',
-  success: '#0C9B72',
+const accent: Record<NonNullable<ActionCardProps['variant']>, string> = {
+  info: '#0071e3',
+  success: '#30d158',
   warning: '#FF9500',
-  danger: '#FF3B30',
-  neutral: '#8E8E93',
+  danger: '#ff3b30',
+  neutral: '#86868b',
 };
 
 const getButtonStyles = (variant: ActionCTAButton['variant'] = 'secondary') => {
   switch (variant) {
     case 'primary':
-      return 'bg-gradient-to-r from-[#007AFF] to-[#5AC8FA] text-white hover:opacity-90 active:scale-95';
+      return 'bg-[#0071e3] text-white hover:bg-[#0077ed]';
     case 'danger':
-      return 'bg-gradient-to-r from-[#FF3B30] to-[#FF1744] text-white hover:opacity-90 active:scale-95';
+      return 'bg-[#ff3b30] text-white hover:opacity-90';
     case 'secondary':
-      return 'bg-white/60 text-[#007AFF] border border-[#007AFF]/20 hover:bg-white/80 active:scale-95';
+      return 'bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed]';
     case 'tertiary':
     default:
-      return 'text-[#8E8E93] hover:text-[#1C1C1E] font-medium transition-colors';
+      return 'text-[#2997ff] bg-transparent';
   }
 };
 
@@ -62,99 +54,72 @@ export const ActionCard: React.FC<ActionCardProps> = ({
   variant = 'neutral',
   className = '',
 }) => {
+  const color = accent[variant];
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${variantStyles[variant]} backdrop-blur-xl group transition-all duration-300 ${className}`}
+      transition={{ duration: 0.35 }}
+      className={`bg-white rounded-[28px] ${className}`}
     >
-      {/* Background gradient blob */}
-      <div
-        className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-60 group-hover:opacity-100 transition-opacity duration-500"
-        style={{
-          backgroundColor: `${variants_ColorAccent[variant]}20`,
-        }}
-      />
-      <div
-        className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-3xl opacity-40"
-        style={{
-          backgroundColor: `${variants_ColorAccent[variant]}10`,
-        }}
-      />
-
-      {/* Content */}
-      <div className="relative z-10 p-8 sm:p-10">
-        {/* Header with icon */}
+      <div className="p-8 sm:p-10">
         <div className="flex items-start gap-4 mb-6">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
-            style={{
-              backgroundColor: `${variants_ColorAccent[variant]}15`,
-            }}
+            className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-[#f5f5f7]"
           >
             {React.cloneElement(icon as React.ReactElement, {
-              size: 24,
-              color: variants_ColorAccent[variant],
+              size: 22,
+              color,
+              strokeWidth: 1.5,
             })}
           </div>
-          <div className="flex-1 min-w-0">
-            <p
-              className="text-[12px] font-bold uppercase tracking-wider"
-              style={{ color: variants_ColorAccent[variant] }}
-            >
+          <div className="flex-1 min-w-0 pt-1">
+            <p className="text-[13px] font-normal text-[#86868b] tracking-[-0.011em]">
               {label}
             </p>
           </div>
         </div>
 
-        {/* Title */}
-        <h2 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight leading-tight">
+        <h2 className="apple-display-ink text-[28px]">
           {title}
         </h2>
 
-        {/* Subtitle */}
         {subtitle && (
-          <p className="text-[#8E8E93] text-[15px] mt-3 font-medium">
+          <p className="apple-subhead text-[17px] mt-3">
             {subtitle}
           </p>
         )}
 
-        {/* Additional Info */}
         {additionalInfo && (
           <div className="mt-5 space-y-2">
             {additionalInfo}
           </div>
         )}
 
-        {/* Actions */}
-        <div className="mt-6 space-y-3">
-          {/* Primary Action */}
+        <div className="mt-8 space-y-3">
           <motion.button
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.98 }}
             onClick={primaryAction.onClick}
             disabled={primaryAction.loading}
-            className={`w-full h-12 px-5 rounded-full text-[15px] font-semibold tracking-tight transition-all flex items-center justify-center gap-2 ${getButtonStyles(primaryAction.variant)} disabled:opacity-60 disabled:cursor-not-allowed`}
+            className={`w-full py-3 px-[22px] rounded-[980px] text-[17px] font-normal tracking-[-0.022em] transition-colors flex items-center justify-center gap-2 ${getButtonStyles(primaryAction.variant)} disabled:opacity-60 disabled:cursor-not-allowed`}
           >
             {primaryAction.icon}
-            {primaryAction.loading ? 'Aguarde...' : primaryAction.label}
+            {primaryAction.loading ? 'Aguarde' : primaryAction.label}
           </motion.button>
 
-          {/* Secondary Actions */}
           {secondaryActions && secondaryActions.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-white/20">
+            <div className="space-y-2 pt-2">
               {secondaryActions.map((action, idx) => (
                 <motion.button
                   key={idx}
-                  whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={action.onClick}
                   disabled={action.loading}
-                  className={`w-full h-11 px-4 rounded-full text-[14px] font-medium transition-all flex items-center justify-center gap-2 ${getButtonStyles(action.variant)} disabled:opacity-60 disabled:cursor-not-allowed`}
+                  className={`w-full py-3 px-4 rounded-[980px] text-[17px] font-normal transition-colors flex items-center justify-center gap-2 ${getButtonStyles(action.variant)} disabled:opacity-60 disabled:cursor-not-allowed`}
                 >
                   {action.icon}
-                  {action.loading ? 'Aguarde...' : action.label}
+                  {action.loading ? 'Aguarde' : action.label}
                 </motion.button>
               ))}
             </div>

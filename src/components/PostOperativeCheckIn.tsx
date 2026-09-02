@@ -197,7 +197,7 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   onClick={() => setStage(stage === 'symptoms' ? 'feeling' : 'symptoms')}
                   className="p-2 hover:bg-white/50 rounded-full transition"
                 >
-                  <ChevronLeft size={20} className="text-[#1C1C1E]" />
+                  <ChevronLeft size={20} className="text-[#1d1d1f]" />
                 </button>
               )}
               <h2 className="text-[#FF9500] text-[13px] font-bold uppercase tracking-wider flex-1">
@@ -205,10 +205,10 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
               </h2>
               {stage !== 'feeling' && <div className="w-6" />}
             </div>
-            <p className="text-[#1C1C1E] text-[16px] font-semibold">
+            <p className="text-[#1d1d1f] text-[16px] font-semibold">
               Após {procedure}
             </p>
-            <p className="text-[#8E8E93] text-[13px] mt-1">
+            <p className="text-[#86868b] text-[13px] mt-1">
               Você realizou {getRecoveryMessage()}
             </p>
           </div>
@@ -225,7 +225,7 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-4"
                 >
-                  <p className="text-[#1C1C1E] text-[15px] leading-relaxed">
+                  <p className="text-[#1d1d1f] text-[15px] leading-relaxed">
                     Está tudo bem com você?
                   </p>
 
@@ -235,14 +235,14 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                       whileHover={{ y: -2 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleFeelingResponse(true)}
-                      className="w-full p-4 rounded-2xl border-2 border-transparent bg-[#F2F2F7] hover:border-[#0C9B72] hover:bg-[#0C9B72]/5 transition-all flex items-center gap-3"
+                      className="w-full p-4 rounded-2xl border-2 border-transparent bg-[#f5f5f7] hover:border-[#0071e3] hover:bg-[#0071e3]/5 transition-all flex items-center gap-3"
                     >
                       <span className="text-2xl">😊</span>
                       <div className="text-left flex-1">
-                        <p className="text-[#1C1C1E] text-[15px] font-semibold">Sim, estou bem</p>
-                        <p className="text-[#8E8E93] text-[12px]">Recuperação normal</p>
+                        <p className="text-[#1d1d1f] text-[15px] font-semibold">Sim, estou bem</p>
+                        <p className="text-[#86868b] text-[12px]">Recuperação normal</p>
                       </div>
-                      <CheckCircle2 size={20} className="text-[#0C9B72]" />
+                      <CheckCircle2 size={20} className="text-[#0071e3]" />
                     </motion.button>
 
                     {/* Negative Response */}
@@ -250,12 +250,12 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                       whileHover={{ y: -2 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleFeelingResponse(false)}
-                      className="w-full p-4 rounded-2xl border-2 border-transparent bg-[#F2F2F7] hover:border-[#FF3B30] hover:bg-[#FF3B30]/5 transition-all flex items-center gap-3"
+                      className="w-full p-4 rounded-2xl border-2 border-transparent bg-[#f5f5f7] hover:border-[#FF3B30] hover:bg-[#FF3B30]/5 transition-all flex items-center gap-3"
                     >
                       <span className="text-2xl">😕</span>
                       <div className="text-left flex-1">
-                        <p className="text-[#1C1C1E] text-[15px] font-semibold">Não, tenho um problema</p>
-                        <p className="text-[#8E8E93] text-[12px]">Quero reportar algo</p>
+                        <p className="text-[#1d1d1f] text-[15px] font-semibold">Não, tenho um problema</p>
+                        <p className="text-[#86868b] text-[12px]">Quero reportar algo</p>
                       </div>
                       <AlertCircle size={20} className="text-[#FF3B30]" />
                     </motion.button>
@@ -272,7 +272,7 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-3"
                 >
-                  <p className="text-[#1C1C1E] text-[15px] leading-relaxed mb-4">
+                  <p className="text-[#1d1d1f] text-[15px] leading-relaxed mb-4">
                     O que você está sentindo?
                   </p>
 
@@ -287,10 +287,10 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                           ? 'border-[#FF3B30]/30 hover:border-[#FF3B30] bg-[#FF3B30]/5'
                           : option.severity === 'moderate'
                           ? 'border-[#FF9500]/30 hover:border-[#FF9500] bg-[#FF9500]/5'
-                          : 'border-[#E5E5EA] hover:border-[#0C9B72] bg-[#F2F2F7]'
+                          : 'border-[#E5E5EA] hover:border-[#0071e3] bg-[#f5f5f7]'
                       }`}
                     >
-                      <p className="text-[#1C1C1E] text-[14px] font-semibold">{option.label}</p>
+                      <p className="text-[#1d1d1f] text-[14px] font-semibold">{option.label}</p>
                     </motion.button>
                   ))}
                 </motion.div>
@@ -309,14 +309,14 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   <div className={`rounded-2xl p-4 mb-6 ${
                     !getSmartGuidance().isNormal
                       ? 'bg-[#FF3B30]/10 border border-[#FF3B30]/30'
-                      : 'bg-[#0C9B72]/10 border border-[#0C9B72]/30'
+                      : 'bg-[#0071e3]/10 border border-[#0071e3]/30'
                   }`}>
                     <p className={`text-[14px] font-semibold ${
-                      !getSmartGuidance().isNormal ? 'text-[#FF3B30]' : 'text-[#0C9B72]'
+                      !getSmartGuidance().isNormal ? 'text-[#FF3B30]' : 'text-[#0071e3]'
                     }`}>
                       {getSmartGuidance().title}
                     </p>
-                    <p className="text-[#1C1C1E] text-[13px] mt-2 leading-relaxed">
+                    <p className="text-[#1d1d1f] text-[13px] mt-2 leading-relaxed">
                       {getSmartGuidance().message}
                     </p>
                   </div>
@@ -331,16 +331,16 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                         disabled={isSubmitting}
                         className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
                           action.primary
-                            ? 'border-[#0C9B72] bg-[#0C9B72]/10 hover:bg-[#0C9B72]/20'
-                            : 'border-[#E5E5EA] bg-[#F2F2F7] hover:border-[#0C9B72]'
+                            ? 'border-[#0071e3] bg-[#0071e3]/10 hover:bg-[#0071e3]/20'
+                            : 'border-[#E5E5EA] bg-[#f5f5f7] hover:border-[#0071e3]'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         <p className={`text-[15px] font-semibold ${
-                          action.primary ? 'text-[#0C9B72]' : 'text-[#1C1C1E]'
+                          action.primary ? 'text-[#0071e3]' : 'text-[#1d1d1f]'
                         }`}>
                           {action.label}
                         </p>
-                        <p className="text-[#8E8E93] text-[12px] mt-1">{action.description}</p>
+                        <p className="text-[#86868b] text-[12px] mt-1">{action.description}</p>
                       </motion.button>
                     ))}
                   </div>
@@ -367,12 +367,12 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                       }}
                     >
                       {symptomData?.isComfortable ? (
-                        <div className="w-16 h-16 bg-[#0C9B72]/20 rounded-full flex items-center justify-center">
-                          <CheckCircle2 size={32} className="text-[#0C9B72]" />
+                        <div className="w-16 h-16 bg-[#0071e3]/20 rounded-full flex items-center justify-center">
+                          <CheckCircle2 size={32} className="text-[#0071e3]" />
                         </div>
                       ) : (
-                        <div className="w-16 h-16 bg-[#0C9B72]/20 rounded-full flex items-center justify-center">
-                          <Heart size={32} className="text-[#0C9B72]" />
+                        <div className="w-16 h-16 bg-[#0071e3]/20 rounded-full flex items-center justify-center">
+                          <Heart size={32} className="text-[#0071e3]" />
                         </div>
                       )}
                     </motion.div>
@@ -381,8 +381,8 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   {symptomData?.isComfortable ? (
                     <>
                       <div>
-                        <h3 className="text-[#1C1C1E] text-[18px] font-bold">Que alívio!</h3>
-                        <p className="text-[#8E8E93] text-[14px] mt-2">
+                        <h3 className="text-[#1d1d1f] text-[18px] font-bold">Que alívio!</h3>
+                        <p className="text-[#86868b] text-[14px] mt-2">
                           Sua recuperação está indo bem. Continue seguindo as orientações e nos contacte se surgir qualquer dúvida.
                         </p>
                       </div>
@@ -390,10 +390,10 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   ) : (
                     <>
                       <div>
-                        <h3 className="text-[#1C1C1E] text-[18px] font-bold">
+                        <h3 className="text-[#1d1d1f] text-[18px] font-bold">
                           {symptomData?.severity === 'severe' ? 'Já estamos aqui para você' : 'Recebemos seu relato'}
                         </h3>
-                        <p className="text-[#8E8E93] text-[14px] mt-2">
+                        <p className="text-[#86868b] text-[14px] mt-2">
                           {symptomData?.severity === 'severe'
                             ? 'A clínica está acompanhando. Entraremos em contato nos próximos minutos.'
                             : getSmartGuidance().message}
@@ -406,7 +406,7 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={onClose}
-                    className="w-full h-12 rounded-full bg-[#0C9B72] text-white text-[15px] font-semibold transition-all hover:opacity-90"
+                    className="w-full h-12 rounded-full bg-[#0071e3] text-white text-[15px] font-semibold transition-all hover:opacity-90"
                   >
                     {'Voltar ao portal'}
                   </motion.button>

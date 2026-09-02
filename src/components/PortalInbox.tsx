@@ -213,7 +213,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
                         }
                       }}
                       disabled={updatingId === req.id}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-[#0077ed] transition-colors disabled:opacity-50"
                     >
                       <Check size={13} /> Aprovar e Agendar
                     </button>
@@ -273,7 +273,7 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
                 {threadMessages.map(msg => (
                   <div key={msg.id} className={`flex ${msg.sender === 'dentist' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                      msg.sender === 'dentist' ? 'bg-emerald-600 text-white rounded-br-md' : 'bg-white text-slate-800 rounded-bl-md shadow-sm border border-slate-100'
+                      msg.sender === 'dentist' ? 'bg-primary text-white rounded-br-md' : 'bg-white text-slate-800 rounded-bl-md shadow-sm border border-slate-100'
                     }`}>
                       <p className="whitespace-pre-wrap">{msg.message}</p>
                       <p className={`text-[10px] mt-1 ${msg.sender === 'dentist' ? 'text-white/60' : 'text-slate-400'}`}>
@@ -288,10 +288,10 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
                   type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSendReply(); }}
                   placeholder="Responder..."
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-emerald-300"
+                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary"
                 />
                 <button onClick={handleSendReply} disabled={!replyText.trim() || sendingReply}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-30">
+                  className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-[#0077ed] transition-colors disabled:opacity-30">
                   Enviar
                 </button>
               </div>

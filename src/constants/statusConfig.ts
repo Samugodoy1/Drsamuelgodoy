@@ -10,9 +10,9 @@ export const APPOINTMENT_STATUS_CONFIG = {
   SCHEDULED: {
     label: 'Agendado',
     description: 'Requer confirmação',
-    color: 'bg-[#007AFF]/10 text-[#007AFF]',
-    borderColor: 'border-[#007AFF]/20',
-    bgLight: 'bg-[#007AFF]/5',
+    color: 'bg-[#0071e3]/10 text-[#0071e3]',
+    borderColor: 'border-[#0071e3]/20',
+    bgLight: 'bg-[#0071e3]/5',
     icon: 'Clock',
     showAction: true,
     actionPrimary: 'Confirmar',
@@ -22,9 +22,9 @@ export const APPOINTMENT_STATUS_CONFIG = {
   CONFIRMED: {
     label: 'Confirmado',
     description: 'Presença confirmada',
-    color: 'bg-[#34C759]/10 text-[#34C759]',
-    borderColor: 'border-[#34C759]/20',
-    bgLight: 'bg-[#34C759]/5',
+    color: 'bg-[#30d158]/10 text-[#30d158]',
+    borderColor: 'border-[#30d158]/20',
+    bgLight: 'bg-[#30d158]/5',
     icon: 'CheckCircle2',
     showAction: false,
     successMessage: 'Presença confirmada ✓',
@@ -41,9 +41,9 @@ export const APPOINTMENT_STATUS_CONFIG = {
   FINISHED: {
     label: 'Finalizado',
     description: 'Consulta realizada',
-    color: 'bg-[#E5E5EA] text-[#8E8E93]',
-    borderColor: 'border-[#E5E5EA]',
-    bgLight: 'bg-[#F2F2F7]',
+    color: 'bg-[#f5f5f7] text-[#86868b]',
+    borderColor: 'border-[#d2d2d7]',
+    bgLight: 'bg-[#f5f5f7]',
     icon: 'CheckCircle',
     showAction: false,
     opacity: 'opacity-40',
@@ -82,9 +82,9 @@ export function getStatusConfig(status: string) {
   if (!config) {
     return {
       label: status,
-      color: 'bg-[#E5E5EA] text-[#8E8E93]',
-      borderColor: 'border-[#E5E5EA]',
-      bgLight: 'bg-[#F2F2F7]',
+      color: 'bg-[#f5f5f7] text-[#86868b]',
+      borderColor: 'border-[#d2d2d7]',
+      bgLight: 'bg-[#f5f5f7]',
       showAction: false,
     };
   }
@@ -103,7 +103,7 @@ export function statusRequiresAction(status: string): boolean {
  * Get status countdown label (visual indicator for urgency)
  */
 export function getCountdownLabel(daysUntil: number, hoursUntil: number): string {
-  if (daysUntil <= 0) return 'Hoje!';
+  if (daysUntil <= 0) return 'Hoje';
   if (daysUntil === 1) return hoursUntil <= 24 ? `Em ${hoursUntil}h` : 'Amanhã';
   return `Em ${daysUntil} dias`;
 }
@@ -114,5 +114,5 @@ export function getCountdownLabel(daysUntil: number, hoursUntil: number): string
 export function getCountdownColor(daysUntil: number): string {
   if (daysUntil <= 1) return 'bg-[#FF9500]/10 text-[#FF9500]';
   if (daysUntil <= 3) return 'bg-[#FF9500]/10 text-[#FF9500]';
-  return 'bg-[#007AFF]/10 text-[#007AFF]';
+  return 'bg-[#0071e3]/10 text-[#0071e3]';
 }

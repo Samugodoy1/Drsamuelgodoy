@@ -46,7 +46,6 @@ import {
   Mail,
   Download,
   LinkIcon,
-  BookOpen
 } from './icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
@@ -66,7 +65,6 @@ import { SubscriptionManagement } from './components/SubscriptionManagement';
 import AdminEngagement from './components/AdminEngagement';
 import { SubscriptionCallback } from './components/SubscriptionCallback';
 import GoogleSignInButton from './components/GoogleSignInButton';
-import { Academy, AcademyPatients, AcademyAgenda, AcademyStudy, AcademyChecklist } from './components/Academy';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 import {
   WEEK_HOUR_HEIGHT,
@@ -303,14 +301,14 @@ const SidebarItem = ({ id, icon: Icon, label, activeTab, setActiveTab, setIsSide
       setIsSidebarOpen(false);
       navigate('/');
     }}
-    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
-      activeTab === id 
-        ? 'bg-white text-primary shadow-sm' 
-        : 'text-slate-500 hover:text-slate-900'
+    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-full transition-colors duration-200 ${
+      activeTab === id
+        ? 'bg-[#f5f5f7] text-[#1d1d1f]'
+        : 'text-[#86868b] hover:text-[#1d1d1f]'
     }`}
   >
-    <Icon size={20} className="shrink-0" />
-    <span className="font-medium tablet-l:hidden desktop:block whitespace-nowrap">{label}</span>
+    <Icon size={20} strokeWidth={activeTab === id ? 1.75 : 1.5} className="shrink-0" />
+    <span className="font-normal text-[15px] tracking-[-0.011em] tablet-l:hidden desktop:block whitespace-nowrap">{label}</span>
   </button>
 );
 
@@ -320,14 +318,14 @@ const BottomNavItem = ({ id, icon: Icon, label, activeTab, setActiveTab, navigat
       setActiveTab(id);
       navigate('/');
     }}
-    className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all ${
-      activeTab === id 
-        ? 'text-primary' 
-        : 'text-[#8E8E93]'
+    className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors ${
+      activeTab === id
+        ? 'text-[#1d1d1f]'
+        : 'text-[#86868b]'
     }`}
   >
-    <Icon size={24} className={activeTab === id ? 'stroke-[2.5px]' : 'stroke-[1.5px]'} />
-    <span className={`text-[10px] font-semibold ${activeTab === id ? 'opacity-100' : 'opacity-80'}`}>{label}</span>
+    <Icon size={22} strokeWidth={activeTab === id ? 1.75 : 1.25} />
+    <span className="text-[10px] font-normal tracking-[-0.01em]">{label}</span>
   </button>
 );
 
@@ -371,7 +369,7 @@ const StatusBadge = ({ app, now }: { app: Appointment; now: Date }) => {
   }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${style}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-normal tracking-[-0.011em] border ${style}`}>
       {icon}
       {label}
     </span>
@@ -899,8 +897,6 @@ export default function App() {
       setAgendaFocusMode(false);
     }
   }, [activeTab, agendaFocusMode, hasUpcomingToday]);
-
-  const [academyView, setAcademyView] = useState<'home' | 'pacientes' | 'agenda' | 'estudos' | 'checklist'>('home');
 
   const getCurrentProduct = useCallback((): Product => {
     return activeTab === 'academy' ? ACADEMY_PRODUCT : ODONTOHUB_PRODUCT;
@@ -2340,7 +2336,7 @@ export default function App() {
     const attentionStatusMap: Record<AttentionKey, { key: AttentionKey; label: string; dot: string; tone: string }> = {
       'overdue':    { key: 'overdue',    label: 'Sem visita há tempo', dot: 'bg-rose-500',    tone: 'text-rose-700 bg-rose-50 border-rose-100' },
       'review':     { key: 'review',     label: 'Revisão próxima', dot: 'bg-amber-400',   tone: 'text-amber-700 bg-amber-50 border-amber-100' },
-      'up-to-date': { key: 'up-to-date', label: 'Em dia',          dot: 'bg-emerald-500', tone: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+      'up-to-date': { key: 'up-to-date', label: 'Em dia',          dot: 'bg-primary', tone: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
       'lead':       { key: 'lead',       label: 'Lead',            dot: 'bg-violet-500',  tone: 'text-violet-700 bg-violet-50 border-violet-100' },
     };
 
@@ -3081,7 +3077,7 @@ export default function App() {
       <Route path="/pre-atendimento/:token" element={<PreAtendimento />} />
       <Route path="/prontuario/:id" element={
         user ? (
-          <div className="min-h-screen bg-[#F7F7F8] flex font-sans text-slate-900 relative overflow-x-hidden">
+          <div className="min-h-screen bg-[#f5f5f7] flex font-sans text-slate-900 relative overflow-x-hidden">
             {/* Mobile Sidebar Overlay */}
             <AnimatePresence>
               {isSidebarOpen && (
@@ -3100,19 +3096,14 @@ export default function App() {
               ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 tablet-l:w-20 desktop:w-72'}
             `}>
               <div className="flex items-center justify-between mb-10 px-2">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0">
-                    <Plus size={24} strokeWidth={3} />
-                  </div>
-                  <div className="tablet-l:hidden desktop:block">
-                    <h1 className="text-xl font-bold tracking-tight text-slate-800 whitespace-nowrap">OdontoHub</h1>
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <h1 className="text-[21px] font-semibold tracking-[-0.025em] text-[#1d1d1f] whitespace-nowrap">OdontoHub</h1>
                     {getProductAccess('odontohub')?.plan && getProductAccess('odontohub')?.plan !== 'free' && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      <span className="text-[11px] text-[#86868b]">
                         {getProductAccess('odontohub')?.plan}
                       </span>
                     )}
                   </div>
-                </div>
                 <button onClick={() => setIsSidebarOpen(false)} className="tablet-l:hidden text-slate-400">
                   <Plus size={24} className="rotate-45" />
                 </button>
@@ -3123,7 +3114,6 @@ export default function App() {
                 <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-                <SidebarItem id="inteligencia" icon={Sparkles} label="Inteligência ML" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
                 <SidebarItem id="configuracoes" icon={Settings} label="Configurações" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
               </nav>
             </aside>
@@ -3170,50 +3160,50 @@ export default function App() {
       } />
       <Route path="*" element={
         !user ? (
-          <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-sans antialiased">
+          <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 font-sans antialiased">
             <motion.div
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-[372px]"
+              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-[400px]"
             >
-              {/* Heading */}
               <motion.div
-                className="mb-11"
-                initial={{ opacity: 0, y: 6 }}
+                className="mb-12"
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ delay: 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               >
-                <h1 className="text-[26px] font-semibold text-[#0F1211] tracking-[-0.4px] leading-[1.2] mb-2.5">
-                  {isRegistering ? 'Crie sua conta gratuita' : (() => {
+                <p className="text-[12px] text-[#86868b] tracking-[0.08em] mb-6">OdontoHub</p>
+                <h1 className="apple-display-ink text-[40px] sm:text-[44px] mb-3">
+                  {isRegistering ? 'Crie sua conta.' : (() => {
                     const h = new Date().getHours();
-                    if (h >= 5 && h < 12) return 'Bom dia ☀️ Vamos organizar sua clínica?';
-                    if (h >= 12 && h < 18) return 'Boa tarde 👋🏻 Pronto para mais um turno?';
-                    return 'Boa noite 🌙 Vamos revisar o dia de hoje?';
+                    if (h >= 5 && h < 12) return 'Bom dia.';
+                    if (h >= 12 && h < 18) return 'Boa tarde.';
+                    return 'Boa noite.';
                   })()}
                 </h1>
-                <p className="text-[15px] text-[#8B918E] leading-relaxed">
-                  {isRegistering ? 'Preencha os dados para enviar sua solicitação' : 'Acesse sua clínica com segurança'}
+                <p className="apple-subhead text-[17px]">
+                  {isRegistering ? 'Leva um minuto.' : 'Entre na sua clínica.'}
                 </p>
               </motion.div>
 
               <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-5">
                 {isRegistering && (
                   <div>
-                    <label className="block text-[13px] font-medium text-[#4B5250] mb-2">Nome completo</label>
+                    <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Nome completo</label>
                     <input
                       type="text"
                       required
                       placeholder="Dr. João Silva"
                       value={registerData.name}
                       onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
-                      className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+                      className="ios-input w-full h-[48px] text-[17px]"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-[13px] font-medium text-[#4B5250] mb-2">E-mail</label>
+                  <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">E-mail</label>
                   <input
                     type="email"
                     required
@@ -3223,17 +3213,17 @@ export default function App() {
                       ? setRegisterData({...registerData, email: e.target.value})
                       : setLoginData({...loginData, email: e.target.value})
                     }
-                    className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+                    className="ios-input w-full h-[48px] text-[17px]"
                   />
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-[13px] font-medium text-[#4B5250]">Senha</label>
+                    <label className="text-[13px] font-medium text-[#6e6e73]">Senha</label>
                     {!isRegistering && (
                       <Link
                         to="/forgot-password"
-                        className="text-[12px] text-[#A3AAA7] hover:text-[#6B7270] transition-colors duration-200"
+                        className="text-[13px] text-[#2997ff] hover:underline underline-offset-2"
                       >
                         Esqueci a senha
                       </Link>
@@ -3248,7 +3238,7 @@ export default function App() {
                       ? setRegisterData({...registerData, password: e.target.value})
                       : setLoginData({...loginData, password: e.target.value})
                     }
-                    className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+                    className="ios-input w-full h-[48px] text-[17px]"
                   />
                 </div>
 
@@ -3268,7 +3258,7 @@ export default function App() {
                     initial={{ opacity: 0, y: -2 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="text-[13px] text-[#2E6B53]"
+                    className="text-[13px] text-[#0071e3]"
                   >
                     {registerMessage}
                   </motion.p>
@@ -3286,13 +3276,13 @@ export default function App() {
                           acceptedTerms: e.target.checked,
                           acceptedPrivacyPolicy: e.target.checked
                         })}
-                        className="mt-[3px] w-3.5 h-3.5 rounded-[4px] border-[#D1D5DB] text-[#2E6B53] focus:ring-0 cursor-pointer shrink-0"
+                        className="mt-[3px] w-3.5 h-3.5 rounded-[4px] border-[#D1D5DB] text-[#0071e3] focus:ring-0 cursor-pointer shrink-0"
                       />
-                      <span className="text-[13px] text-[#6B7270] leading-snug">
+                      <span className="text-[13px] text-[#6e6e73] leading-snug">
                         Li e concordo com os{' '}
-                        <Link to="/termos" target="_blank" className="text-[#0F1211] underline underline-offset-2 decoration-[#D1D5DB] hover:decoration-[#0F1211] transition-[text-decoration-color] duration-200">Termos de Uso</Link>
+                        <Link to="/termos" target="_blank" className="text-[#1d1d1f] underline underline-offset-2 decoration-[#D1D5DB] hover:decoration-[#1d1d1f] transition-[text-decoration-color] duration-200">Termos de Uso</Link>
                         {' '}e a{' '}
-                        <Link to="/privacidade" target="_blank" className="text-[#0F1211] underline underline-offset-2 decoration-[#D1D5DB] hover:decoration-[#0F1211] transition-[text-decoration-color] duration-200">Política de Privacidade</Link>.
+                        <Link to="/privacidade" target="_blank" className="text-[#1d1d1f] underline underline-offset-2 decoration-[#D1D5DB] hover:decoration-[#1d1d1f] transition-[text-decoration-color] duration-200">Política de Privacidade</Link>.
                       </span>
                     </label>
                     <label className="flex items-start gap-2.5 cursor-pointer">
@@ -3301,9 +3291,9 @@ export default function App() {
                         required
                         checked={registerData.acceptedResponsibility}
                         onChange={(e) => setRegisterData({...registerData, acceptedResponsibility: e.target.checked})}
-                        className="mt-[3px] w-3.5 h-3.5 rounded-[4px] border-[#D1D5DB] text-[#2E6B53] focus:ring-0 cursor-pointer shrink-0"
+                        className="mt-[3px] w-3.5 h-3.5 rounded-[4px] border-[#D1D5DB] text-[#0071e3] focus:ring-0 cursor-pointer shrink-0"
                       />
-                      <span className="text-[13px] text-[#6B7270] leading-snug">
+                      <span className="text-[13px] text-[#6e6e73] leading-snug">
                         Declaro que sou responsável legal pelos dados dos pacientes cadastrados.
                       </span>
                     </label>
@@ -3316,18 +3306,18 @@ export default function App() {
                     whileHover={{ scale: 1.005 }}
                     whileTap={{ scale: 0.98 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
-                    className="w-full h-[48px] bg-[#264E36] hover:bg-[#1E4230] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(38,78,54,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(38,78,54,0.14),0_1px_2px_rgba(0,0,0,0.04)] transition-[background-color,box-shadow] duration-[160ms] ease-in-out"
+                    className="w-full apple-btn border-0 cursor-pointer"
                     style={{ willChange: 'transform' }}
                   >
                     {isRegistering ? 'Criar conta' : 'Continuar'}
                   </motion.button>
-                  <p className="text-center text-[11px] text-[#C0C7C3] mt-3.5">Ambiente seguro · Dados criptografados</p>
+                  <p className="text-center text-[12px] text-[#86868b] mt-4">Dados protegidos.</p>
                 </div>
 
                 <div className="flex items-center gap-3 pt-1">
-                  <div className="h-px flex-1 bg-[#E5E8E7]" />
-                  <span className="text-[12px] text-[#A3AAA7]">ou</span>
-                  <div className="h-px flex-1 bg-[#E5E8E7]" />
+                  <div className="h-px flex-1 bg-[#d2d2d7]" />
+                  <span className="text-[12px] text-[#86868b]">ou</span>
+                  <div className="h-px flex-1 bg-[#d2d2d7]" />
                 </div>
 
                 <GoogleSignInButton
@@ -3347,22 +3337,22 @@ export default function App() {
                     }}
                     whileTap={{ scale: 0.97 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="text-[13px] text-[#8B918E] hover:text-[#4B5250] transition-colors duration-200"
+                    className="text-[17px] text-[#2997ff]"
                   >
-                    {isRegistering ? 'Já tem uma conta? Entrar' : 'Não tem conta? Cadastre-se'}
+                    {isRegistering ? 'Já tem conta? Entrar ›' : 'Não tem conta? Cadastre-se ›'}
                   </motion.button>
                 </div>
 
-                <div className="flex justify-center items-center gap-3 text-[11px] text-[#C0C7C3]">
-                  <Link to="/termos" className="hover:text-[#8B918E] transition-colors duration-200">Termos</Link>
-                  <span>·</span>
-                  <Link to="/privacidade" className="hover:text-[#8B918E] transition-colors duration-200">Privacidade</Link>
+                <div className="flex justify-center items-center gap-3 text-[11px] text-[#86868b]">
+                  <Link to="/termos" className="text-[#2997ff]">Termos</Link>
+                  <span className="text-[#d2d2d7]">·</span>
+                  <Link to="/privacidade" className="text-[#2997ff]">Privacidade</Link>
                 </div>
               </div>
             </motion.div>
           </div>
         ) : (
-          <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-slate-900 relative overflow-x-hidden">
+          <div className="min-h-screen bg-[#f5f5f7] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -3383,10 +3373,7 @@ export default function App() {
       `}>
         <div className="flex items-center justify-between mb-10 px-2">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-md shadow-primary/10 shrink-0">
-              <Plus size={24} strokeWidth={3} />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 whitespace-nowrap tablet-l:hidden desktop:block">OdontoHub</h1>
+            <h1 className="text-[21px] font-semibold tracking-[-0.025em] text-[#1d1d1f] whitespace-nowrap tablet-l:hidden desktop:block">OdontoHub</h1>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="tablet-l:hidden text-slate-400">
             <Plus size={24} className="rotate-45" />
@@ -3397,12 +3384,8 @@ export default function App() {
           <SidebarItem id="dashboard" icon={Home} label="Início" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="agenda" icon={Calendar} label="Agenda" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          {hasApprovedProductAccess(ACADEMY_PRODUCT) && (
-            <SidebarItem id="academy" icon={BookOpen} label="Academy" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          )}
           <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          <SidebarItem id="inteligencia" icon={Sparkles} label="Inteligência ML" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           {user?.role?.toUpperCase() === 'ADMIN' && (
             <SidebarItem id="admin" icon={UserCog} label="Gestão de Dentistas" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
           )}
@@ -3439,8 +3422,8 @@ export default function App() {
           <div className="mt-6 pt-6 border-t border-slate-50 tablet-l:hidden desktop:block">
             <p className="text-[10px] text-slate-400 px-4 mb-2">© 2026 OdontoHub</p>
             <div className="flex flex-col gap-1 px-4 text-[10px] font-bold text-slate-500">
-              <Link to="/termos" className="hover:text-primary transition-colors">Termos de Uso</Link>
-              <Link to="/privacidade" className="hover:text-primary transition-colors">Política de Privacidade</Link>
+              <Link to="/termos" className="hover:text-[#2997ff] transition-colors">Termos de Uso</Link>
+              <Link to="/privacidade" className="hover:text-[#2997ff] transition-colors">Política de Privacidade</Link>
             </div>
           </div>
         </div>
@@ -3461,11 +3444,8 @@ export default function App() {
               transition={{ duration: 0.3 }}
               className="max-w-screen-xl mx-auto px-0 md:px-4 mb-4 no-print"
             >
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/10 rounded-2xl px-5 py-3.5">
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                  <Sparkles size={16} className="text-primary" />
-                </div>
-                <p className="text-[13px] font-medium text-slate-700 flex-1">
+              <div className="flex items-center gap-3 bg-white rounded-[28px] px-5 py-3.5">
+                <p className="text-[15px] font-normal text-[#1d1d1f] flex-1 leading-snug">
                   {guide.message}
                 </p>
                 <button
@@ -3477,7 +3457,7 @@ export default function App() {
                     }
                     guide.onClick?.();
                   }}
-                  className="shrink-0 bg-primary text-white px-4 py-2 rounded-xl text-[12px] font-bold hover:opacity-90 transition-all"
+                  className="shrink-0 apple-btn text-[15px] py-2 px-4"
                 >
                   {guide.action}
                 </button>
@@ -3551,7 +3531,7 @@ export default function App() {
                   {patients.filter(p => (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).length > 5 && (
                     <button 
                       onClick={() => setActiveTab('pacientes')}
-                      className="w-full text-center py-2 text-xs font-bold text-slate-400 hover:text-primary transition-colors"
+                      className="w-full text-center py-2 text-xs font-bold text-slate-400 hover:text-[#2997ff] transition-colors"
                     >
                       Ver todos os resultados
                     </button>
@@ -3763,7 +3743,7 @@ export default function App() {
                             </div>
                             <button 
                               onClick={() => setActiveTab('pacientes')}
-                              className="bg-primary text-white px-6 py-3 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
+                              className="apple-btn font-normal  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
                             >
                               <UserPlus size={16} />
                               Cadastrar primeiro paciente
@@ -3780,7 +3760,7 @@ export default function App() {
                             </div>
                             <button 
                               onClick={openAppointmentModal}
-                              className="bg-primary text-white px-6 py-3 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
+                              className="apple-btn font-normal  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
                             >
                               <Plus size={16} />
                               Agendar consulta
@@ -4865,7 +4845,7 @@ export default function App() {
                                           setMonthSheetSelectedDay(null);
                                           setIsModalOpen(true);
                                         }}
-                                        className="bg-primary text-white px-6 py-3 rounded-full font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
+                                        className="apple-btn font-normal  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
                                       >
                                         <Plus size={18} />
                                         Criar Nova Consulta
@@ -4976,7 +4956,7 @@ export default function App() {
                         return (
                           <div key={label} className="py-2">
                             <div className="px-6 py-2 flex items-center gap-2">
-                              <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">{label}</span>
+                              <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">{label}</span>
                             </div>
                             {content}
                           </div>
@@ -4984,7 +4964,7 @@ export default function App() {
                       };
 
                       return (
-                        <div className="divide-y divide-[#C6C6C8]/5">
+                        <div className="divide-y divide-[#d2d2d7]/5">
                           {/* Past finished appointments */}
                           {pastFinishedAppointments.length > 0 && (
                             <div className="py-4">
@@ -5355,7 +5335,7 @@ export default function App() {
                                     type="button"
                                     title="Agendar 1ª consulta"
                                     onClick={() => handleScheduleFromCard(patient)}
-                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-primary hover:bg-primary/8 transition-colors"
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-[#2997ff] hover:bg-primary/8 transition-colors"
                                   >
                                     <CalendarPlus size={16} />
                                   </button>
@@ -5368,7 +5348,7 @@ export default function App() {
                                       className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors ${
                                         isActed
                                           ? 'text-emerald-600 bg-emerald-50'
-                                          : 'text-slate-400 hover:text-primary hover:bg-primary/8'
+                                          : 'text-slate-400 hover:text-[#2997ff] hover:bg-primary/8'
                                       }`}
                                     >
                                       {isActed ? <Check size={16} /> : <Calendar size={16} />}
@@ -5377,7 +5357,7 @@ export default function App() {
                                       type="button"
                                       title="Contatar via WhatsApp"
                                       onClick={() => contactPatientOnWhatsApp(patient)}
-                                      className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                      className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-[#f5f5f7] transition-colors"
                                     >
                                       <MessageCircle size={16} />
                                     </button>
@@ -5397,7 +5377,7 @@ export default function App() {
                         })}
 
                         {patientCards.length === 0 && patients.length === 0 && !searchTerm && (
-                          <div className="col-span-full bg-white rounded-3xl border border-slate-100 shadow-sm p-8 sm:p-12 space-y-6">
+                          <div className="col-span-full bg-white rounded-[28px] p-8 sm:p-12 space-y-6">
                             <div className="text-center space-y-3">
                               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
                                 <UserPlus size={28} className="text-primary" />
@@ -5423,7 +5403,7 @@ export default function App() {
                             <div className="text-center">
                               <button
                                 onClick={() => setIsPatientModalOpen(true)}
-                                className="bg-primary text-white px-7 py-3.5 rounded-[20px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 inline-flex items-center gap-2 text-sm"
+                                className="apple-btn font-normal  hover:opacity-90 transition-all active:scale-95 inline-flex items-center gap-2 text-sm"
                               >
                                 <Plus size={16} />
                                 Cadastrar paciente
@@ -5547,7 +5527,7 @@ export default function App() {
                     </div>
                     <button 
                       onClick={() => setIsDentistModalOpen(true)}
-                      className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-2xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-[0_12px_36px_rgba(38,78,54,0.12)]"
+                      className="w-full sm:w-auto apple-btn font-normal hover:opacity-90 transition-all flex items-center justify-center gap-2 "
                     >
                       <UserPlus size={20} />
                       Adicionar Dentista
@@ -5735,32 +5715,12 @@ export default function App() {
               <MLInsights openPatientRecord={openPatientRecord} product={getCurrentProduct()} />
             )}
 
-            {activeTab === 'academy' && hasApprovedProductAccess(ACADEMY_PRODUCT) && (
-              <>
-                {academyView === 'home' && (
-                  <Academy user={user} onNavigate={setAcademyView} />
-                )}
-                {academyView === 'pacientes' && (
-                  <AcademyPatients />
-                )}
-                {academyView === 'agenda' && (
-                  <AcademyAgenda />
-                )}
-                {academyView === 'estudos' && (
-                  <AcademyStudy />
-                )}
-                {academyView === 'checklist' && (
-                  <AcademyChecklist />
-                )}
-              </>
-            )}
-
             {activeTab === 'configuracoes' && profile && (
               <div className="max-w-2xl mx-auto space-y-6">
 
                 {/* ── PROFILE HEADER ── */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="h-24 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
+                <div className="bg-white rounded-[28px] overflow-hidden">
+                  <div className="h-16 bg-[#f5f5f7]" />
                   <div className="px-8 pb-8 -mt-14">
                     <div className="flex items-end gap-5">
                       <div className="relative group shrink-0">
@@ -5777,7 +5737,7 @@ export default function App() {
                         </label>
                       </div>
                       <div className="pb-1 min-w-0">
-                        <h2 className="text-xl font-bold text-slate-900 truncate">{profile.name}</h2>
+                        <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f] truncate">{profile.name}</h2>
                         {user.role === 'DENTIST' && profile.specialty && (
                           <p className="text-sm text-primary font-medium">{profile.specialty}</p>
                         )}
@@ -5790,7 +5750,7 @@ export default function App() {
                     {!isProfileEditing && (
                       <button
                         onClick={startProfileEditing}
-                        className="mt-5 flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                        className="mt-5 flex items-center gap-2 text-sm font-semibold text-primary hover:text-[#2997ff]/80 transition-colors"
                       >
                         <Pencil size={14} />
                         Editar perfil
@@ -5803,8 +5763,8 @@ export default function App() {
                 {!isProfileEditing && (
                   <>
                     {/* Profile Section */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Perfil</h3>
+                    <div className="bg-white rounded-[28px] p-6 space-y-4">
+                      <h3 className="text-[13px] font-normal text-[#86868b] tracking-[-0.011em]">Perfil</h3>
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
                           <UserCircle size={16} className="text-slate-300 shrink-0" />
@@ -5844,8 +5804,8 @@ export default function App() {
                     </div>
 
                     {/* Contact Section */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contato</h3>
+                    <div className="bg-white rounded-[28px] p-6 space-y-4">
+                      <h3 className="text-[13px] font-normal text-[#86868b]">Contato</h3>
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
                           <Mail size={16} className="text-slate-300 shrink-0" />
@@ -5866,8 +5826,8 @@ export default function App() {
 
                     {/* Clinic Section (dentist only) */}
                     {user.role === 'DENTIST' && (profile.clinic_name || profile.clinic_address) && (
-                      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clínica</h3>
+                      <div className="bg-white rounded-[28px] p-6 space-y-4">
+                        <h3 className="text-[13px] font-normal text-[#86868b]">Clínica</h3>
                         <div className="space-y-3">
                           {profile.clinic_name && (
                             <div className="flex items-center gap-3">
@@ -5897,8 +5857,8 @@ export default function App() {
                 {isProfileEditing && profileDraft && (
                   <form onSubmit={handleSaveProfile} className="space-y-6">
                     {/* Profile Fields */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Perfil</h3>
+                    <div className="bg-white rounded-[28px] p-6 space-y-5">
+                      <h3 className="text-[13px] font-normal text-[#86868b] tracking-[-0.011em]">Perfil</h3>
                       <div className="space-y-4">
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Nome Completo</label>
@@ -5937,8 +5897,8 @@ export default function App() {
                     </div>
 
                     {/* Contact Fields */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contato</h3>
+                    <div className="bg-white rounded-[28px] p-6 space-y-5">
+                      <h3 className="text-[13px] font-normal text-[#86868b]">Contato</h3>
                       <div className="space-y-4">
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">E-mail</label>
@@ -5958,8 +5918,8 @@ export default function App() {
 
                     {/* Clinic Fields (dentist only) */}
                     {user.role === 'DENTIST' && (
-                      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clínica</h3>
+                      <div className="bg-white rounded-[28px] p-6 space-y-5">
+                        <h3 className="text-[13px] font-normal text-[#86868b]">Clínica</h3>
                         <div className="space-y-4">
                           <div>
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Nome da Clínica</label>
@@ -5980,8 +5940,8 @@ export default function App() {
                     )}
 
                     {/* Password */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Segurança</h3>
+                    <div className="bg-white rounded-[28px] p-6 space-y-5">
+                      <h3 className="text-[13px] font-normal text-[#86868b]">Segurança</h3>
                       <div>
                         <label className="text-[11px] text-slate-400 mb-1.5 block">Nova Senha</label>
                         <input type="password" value={profilePassword}
@@ -6003,7 +5963,7 @@ export default function App() {
                       <button
                         type="submit"
                         disabled={isSavingProfile}
-                        className="bg-primary text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-[0_8px_24px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                        className="bg-primary text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
                       >
                         {isSavingProfile ? 'Salvando...' : 'Salvar alterações'}
                       </button>
@@ -6019,9 +5979,9 @@ export default function App() {
                 />
 
                 {/* ── LEGAL (minimal) ── */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                <div className="bg-white rounded-[28px] p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Legal</h3>
+                    <h3 className="text-[13px] font-normal text-[#86868b]">Legal</h3>
                     {profile.accepted_terms_at && (
                       <span className="text-[10px] text-slate-400 flex items-center gap-1">
                         <CheckCircle2 size={12} className="text-primary" />
@@ -6033,20 +5993,20 @@ export default function App() {
                     <Link to="/termos" target="_blank"
                       className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group hover:border-primary/20 transition-all">
                       <span className="text-xs font-semibold text-slate-600">Termos de Uso</span>
-                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" size={14} />
+                      <ChevronRight className="text-slate-300 group-hover:text-[#2997ff] group-hover:translate-x-0.5 transition-all" size={14} />
                     </Link>
                     <Link to="/privacidade" target="_blank"
                       className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group hover:border-primary/20 transition-all">
                       <span className="text-xs font-semibold text-slate-600">Privacidade</span>
-                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" size={14} />
+                      <ChevronRight className="text-slate-300 group-hover:text-[#2997ff] group-hover:translate-x-0.5 transition-all" size={14} />
                     </Link>
                   </div>
                 </div>
 
                 {/* ── ADMIN ── */}
                 {user?.role?.toUpperCase() === 'ADMIN' && (
-                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Administração</h3>
+                  <div className="bg-white rounded-[28px] p-6">
+                    <h3 className="text-[13px] font-normal text-[#86868b] mb-4">Administração</h3>
                     <button
                       onClick={() => setActiveTab('admin')}
                       className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group hover:border-primary/20 transition-all text-left"
@@ -6055,7 +6015,7 @@ export default function App() {
                         <UserCog size={16} className="text-slate-400" />
                         <span className="text-xs font-semibold text-slate-600">Gerenciar Dentistas</span>
                       </div>
-                      <ChevronRight className="text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" size={14} />
+                      <ChevronRight className="text-slate-300 group-hover:text-[#2997ff] group-hover:translate-x-0.5 transition-all" size={14} />
                     </button>
                   </div>
                 )}
@@ -6173,7 +6133,7 @@ export default function App() {
                   </button>
                   <button 
                     onClick={exportType === 'patients' ? exportPatients : exportFinance}
-                    className="flex-1 bg-primary text-white py-3 rounded-full font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 bg-primary text-white py-3 rounded-full font-bold  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
                     <Download size={20} />
                     Exportar
@@ -6501,7 +6461,7 @@ export default function App() {
 
                   {/* Informações Adicionais - Collapsible */}
                   <details className="group">
-                    <summary className="cursor-pointer text-xs font-bold text-slate-400 uppercase tracking-wider py-3 hover:text-slate-600 transition-colors">
+                    <summary className="cursor-pointer text-[13px] font-normal text-[#86868b] py-3 hover:text-slate-600 transition-colors">
                       + Informações adicionais
                     </summary>
                     <div className="space-y-3 pt-1">
@@ -6545,7 +6505,7 @@ export default function App() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-4 py-2.5 bg-primary text-white text-sm font-bold rounded-full shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 px-4 py-2.5 bg-primary text-white text-sm font-bold rounded-full  hover:opacity-90 transition-all active:scale-95"
                     >
                       Salvar
                     </button>
@@ -6613,7 +6573,7 @@ export default function App() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-xl  hover:opacity-90 transition-all active:scale-95"
                     >
                       Salvar
                     </button>
@@ -6736,7 +6696,7 @@ export default function App() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-full shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-full  hover:opacity-90 transition-all active:scale-95"
                     >
                       Criar Plano
                     </button>
@@ -6890,7 +6850,7 @@ export default function App() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-full shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-full  hover:opacity-90 transition-all active:scale-95"
                     >
                       Salvar dentista
                     </button>
@@ -6951,7 +6911,7 @@ export default function App() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-col items-center gap-2 text-slate-400 group-hover:text-primary">
+                          <div className="flex flex-col items-center gap-2 text-slate-400 group-hover:text-[#2997ff]">
                             <Upload size={32} />
                             <span className="text-xs font-bold uppercase">Clique para selecionar arquivo</span>
                             <span className="text-[10px] text-slate-400">PNG, JPG ou GIF</span>
@@ -6981,7 +6941,7 @@ export default function App() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-xl  hover:opacity-90 transition-all active:scale-95"
                     >
                       Salvar
                     </button>
@@ -7240,7 +7200,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => handlePayInstallment(selectedInstallment.id, paymentMethod)}
-                    className="flex-1 py-3 px-4 bg-primary text-white font-bold rounded-full hover:opacity-90 transition-all shadow-[0_12px_36px_rgba(38,78,54,0.12)] active:scale-95"
+                    className="flex-1 py-3 px-4 bg-primary text-white font-bold rounded-full hover:opacity-90 transition-all  active:scale-95"
                   >
                     Confirmar
                   </button>
@@ -7344,7 +7304,7 @@ export default function App() {
       {/* Primary Action & Mobile Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 tablet-l:hidden no-print">
         {/* Bottom Navigation */}
-        <nav className="bg-white/80 backdrop-blur-xl border-t border-[#C6C6C8]/30 px-2 pt-2 pb-6 flex justify-around items-center">
+        <nav className="ios-glass border-t border-[#d2d2d7] px-2 pt-1.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex justify-around items-center h-11 min-h-[44px]">
           <BottomNavItem id="dashboard" label="Início" icon={Home} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
           <BottomNavItem id="pacientes" label="Pacientes" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
@@ -7490,7 +7450,7 @@ export default function App() {
                       />
                       <button
                         onClick={() => { navigator.clipboard.writeText(portalLinkData.preUrl!); }}
-                        className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                        className="px-3 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-[#0077ed] transition-colors whitespace-nowrap"
                       >
                         Copiar
                       </button>
@@ -7592,7 +7552,7 @@ function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-sans antialiased">
+    <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 font-sans antialiased">
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -7605,24 +7565,24 @@ function ForgotPassword() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <h1 className="text-[26px] font-semibold text-[#0F1211] tracking-[-0.4px] leading-[1.2] mb-2.5">
+          <h1 className="text-[26px] font-semibold text-[#1d1d1f] tracking-[-0.4px] leading-[1.2] mb-2.5">
             Redefinir sua senha
           </h1>
-          <p className="text-[15px] text-[#8B918E] leading-relaxed">
+          <p className="text-[15px] text-[#86868b] leading-relaxed">
             Informe seu e-mail para receber as instruções de acesso.
           </p>
         </motion.div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-[13px] font-medium text-[#4B5250] mb-2">E-mail</label>
+            <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">E-mail</label>
             <input
               type="email"
               required
               placeholder="voce@clinica.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] placeholder-[#C0C7C3] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-[#2E6B53] focus:bg-[#FBFEFC] focus:shadow-[0_0_0_4px_rgba(46,107,83,0.08),0_1px_2px_rgba(0,0,0,0.04)]"
+              className="ios-input w-full h-[48px] text-[17px]"
             />
           </div>
 
@@ -7642,7 +7602,7 @@ function ForgotPassword() {
               initial={{ opacity: 0, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="text-[13px] text-[#2E6B53]"
+              className="text-[13px] text-[#0071e3]"
             >
               {message}
             </motion.p>
@@ -7655,26 +7615,26 @@ function ForgotPassword() {
               whileHover={{ scale: loading ? 1 : 1.005 }}
               whileTap={{ scale: loading ? 1 : 0.98 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
-              className="w-full h-[48px] bg-[#264E36] hover:bg-[#1E4230] disabled:hover:bg-[#264E36] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(38,78,54,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(38,78,54,0.14),0_1px_2px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] duration-[160ms] ease-in-out"
+              className="w-full h-[48px] bg-[#1d1d1f] hover:bg-[#1d1d1f] disabled:hover:bg-[#1d1d1f] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(0,0,0,0.14),0_1px_2px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] duration-[160ms] ease-in-out"
               style={{ willChange: 'transform' }}
             >
               {loading ? 'Enviando...' : 'Enviar instruções'}
             </motion.button>
-            <p className="text-center text-[11px] text-[#C0C7C3] mt-3.5">Ambiente seguro · Dados criptografados</p>
+            <p className="text-center text-[11px] text-[#86868b] mt-3.5">Ambiente seguro · Dados criptografados</p>
           </div>
         </form>
 
         <div className="mt-14 space-y-6">
           <div className="text-center">
-            <Link to="/" className="text-[13px] text-[#8B918E] hover:text-[#4B5250] transition-colors duration-200">
+            <Link to="/" className="text-[13px] text-[#86868b] hover:text-[#6e6e73] transition-colors duration-200">
               Voltar para o login
             </Link>
           </div>
 
-          <div className="flex justify-center items-center gap-3 text-[11px] text-[#C0C7C3]">
-            <Link to="/termos" className="hover:text-[#8B918E] transition-colors duration-200">Termos</Link>
+          <div className="flex justify-center items-center gap-3 text-[11px] text-[#86868b]">
+            <Link to="/termos" className="hover:text-[#86868b] transition-colors duration-200">Termos</Link>
             <span>·</span>
-            <Link to="/privacidade" className="hover:text-[#8B918E] transition-colors duration-200">Privacidade</Link>
+            <Link to="/privacidade" className="hover:text-[#86868b] transition-colors duration-200">Privacidade</Link>
           </div>
         </div>
       </motion.div>
@@ -7804,7 +7764,7 @@ function ResetPassword() {
             <button 
               type="submit"
               disabled={loading || success}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full bg-primary text-white py-4 rounded-2xl font-bold  hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {loading ? 'Processando...' : 'Redefinir Senha'}
             </button>
@@ -7844,7 +7804,7 @@ function PrintLayout({ children, title, onPrint }: { children: React.ReactNode, 
             </button>
             <button 
               onClick={onPrint}
-              className="print-btn flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-[0_12px_36px_rgba(38,78,54,0.12)]"
+              className="print-btn flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-all "
             >
               <Printer size={20} />
               Imprimir Agora

@@ -95,7 +95,7 @@ interface MLInsightsProps {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const riskColors = {
-  LOW:      { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500' },
+  LOW:      { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-primary' },
   MEDIUM:   { bg: 'bg-amber-50',   text: 'text-amber-700',   bar: 'bg-amber-500' },
   HIGH:     { bg: 'bg-rose-50',    text: 'text-rose-700',    bar: 'bg-rose-500' },
   CRITICAL: { bg: 'bg-red-50',     text: 'text-red-800',     bar: 'bg-red-600' },
