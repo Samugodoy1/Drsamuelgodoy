@@ -192,7 +192,7 @@ export const NovaEvolucao: React.FC<NovaEvolucaoProps> = ({
           <button
             onClick={handleSave}
             disabled={isSaving || inputText.trim() === ''}
-            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 px-5 sm:px-6 rounded-xl flex items-center gap-2 transition-all ios-press text-xs sm:text-sm shadow-[0_2px_8px_rgba(0,113,227,0.25)]"
+            className="bg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-normal py-2 px-5 sm:px-6 rounded-full flex items-center gap-2 transition-all ios-press text-xs sm:text-sm"
           >
             {saved ? (
               <Check size={16} />

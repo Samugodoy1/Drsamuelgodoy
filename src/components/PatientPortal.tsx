@@ -1376,8 +1376,8 @@ export function PatientPortal() {
                 <button
                   onClick={handleAnamnesisSubmit}
                   disabled={anamnesisSubmitting || anamnesisSaved}
-                  className={`w-full h-14 mt-2 rounded-xl font-bold text-[16px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
-                    anamnesisSaved ? 'bg-[#30d158]/10 text-[#1F9D4D]' : 'bg-[#0071e3] text-white'
+                  className={`w-full apple-btn mt-2 gap-2 ${
+                    anamnesisSaved ? '!bg-[#30d158]/15 !text-[#1d1d1f]' : ''
                   }`}
                 >
                   {anamnesisSubmitting ? (
@@ -1385,7 +1385,7 @@ export function PatientPortal() {
                   ) : anamnesisSaved ? (
                     <>
                       <CheckCircle2 size={20} />
-                      Ficha salva!
+                      Ficha salva
                     </>
                   ) : 'Salvar ficha médica'}
                 </button>
@@ -1494,7 +1494,7 @@ export function PatientPortal() {
                     <button
                       type="submit"
                       disabled={scheduleSubmitting || !scheduleForm.preferred_date}
-                      className="w-full h-14 mt-2 bg-[#0071e3] text-white rounded-xl font-bold text-[16px] active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-70"
+                      className="w-full apple-btn mt-2 disabled:opacity-70"
                     >
                       {scheduleSubmitting ? (
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1545,7 +1545,7 @@ export function PatientPortal() {
                   <button
                     onClick={handleCancelAppointment}
                     disabled={cancelSubmitting}
-                    className="w-full h-14 bg-white border border-[#FF3B30]/30 text-[#C0392B] rounded-xl font-bold text-[16px] active:bg-red-50 transition-colors flex items-center justify-center"
+                    className="w-full apple-btn-light border border-[#ff3b30]/30 text-[#ff3b30]"
                   >
                     {cancelSubmitting ? (
                       <div className="w-5 h-5 border-2 border-[#C0392B]/30 border-t-[#C0392B] rounded-full animate-spin" />
@@ -1612,14 +1612,14 @@ export function PatientPortal() {
 
                     <button
                       onClick={() => copyToClipboard(pixInfo.pix_key!)}
-                      className={`w-full h-14 rounded-xl font-bold text-[16px] flex items-center justify-center gap-2 transition-colors ${
-                        pixCopied ? 'bg-[#30d158]/10 text-[#1F9D4D]' : 'bg-[#0071e3] text-white active:scale-[0.98]'
+                      className={`w-full apple-btn gap-2 ${
+                        pixCopied ? '!bg-[#30d158]/15 !text-[#1d1d1f]' : ''
                       }`}
                     >
                       {pixCopied ? (
                         <>
                           <CheckCircle2 size={20} />
-                          Chave copiada!
+                          Chave copiada
                         </>
                       ) : (
                         <>

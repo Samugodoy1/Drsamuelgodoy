@@ -223,7 +223,7 @@ export default function FillAgendaModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.98 }}
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+            className="relative w-full sm:max-w-lg bg-white rounded-t-[28px] sm:rounded-[28px] max-h-[90vh] flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="px-5 pt-5 pb-4 border-b border-slate-100">
@@ -273,11 +273,11 @@ export default function FillAgendaModal({
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {freeSlots.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-sm font-semibold text-slate-700">Sua agenda de hoje já está completa 🎉</p>
+                  <p className="text-sm font-semibold text-slate-700">Sua agenda de hoje já está completa</p>
                   <p className="text-[13px] text-slate-500 mt-1">Que tal já garantir os próximos dias?</p>
                   <button
                     onClick={onOpenBlankSchedule}
-                    className="mt-4 inline-flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-all active:scale-95"
+                    className="mt-4 apple-btn text-[15px] py-2 px-4 gap-2"
                   >
                     <CalendarPlus size={16} />
                     Agendar pra outro dia
@@ -290,7 +290,7 @@ export default function FillAgendaModal({
                 </div>
               ) : (
                 <>
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
+                  <p className="flex items-center gap-1.5 text-[13px] text-[#86868b] mb-3">
                     <Target size={13} />
                     Quem vale a pena chamar
                   </p>
@@ -334,7 +334,7 @@ export default function FillAgendaModal({
               <div className="px-5 py-3.5 border-t border-slate-100">
                 <button
                   onClick={onOpenBlankSchedule}
-                  className="w-full py-2.5 rounded-full text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+                  className="w-full apple-btn-light text-[15px]"
                 >
                   Agendar manualmente
                 </button>
