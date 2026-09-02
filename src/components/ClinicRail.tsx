@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Calendar,
@@ -28,50 +28,24 @@ import {
 
 export type RailTab = ControlTab;
 
-export type WidgetId = RailTab | 'amanha';
-
-export type RailAppointment = {
-  id: number;
-  patient_id: number;
-  patient_name: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  notes?: string;
-};
-
-export type RailMoney = {
-  type: 'INCOME' | 'EXPENSE';
-  amount: number;
-  date: string;
-};
-
-export type RailInstallment = {
-  status: string;
-  amount: number;
-};
-
 type TileDef = {
-  id: WidgetId;
+  id: RailTab;
   label: string;
+  hint: string;
   icon: typeof Home;
-  tab: RailTab;
-  wide?: boolean;
-  locked?: boolean;
 };
 
 const TILES: TileDef[] = [
-  { id: 'dashboard', label: 'Hoje', icon: Home, tab: 'dashboard', locked: true, wide: true },
-  { id: 'agenda', label: 'Agenda', icon: Calendar, tab: 'agenda' },
-  { id: 'pacientes', label: 'Pacientes', icon: Users, tab: 'pacientes' },
-  { id: 'financeiro', label: 'Caixa', icon: DollarSign, tab: 'financeiro' },
-  { id: 'amanha', label: 'Amanhã', icon: Clock, tab: 'agenda', wide: true },
-  { id: 'documentos', label: 'Papéis', icon: FileText, tab: 'documentos' },
-  { id: 'configuracoes', label: 'Clínica', icon: Settings, tab: 'configuracoes' },
-  { id: 'admin', label: 'Equipe', icon: UserCog, tab: 'admin' },
+  { id: 'dashboard', label: 'Hoje', hint: 'O dia da clínica', icon: Home },
+  { id: 'agenda', label: 'Agenda', hint: 'Consultas', icon: Calendar },
+  { id: 'pacientes', label: 'Pacientes', hint: 'Prontuários', icon: Users },
+  { id: 'financeiro', label: 'Caixa', hint: 'Receber', icon: DollarSign },
+  { id: 'documentos', label: 'Papéis', hint: 'Receita e atestado', icon: FileText },
+  { id: 'configuracoes', label: 'Clínica', hint: 'Perfil e plano', icon: Settings },
+  { id: 'admin', label: 'Equipe', hint: 'Dentistas', icon: UserCog },
 ];
 
-const DEFAULT_PINS: WidgetId[] = ['dashboard', 'agenda', 'pacientes', 'financeiro'];
+const DEFAULT_PINS: RailTab[] = ['dashboard', 'agenda', 'pacientes', 'financeiro'];
 
 const WIDGET_ICONS: Record<string, typeof Home> = {
   dashboard: Home,
@@ -95,259 +69,7 @@ const WIDGET_ICONS: Record<string, typeof Home> = {
 const pinKey = (userId: string | number) => `odontohub.rail.${userId}`;
 const hideKey = (userId: string | number) => `odontohub.cc.hide.${userId}`;
 
-function firstNameOf(name?: string | null) {
-  const part = (name || '').trim().split(/\s+/)[0];
-  return part || '';
-}
-
-function greetingForHour(h: number) {
-  if (h >= 5 && h < 12) return 'Bom dia';
-  if (h >= 12 && h < 18) return 'Boa tarde';
-  return 'Boa noite';
-}
-
-function brl(n: number) {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-}
-
-function hhmm(d: Date) {
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function sameDay(a: Date, b: Date) {
-  return a.toDateString() === b.toDateString();
-}
-
-function effectiveStatus(app: RailAppointment, now: Date) {
-  if (app.status === 'NO_SHOW' || app.status === 'CANCELLED' || app.status === 'FINISHED') return app.status;
-  const start = new Date(app.start_time);
-  const end = new Date(app.end_time);
-  if (now >= end) return 'FINISHED';
-  if (now >= start && now < end) return 'IN_PROGRESS';
-  return app.status;
-}
-
-function minsUntil(target: Date, now: Date) {
-  return Math.round((target.getTime() - now.getTime()) / 60_000);
-}
-
-type NowKind = 'attending' | 'ready' | 'soon' | 'next' | 'free' | 'done' | 'empty';
-
-export type RoutineSnapshot = {
-  pulse: string;
-  now: {
-    kind: NowKind;
-    kicker: string;
-    title: string;
-    detail: string;
-    time: string;
-    patientId?: number;
-    progress?: { done: number; total: number };
-    dark: boolean;
-  };
-  agenda: { metric: string; hint: string; badge?: number };
-  caixa: { metric: string; hint: string };
-  pacientes: { metric: string; hint: string; badge?: number };
-  amanha: { metric: string; hint: string; badge?: number; relevant: boolean };
-  papeis: { metric: string; hint: string };
-  clinica: { metric: string; hint: string };
-  equipe: { metric: string; hint: string };
-};
-
-function buildRoutine(
-  now: Date,
-  args: {
-    displayName: string;
-    clinicLine: string;
-    appointments: RailAppointment[];
-    transactions: RailMoney[];
-    installments: RailInstallment[];
-    patientsCount: number;
-    portalPendingCount: number;
-  },
-): RoutineSnapshot {
-  const {
-    displayName,
-    clinicLine,
-    appointments,
-    transactions,
-    installments,
-    patientsCount,
-    portalPendingCount,
-  } = args;
-
-  const today = appointments.filter(a => sameDay(new Date(a.start_time), now) && a.status !== 'CANCELLED');
-  const activeToday = today.filter(a => {
-    const s = effectiveStatus(a, now);
-    return s !== 'FINISHED' && s !== 'NO_SHOW';
-  });
-  const doneToday = today.filter(a => effectiveStatus(a, now) === 'FINISHED').length;
-  const attending = activeToday.find(a => effectiveStatus(a, now) === 'IN_PROGRESS');
-  const upcoming = activeToday
-    .filter(a => new Date(a.start_time) >= now || effectiveStatus(a, now) === 'IN_PROGRESS')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  const next = attending || upcoming[0];
-
-  const tomorrowStart = new Date(now);
-  tomorrowStart.setDate(now.getDate() + 1);
-  tomorrowStart.setHours(0, 0, 0, 0);
-  const tomorrowEnd = new Date(tomorrowStart);
-  tomorrowEnd.setHours(23, 59, 59, 999);
-  const tomorrow = appointments.filter(a => {
-    const d = new Date(a.start_time);
-    return d >= tomorrowStart && d <= tomorrowEnd && a.status !== 'CANCELLED';
-  });
-  const tomorrowOpen = tomorrow.filter(a => a.status !== 'CONFIRMED').length;
-
-  const todayStr = now.toLocaleDateString('en-CA');
-  const todayIncome = transactions
-    .filter(t => t.type === 'INCOME' && t.date?.split('T')[0] === todayStr)
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-  const toReceive = installments
-    .filter(i => i.status === 'PENDING' || i.status === 'OVERDUE')
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-
-  const hour = now.getHours();
-  const remaining = activeToday.length;
-  const progress = today.length > 0 ? { done: doneToday, total: today.length } : undefined;
-
-  let kind: NowKind = 'free';
-  if (patientsCount === 0) kind = 'empty';
-  else if (attending) kind = 'attending';
-  else if (next) {
-    const mins = minsUntil(new Date(next.start_time), now);
-    if (mins <= 0) kind = 'ready';
-    else if (mins <= 20) kind = 'soon';
-    else kind = 'next';
-  } else if (today.length > 0) kind = 'done';
-
-  const who = firstNameOf(next?.patient_name) || 'Paciente';
-  const nextTime = next ? hhmm(new Date(next.start_time)) : hhmm(now);
-  const procedure = (next?.notes || '').trim() || 'Consulta';
-
-  const nowCard: RoutineSnapshot['now'] = {
-    kind,
-    kicker: 'Hoje',
-    title: 'Agenda livre',
-    detail: hour < 12 ? 'Manhã aberta na cadeira' : hour < 18 ? 'Nenhuma cadeira ocupada' : 'Expediente em silêncio',
-    time: hhmm(now),
-    patientId: next?.patient_id,
-    progress,
-    dark: kind === 'attending' || kind === 'ready',
-  };
-
-  if (kind === 'empty') {
-    nowCard.kicker = 'Começar';
-    nowCard.title = 'Esperando um nome';
-    nowCard.detail = 'O primeiro paciente abre o resto';
-  } else if (kind === 'attending') {
-    nowCard.kicker = 'Na cadeira';
-    nowCard.title = who;
-    nowCard.detail = procedure;
-    nowCard.time = nextTime;
-  } else if (kind === 'ready') {
-    nowCard.kicker = 'Na porta';
-    nowCard.title = who;
-    nowCard.detail = procedure;
-    nowCard.time = nextTime;
-  } else if (kind === 'soon') {
-    const m = Math.max(1, minsUntil(new Date(next!.start_time), now));
-    nowCard.kicker = `Em ${m} min`;
-    nowCard.title = who;
-    nowCard.detail = procedure;
-    nowCard.time = nextTime;
-  } else if (kind === 'next') {
-    nowCard.kicker = 'Próxima';
-    nowCard.title = who;
-    nowCard.detail = `${nextTime} · ${procedure}`;
-    nowCard.time = nextTime;
-  } else if (kind === 'done') {
-    nowCard.kicker = 'Encerrada';
-    nowCard.title = 'Cadeira livre';
-    nowCard.detail = tomorrow.length
-      ? `Amanhã · ${tomorrow.length} consulta${tomorrow.length === 1 ? '' : 's'}`
-      : 'O dia da sala acabou';
-  }
-
-  let pulse = `${greetingForHour(hour)}, ${displayName}.`;
-  if (kind === 'attending') pulse = `A sala é da ${who} agora.`;
-  else if (kind === 'ready') pulse = `${who} já pode entrar.`;
-  else if (kind === 'soon') {
-    const m = Math.max(1, minsUntil(new Date(next!.start_time), now));
-    pulse = `Faltam ${m} min para ${who}.`;
-  } else if (kind === 'empty') pulse = 'A clínica ainda vai ganhar o primeiro nome.';
-  else if (portalPendingCount > 0) {
-    pulse = portalPendingCount === 1
-      ? '1 pedido esperando no portal.'
-      : `${portalPendingCount} pedidos esperando no portal.`;
-  } else if (hour >= 16 && tomorrowOpen > 0) {
-    pulse = tomorrowOpen === 1
-      ? 'Amanhã tem 1 consulta sem confirmar.'
-      : `Amanhã: ${tomorrowOpen} ainda sem confirmar.`;
-  } else if (kind === 'next') pulse = `Próxima às ${nextTime}.`;
-  else if (kind === 'done') pulse = tomorrow.length ? 'Hoje acabou. Olha o amanhã.' : 'Cadeira encerrada por hoje.';
-  else if (hour < 12) pulse = 'Manhã livre na cadeira.';
-  else pulse = 'Ninguém na cadeira por agora.';
-
-  const laterCount = Math.max(0, remaining - (next ? 1 : 0));
-  const agenda = remaining === 0
-    ? { metric: 'Livre', hint: today.length ? 'Dia cumprido' : 'Nada marcado', badge: undefined as number | undefined }
-    : next
-      ? { metric: nextTime, hint: laterCount > 0 ? `${who} · ${laterCount} depois` : who, badge: remaining }
-      : { metric: String(remaining), hint: remaining === 1 ? 'pela frente' : 'pela frente', badge: remaining };
-
-  const caixa = todayIncome > 0
-    ? { metric: brl(todayIncome), hint: 'hoje' }
-    : toReceive > 0
-      ? { metric: brl(toReceive), hint: 'a receber' }
-      : { metric: 'R$ 0', hint: 'hoje' };
-
-  const pacientes = portalPendingCount > 0
-    ? { metric: String(portalPendingCount), hint: portalPendingCount === 1 ? 'no portal' : 'no portal', badge: portalPendingCount }
-    : patientsCount === 0
-      ? { metric: '—', hint: 'sem prontuário' }
-      : { metric: String(patientsCount), hint: patientsCount === 1 ? 'na base' : 'na base', badge: undefined };
-
-  const amanha = {
-    metric: tomorrow.length === 0 ? 'Livre' : `${tomorrow.length}`,
-    hint: tomorrow.length === 0
-      ? 'Nada amanhã ainda'
-      : tomorrowOpen > 0
-        ? `${tomorrowOpen} sem confirmar`
-        : tomorrow.length === 1
-          ? 'confirmada'
-          : 'consultas',
-    badge: tomorrowOpen || undefined,
-    relevant: tomorrow.length > 0,
-  };
-
-  return {
-    pulse,
-    now: nowCard,
-    agenda,
-    caixa,
-    pacientes,
-    amanha,
-    papeis: { metric: 'Receita', hint: 'Atestado e ficha' },
-    clinica: { metric: 'Clínica', hint: clinicLine },
-    equipe: { metric: 'Equipe', hint: 'Dentistas' },
-  };
-}
-
-function liveFor(id: WidgetId, routine: RoutineSnapshot): { metric: string; hint: string; badge?: number } {
-  switch (id) {
-    case 'agenda': return routine.agenda;
-    case 'financeiro': return routine.caixa;
-    case 'pacientes': return routine.pacientes;
-    case 'amanha': return routine.amanha;
-    case 'documentos': return routine.papeis;
-    case 'configuracoes': return routine.clinica;
-    case 'admin': return routine.equipe;
-    default: return { metric: '', hint: '' };
-  }
-}
-
-function loadPins(userId: string | number | undefined, allowAdmin: boolean): WidgetId[] {
+function loadPins(userId: string | number | undefined, allowAdmin: boolean): RailTab[] {
   const allowed = new Set(TILES.filter(t => allowAdmin || t.id !== 'admin').map(t => t.id));
   if (userId != null) {
     try {
@@ -355,7 +77,7 @@ function loadPins(userId: string | number | undefined, allowAdmin: boolean): Wid
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          const pins = parsed.filter((id: string) => allowed.has(id as WidgetId)) as WidgetId[];
+          const pins = parsed.filter((id: string) => allowed.has(id as RailTab)) as RailTab[];
           if (!pins.includes('dashboard')) pins.unshift('dashboard');
           if (pins.length) return pins;
         }
@@ -501,82 +223,14 @@ export function ClinicRail({
 
   const unusedTiles = catalog.filter(t => t.id !== 'dashboard' && !pins.includes(t.id));
 
-  const routine = useMemo(
-    () => buildRoutine(now, {
-      displayName,
-      clinicLine,
-      appointments,
-      transactions,
-      installments,
-      patientsCount,
-      portalPendingCount,
-    }),
-    [now, displayName, clinicLine, appointments, transactions, installments, patientsCount, portalPendingCount],
-  );
-
-  const seededRef = useRef(false);
-  useEffect(() => {
-    if (seededRef.current || user?.id == null) return;
-    if (localStorage.getItem(storageKey(user.id))) {
-      seededRef.current = true;
-      return;
-    }
-    if (!routine.amanha.relevant) return;
-    seededRef.current = true;
-    persist(['dashboard', 'agenda', 'amanha', 'pacientes', 'financeiro']);
-  }, [user?.id, routine.amanha.relevant, persist]);
-
-  const restPins = pins
-    .filter(id => id !== 'dashboard')
-    .map(id => catalog.find(t => t.id === id))
-    .filter(Boolean) as TileDef[];
-
-  const unusedTiles = useMemo(() => {
-    const unused = catalog.filter(t => t.id !== 'dashboard' && !pins.includes(t.id));
-    unused.sort((a, b) => {
-      const score = (id: WidgetId) => {
-        if (id === 'amanha' && routine.amanha.relevant) return 0;
-        if (id === 'documentos') return 2;
-        if (id === 'configuracoes') return 3;
-        return 1;
-      };
-      return score(a.id) - score(b.id);
-    });
-    return unused;
-  }, [catalog, pins, routine.amanha.relevant]);
-
-  const goTab = (tab: RailTab) => {
-    setActiveTab(tab);
+  const go = (id: RailTab) => {
+    if (editing) return;
+    setActiveTab(id);
     setIsSidebarOpen(false);
     navigate('/');
   };
 
-  const activate = (tile: TileDef) => {
-    if (editing) return;
-    goTab(tile.tab);
-  };
-
-  const onHero = () => {
-    if (editing) return;
-    const { kind, patientId } = routine.now;
-    if ((kind === 'attending' || kind === 'ready') && patientId && onOpenPatient) {
-      setIsSidebarOpen(false);
-      onOpenPatient(patientId);
-      return;
-    }
-    if (kind === 'empty') {
-      goTab('pacientes');
-      return;
-    }
-    if (kind === 'free' && onNewAppointment) {
-      setIsSidebarOpen(false);
-      onNewAppointment();
-      return;
-    }
-    goTab('dashboard');
-  };
-
-  const togglePin = (id: WidgetId) => {
+  const togglePin = (id: RailTab) => {
     if (id === 'dashboard') return;
     if (pins.includes(id)) persistPins(pins.filter(p => p !== id));
     else persistPins([...pins, id]);
@@ -596,7 +250,7 @@ export function ClinicRail({
     go(widget.tab);
   };
 
-  const onDrop = (target: WidgetId) => {
+  const onDrop = (target: RailTab) => {
     if (!dragging || dragging === target || target === 'dashboard') return;
     const next = pins.filter(p => p !== dragging);
     const at = next.indexOf(target);
@@ -610,8 +264,8 @@ export function ClinicRail({
   const FeaturedIcon = Home;
 
   const widthClass = isSidebarOpen
-    ? 'translate-x-0 w-[19.5rem]'
-    : '-translate-x-full w-[19.5rem] tablet-l:w-[5.25rem] desktop:w-[19.5rem]';
+    ? 'translate-x-0 w-[19rem]'
+    : '-translate-x-full w-[19rem] tablet-l:w-[5.25rem] desktop:w-[19rem]';
 
   const tileClass = (on: boolean, extra = '') =>
     `relative flex flex-col text-left rounded-[26px] transition-colors duration-200 ${extra} ${
@@ -655,11 +309,8 @@ export function ClinicRail({
       <div className="flex-1 overflow-y-auto px-3 desktop:px-4 pb-3 no-scrollbar">
         <button
           type="button"
-          onClick={onHero}
-          className={tileClass(
-            heroOn,
-            'w-full min-h-[128px] p-4 tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-stretch desktop:min-h-[128px] desktop:p-4',
-          )}
+          onClick={() => (editing ? undefined : go('dashboard'))}
+          className={`${tileClass(activeTab === 'dashboard', 'w-full min-h-[108px] p-4 tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-stretch desktop:min-h-[108px] desktop:p-4')}`}
         >
           <div className="flex w-full items-center justify-between tablet-l:justify-center desktop:justify-between">
             <span className="relative">
@@ -708,7 +359,7 @@ export function ClinicRail({
                 title={`${widget.title}${widget.value ? ` · ${widget.value}` : ''} · ${widget.hint}`}
                 className={tileClass(
                   active,
-                  `${span} min-h-[104px] p-3.5 items-start justify-between tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-start desktop:min-h-[104px] desktop:p-3.5`,
+                  'min-h-[96px] p-3.5 items-start justify-between tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-start desktop:min-h-[96px] desktop:p-3.5',
                 )}
               >
                 {editing && (
@@ -814,7 +465,7 @@ export function ClinicRail({
 
         <button
           type="button"
-          onClick={() => goTab('configuracoes')}
+          onClick={() => go('configuracoes')}
           className={`w-full flex items-center gap-3 rounded-[22px] px-2 py-2 text-left ${
             activeTab === 'configuracoes' ? 'clinic-cc-tile' : 'hover:bg-white/50'
           }`}
