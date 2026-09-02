@@ -11,6 +11,20 @@ export type ControlTab =
 
 export type WidgetTone = 'neutral' | 'live' | 'warn' | 'urgent' | 'money' | 'ok';
 
+export type WidgetSize = 's' | 'm' | 'l';
+
+export const SIZE_LABEL: Record<WidgetSize, string> = {
+  s: '1 × 1',
+  m: '2 × 1',
+  l: '2 × 2',
+};
+
+export function cycleWidgetSize(size: WidgetSize): WidgetSize {
+  if (size === 's') return 'm';
+  if (size === 'm') return 'l';
+  return 's';
+}
+
 export type LiveWidgetId =
   | 'proximo'
   | 'confirmar'
@@ -61,6 +75,7 @@ export interface ControlWidget {
   icon: LiveWidgetId | ControlTab;
   live: boolean;
   score: number;
+  size: WidgetSize;
 }
 
 export interface ControlCenterView {
@@ -335,14 +350,16 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'proximo',
       live: true,
       score: facts.phase === 'clinic' ? 100 : facts.phase === 'opening' ? 70 : 55,
+      size: soon || facts.attending ? 'm' : 's',
     });
   }
 
-  if (facts.unconfirmedTomorrow.length > 0) {
+  const needsConfirm = facts.unconfirmedTomorrow.length > 0;
+  if (needsConfirm) {
     const count = facts.unconfirmedTomorrow.length;
     widgets.push({
       id: 'confirmar',
-      tab: 'agenda',
+      tab: 'dashboard',
       title: 'Confirmar',
       value: String(count),
       hint: count === 1 ? 'amanhã sem ok' : 'de amanhã sem ok',
@@ -350,6 +367,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'confirmar',
       live: true,
       score: facts.phase === 'opening' ? 92 : facts.phase === 'night' ? 88 : facts.phase === 'closing' ? 78 : 48,
+      size: 's',
     });
   }
 
@@ -379,6 +397,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
         : facts.pendingReceivables > 0
           ? 46
           : 22,
+      size: 's',
     });
   }
 
@@ -394,6 +413,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'recuperar',
       live: true,
       score: facts.phase === 'opening' ? 76 : facts.phase === 'night' ? 72 : facts.phase === 'closing' ? 58 : 36,
+      size: 's',
     });
   }
 
@@ -409,10 +429,11 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'portal',
       live: true,
       score: 82,
+      size: 's',
     });
   }
 
-  if (facts.tomorrow.length > 0 && (facts.phase === 'closing' || facts.phase === 'night' || facts.today.length === 0)) {
+  if (!needsConfirm && facts.tomorrow.length > 0 && (facts.phase === 'closing' || facts.phase === 'night' || facts.today.length === 0)) {
     const first = facts.tomorrow[0];
     const confirmed = facts.tomorrow.length - facts.unconfirmedTomorrow.length;
     widgets.push({
@@ -425,6 +446,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'amanha',
       live: true,
       score: facts.phase === 'night' ? 90 : facts.phase === 'closing' ? 80 : 42,
+      size: 'm',
     });
   }
 
@@ -439,6 +461,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'ritmo',
       live: true,
       score: 50,
+      size: 'm',
     });
   }
 
@@ -453,6 +476,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'encaixe',
       live: true,
       score: facts.remaining.length === 0 ? 64 : facts.phase === 'clinic' ? 58 : 38,
+      size: 's',
     });
   }
 
@@ -467,6 +491,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       icon: 'agenda',
       live: true,
       score: 26,
+      size: 's',
     });
   }
 
@@ -474,12 +499,12 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
 }
 
 const NAV_WIDGETS: Array<Omit<ControlWidget, 'score'> & { score?: number }> = [
-  { id: 'agenda', tab: 'agenda', title: 'Agenda', value: '', hint: 'Consultas', tone: 'neutral', icon: 'agenda', live: false, score: 0 },
-  { id: 'pacientes', tab: 'pacientes', title: 'Pacientes', value: '', hint: 'Prontuários', tone: 'neutral', icon: 'pacientes', live: false, score: 0 },
-  { id: 'financeiro', tab: 'financeiro', title: 'Caixa', value: '', hint: 'Receber', tone: 'neutral', icon: 'financeiro', live: false, score: 0 },
-  { id: 'documentos', tab: 'documentos', title: 'Papéis', value: '', hint: 'Receita e atestado', tone: 'neutral', icon: 'documentos', live: false, score: 0 },
-  { id: 'configuracoes', tab: 'configuracoes', title: 'Clínica', value: '', hint: 'Perfil e plano', tone: 'neutral', icon: 'configuracoes', live: false, score: 0 },
-  { id: 'admin', tab: 'admin', title: 'Equipe', value: '', hint: 'Dentistas', tone: 'neutral', icon: 'admin', live: false, score: 0 },
+  { id: 'agenda', tab: 'agenda', title: 'Agenda', value: '', hint: 'Consultas', tone: 'neutral', icon: 'agenda', live: false, score: 0, size: 's' },
+  { id: 'pacientes', tab: 'pacientes', title: 'Pacientes', value: '', hint: 'Prontuários', tone: 'neutral', icon: 'pacientes', live: false, score: 0, size: 's' },
+  { id: 'financeiro', tab: 'financeiro', title: 'Caixa', value: '', hint: 'Receber', tone: 'neutral', icon: 'financeiro', live: false, score: 0, size: 's' },
+  { id: 'documentos', tab: 'documentos', title: 'Papéis', value: '', hint: 'Receita e atestado', tone: 'neutral', icon: 'documentos', live: false, score: 0, size: 's' },
+  { id: 'configuracoes', tab: 'configuracoes', title: 'Clínica', value: '', hint: 'Perfil e plano', tone: 'neutral', icon: 'configuracoes', live: false, score: 0, size: 's' },
+  { id: 'admin', tab: 'admin', title: 'Equipe', value: '', hint: 'Dentistas', tone: 'neutral', icon: 'admin', live: false, score: 0, size: 's' },
 ];
 
 export function buildFeatured(facts: ClinicFacts) {
@@ -533,6 +558,8 @@ export function deriveControlCenter(
     pins?: ControlTab[];
     allowAdmin?: boolean;
     maxLive?: number;
+    sizes?: Partial<Record<string, WidgetSize>>;
+    order?: string[];
   } = {},
 ): ControlCenterView {
   const facts = deriveClinicFacts(input);
@@ -571,10 +598,25 @@ export function deriveControlCenter(
     })
     .map(widget => ({ ...widget, score: 0 }));
 
+  const sized = [...chosenLive, ...nav].map(widget => ({
+    ...widget,
+    size: options.sizes?.[widget.id] || widget.size,
+  }));
+
+  const order = options.order || [];
+  const widgets = sized.slice().sort((a, b) => {
+    const ai = order.indexOf(a.id);
+    const bi = order.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
   return {
     voice: buildControlVoice(facts),
     featured: buildFeatured(facts),
-    widgets: [...chosenLive, ...nav],
+    widgets,
   };
 }
 
