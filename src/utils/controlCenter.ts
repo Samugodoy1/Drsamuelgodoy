@@ -34,7 +34,12 @@ export type LiveWidgetId =
   | 'amanha'
   | 'ritmo'
   | 'encaixe'
-  | 'agenda';
+  | 'agenda'
+  | 'sala'
+  | 'pausa'
+  | 'fila'
+  | 'receber'
+  | 'semana';
 
 export interface ControlAppointment {
   id: number;
@@ -76,6 +81,7 @@ export interface ControlWidget {
   live: boolean;
   score: number;
   size: WidgetSize;
+  patientId?: number;
 }
 
 export interface ControlCenterView {
@@ -209,6 +215,20 @@ export function deriveClinicFacts(input: ControlCenterInput) {
   const afternoon = today.filter(({ start }) => start.getHours() >= 12).length;
   const unconfirmedTomorrow = tomorrowItems.filter(({ appointment }) => appointment.status !== 'CONFIRMED');
 
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = addDays(weekStart, 7);
+  const weekCount = input.appointments.filter(appointment => {
+    if (INACTIVE.has(appointment.status)) return false;
+    const start = parseWhen(appointment.start_time);
+    return !!start && start >= weekStart && start < weekEnd;
+  }).length;
+
+  const gapMinutes = next
+    ? Math.round((next.start.getTime() - now.getTime()) / 60_000)
+    : null;
+
   return {
     now,
     phase: getControlPhase(now),
@@ -222,6 +242,8 @@ export function deriveClinicFacts(input: ControlCenterInput) {
     morning,
     afternoon,
     unconfirmedTomorrow,
+    weekCount,
+    gapMinutes,
     todayRevenue: input.todayRevenue || 0,
     weekRevenue: input.weekRevenue || 0,
     pendingReceivables: input.pendingReceivables || 0,
@@ -338,11 +360,27 @@ export function buildControlVoice(facts: ClinicFacts): ControlVoice {
 function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
   const widgets: ControlWidget[] = [];
 
+  if (facts.attending) {
+    widgets.push({
+      id: 'sala',
+      tab: 'dashboard',
+      title: 'Na cadeira',
+      value: patientFirst(facts.attending),
+      hint: facts.attending.appointment.notes?.trim() || 'Em atendimento',
+      tone: 'live',
+      icon: 'sala',
+      live: true,
+      score: 104,
+      size: 'm',
+      patientId: facts.attending.appointment.patient_id,
+    });
+  }
+
   if (facts.next) {
     const soon = (facts.next.start.getTime() - facts.now.getTime()) / 60_000 <= 20;
     widgets.push({
       id: 'proximo',
-      tab: 'dashboard',
+      tab: 'agenda',
       title: facts.attending ? 'Próxima' : 'Agora',
       value: formatUntil(facts.next.start, facts.now),
       hint: patientFirst(facts.next),
@@ -351,6 +389,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       live: true,
       score: facts.phase === 'clinic' ? 100 : facts.phase === 'opening' ? 70 : 55,
       size: soon || facts.attending ? 'm' : 's',
+      patientId: facts.next.appointment.patient_id,
     });
   }
 
@@ -359,7 +398,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
     const count = facts.unconfirmedTomorrow.length;
     widgets.push({
       id: 'confirmar',
-      tab: 'dashboard',
+      tab: 'agenda',
       title: 'Confirmar',
       value: String(count),
       hint: count === 1 ? 'amanhã sem ok' : 'de amanhã sem ok',
@@ -368,6 +407,37 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
       live: true,
       score: facts.phase === 'opening' ? 92 : facts.phase === 'night' ? 88 : facts.phase === 'closing' ? 78 : 48,
       size: 's',
+    });
+  }
+
+  if (facts.gapMinutes != null && facts.gapMinutes >= 25 && !facts.attending) {
+    widgets.push({
+      id: 'pausa',
+      tab: 'agenda',
+      title: 'Pausa',
+      value: formatUntil(facts.next!.start, facts.now),
+      hint: 'até o próximo paciente',
+      tone: 'ok',
+      icon: 'pausa',
+      live: true,
+      score: 44,
+      size: 's',
+    });
+  }
+
+  if (facts.remaining.length >= 2) {
+    const names = facts.remaining.slice(0, 3).map(item => patientFirst(item)).join(' · ');
+    widgets.push({
+      id: 'fila',
+      tab: 'agenda',
+      title: 'Fila',
+      value: String(facts.remaining.length),
+      hint: names,
+      tone: 'neutral',
+      icon: 'fila',
+      live: true,
+      score: facts.phase === 'clinic' ? 62 : 40,
+      size: 'm',
     });
   }
 
@@ -397,6 +467,36 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
         : facts.pendingReceivables > 0
           ? 46
           : 22,
+      size: 's',
+    });
+  }
+
+  if (facts.todayRevenue > 0 && facts.pendingReceivables > 0) {
+    widgets.push({
+      id: 'receber',
+      tab: 'financeiro',
+      title: 'A receber',
+      value: formatBRL(facts.pendingReceivables),
+      hint: 'pendências em aberto',
+      tone: 'warn',
+      icon: 'receber',
+      live: true,
+      score: 47,
+      size: 's',
+    });
+  }
+
+  if (facts.weekCount > 0) {
+    widgets.push({
+      id: 'semana',
+      tab: 'agenda',
+      title: 'Semana',
+      value: String(facts.weekCount),
+      hint: facts.weekCount === 1 ? 'consulta nesta semana' : 'consultas nesta semana',
+      tone: 'neutral',
+      icon: 'semana',
+      live: true,
+      score: 34,
       size: 's',
     });
   }
@@ -557,14 +657,14 @@ export function deriveControlCenter(
     hiddenLive?: string[];
     pins?: ControlTab[];
     allowAdmin?: boolean;
-    maxLive?: number;
+    maxLive?: number; // default 6
     sizes?: Partial<Record<string, WidgetSize>>;
     order?: string[];
   } = {},
 ): ControlCenterView {
   const facts = deriveClinicFacts(input);
   const hidden = new Set(options.hiddenLive || []);
-  const maxLive = options.maxLive ?? 4;
+  const maxLive = options.maxLive ?? 6;
   const pins = (options.pins || ['dashboard', 'agenda', 'pacientes', 'financeiro']).filter(
     tab => options.allowAdmin || tab !== 'admin',
   );

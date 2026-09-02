@@ -199,7 +199,7 @@ describe('control center widgets', () => {
     expect(ids).toContain('confirmar');
     expect(ids).not.toContain('amanha');
     expect(ids.filter(id => id === 'confirmar' || id === 'amanha')).toHaveLength(1);
-    expect(view.widgets.find(widget => widget.id === 'confirmar')?.tab).toBe('dashboard');
+    expect(view.widgets.find(widget => widget.id === 'confirmar')?.tab).toBe('agenda');
   });
 
   it('keeps amanhã when tomorrow is already confirmed', () => {
@@ -213,6 +213,33 @@ describe('control center widgets', () => {
     const ids = view.widgets.map(widget => widget.id);
     expect(ids).toContain('amanha');
     expect(ids).not.toContain('confirmar');
+  });
+
+  it('opens the next patient from Agora and confirmations from the agenda', () => {
+    const view = deriveControlCenter(input(at('2026-09-02T13:10:00'), {
+      appointments: [
+        appt({ id: 9, patient_id: 44, patient_name: 'Ana Clara', start_time: '2026-09-02T14:00:00', end_time: '2026-09-02T14:40:00' }),
+        appt({ id: 10, patient_id: 8, patient_name: 'Lia', start_time: '2026-09-03T09:00:00', end_time: '2026-09-03T09:40:00', status: 'SCHEDULED' }),
+      ],
+    }));
+    expect(view.widgets.find(widget => widget.id === 'proximo')?.patientId).toBe(44);
+    expect(view.widgets.find(widget => widget.id === 'proximo')?.tab).toBe('agenda');
+    expect(view.widgets.find(widget => widget.id === 'confirmar')?.tab).toBe('agenda');
+  });
+
+  it('invents pause, queue and week widgets from the routine', () => {
+    const view = deriveControlCenter(input(at('2026-09-02T10:00:00'), {
+      appointments: [
+        appt({ id: 1, patient_name: 'Ana', start_time: '2026-09-02T11:00:00', end_time: '2026-09-02T11:40:00' }),
+        appt({ id: 2, patient_name: 'João', start_time: '2026-09-02T14:00:00', end_time: '2026-09-02T14:40:00' }),
+        appt({ id: 3, patient_name: 'Lia', start_time: '2026-09-02T16:00:00', end_time: '2026-09-02T16:40:00' }),
+      ],
+    }));
+    const ids = view.widgets.map(widget => widget.id);
+    expect(ids).toContain('pausa');
+    expect(ids).toContain('fila');
+    expect(ids).toContain('semana');
+    expect(view.widgets.find(widget => widget.id === 'fila')?.hint).toMatch(/Ana/);
   });
 
   it('does not invent a caixa widget without money', () => {
