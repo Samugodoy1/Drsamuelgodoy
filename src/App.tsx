@@ -49,6 +49,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
+import { ClinicRail } from './components/ClinicRail';
 import { PatientClinical } from './components/PatientClinical';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
@@ -292,24 +293,6 @@ const getTokenFromPublicUrl = (value?: string | null) => {
 const buildPatientPublicUrl = (path: 'portal' | 'pre-atendimento', token: string) => {
   return `${trimTrailingSlashes(window.location.origin)}/${path}/${token}`;
 };
-
-const SidebarItem = ({ id, icon: Icon, label, activeTab, setActiveTab, setIsSidebarOpen, navigate }: any) => (
-  <button
-    onClick={() => {
-      setActiveTab(id);
-      setIsSidebarOpen(false);
-      navigate('/');
-    }}
-    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-full transition-colors duration-200 ${
-      activeTab === id
-        ? 'bg-[#f5f5f7] text-[#1d1d1f]'
-        : 'text-[#86868b] hover:text-[#1d1d1f]'
-    }`}
-  >
-    <Icon size={20} strokeWidth={activeTab === id ? 1.75 : 1.5} className="shrink-0" />
-    <span className="font-normal text-[15px] tracking-[-0.011em] tablet-l:hidden desktop:block whitespace-nowrap">{label}</span>
-  </button>
-);
 
 const BottomNavItem = ({ id, icon: Icon, label, activeTab, setActiveTab, navigate }: any) => {
   const active = activeTab === id;
@@ -3094,32 +3077,17 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            <aside className={`
-              fixed inset-y-0 left-0 z-[110] bg-white border-r border-slate-200 p-4 md:p-6 flex flex-col transition-all duration-300 ease-in-out tablet-l:static tablet-l:translate-x-0 no-print
-              ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 tablet-l:w-20 desktop:w-72'}
-            `}>
-              <div className="flex items-center justify-between mb-10 px-2">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <h1 className="text-[21px] font-semibold tracking-[-0.025em] text-[#1d1d1f] whitespace-nowrap">OdontoHub</h1>
-                    {getProductAccess('odontohub')?.plan && getProductAccess('odontohub')?.plan !== 'free' && (
-                      <span className="text-[11px] text-[#86868b]">
-                        {getProductAccess('odontohub')?.plan}
-                      </span>
-                    )}
-                  </div>
-                <button onClick={() => setIsSidebarOpen(false)} className="tablet-l:hidden text-slate-400">
-                  <Plus size={24} className="rotate-45" />
-                </button>
-              </div>
-              <nav className="space-y-2 flex-1">
-                <SidebarItem id="dashboard" icon={Home} label="Início" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-                <SidebarItem id="agenda" icon={Calendar} label="Agenda" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-                <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-                <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-                <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-                <SidebarItem id="configuracoes" icon={Settings} label="Configurações" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-              </nav>
-            </aside>
+            <ClinicRail
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              setIsSidebarOpen={setIsSidebarOpen}
+              navigate={navigate}
+              isSidebarOpen={isSidebarOpen}
+              user={user}
+              profile={profile}
+              isAdmin={user?.role?.toUpperCase() === 'ADMIN'}
+              onLogout={handleLogout}
+            />
             <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col">
               <ClinicalPageRoute 
                 transactions={transactions}
@@ -3370,67 +3338,17 @@ export default function App() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-[110] bg-white border-r border-slate-200 p-4 md:p-6 flex flex-col transition-all duration-300 ease-in-out tablet-l:static tablet-l:translate-x-0 no-print
-        ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 tablet-l:w-20 desktop:w-72'}
-      `}>
-        <div className="flex items-center justify-between mb-10 px-2">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <h1 className="text-[21px] font-semibold tracking-[-0.025em] text-[#1d1d1f] whitespace-nowrap tablet-l:hidden desktop:block">OdontoHub</h1>
-          </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="tablet-l:hidden text-slate-400">
-            <Plus size={24} className="rotate-45" />
-          </button>
-        </div>
-
-        <nav className="space-y-2 flex-1">
-          <SidebarItem id="dashboard" icon={Home} label="Início" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          <SidebarItem id="agenda" icon={Calendar} label="Agenda" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          <SidebarItem id="pacientes" icon={Users} label="Pacientes" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          <SidebarItem id="financeiro" icon={DollarSign} label="Financeiro" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          <SidebarItem id="documentos" icon={FileText} label="Documentos" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          {user?.role?.toUpperCase() === 'ADMIN' && (
-            <SidebarItem id="admin" icon={UserCog} label="Gestão de Dentistas" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-          )}
-          <SidebarItem id="configuracoes" icon={Settings} label="Configurações" activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} navigate={navigate} />
-        </nav>
-
-        <div className="pt-6 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-2 mb-4 overflow-hidden">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0 overflow-hidden border border-slate-200">
-              {profile?.photo_url ? (
-                <img 
-                  src={profile.photo_url} 
-                  alt={profile.name} 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <UserCircle size={24} />
-              )}
-            </div>
-            <div className="tablet-l:hidden desktop:block whitespace-nowrap">
-              <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">{user?.role}</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-rose-600 transition-colors overflow-hidden"
-          >
-            <LogOut size={18} className="shrink-0" />
-            <span className="text-sm font-medium tablet-l:hidden desktop:block whitespace-nowrap">Sair</span>
-          </button>
-
-          <div className="mt-6 pt-6 border-t border-slate-50 tablet-l:hidden desktop:block">
-            <p className="text-[10px] text-slate-400 px-4 mb-2">© 2026 OdontoHub</p>
-            <div className="flex flex-col gap-1 px-4 text-[10px] font-bold text-slate-500">
-              <Link to="/termos" className="hover:text-[#2997ff] transition-colors">Termos de Uso</Link>
-              <Link to="/privacidade" className="hover:text-[#2997ff] transition-colors">Política de Privacidade</Link>
-            </div>
-          </div>
-        </div>
-      </aside>
+      <ClinicRail
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setIsSidebarOpen={setIsSidebarOpen}
+        navigate={navigate}
+        isSidebarOpen={isSidebarOpen}
+        user={user}
+        profile={profile}
+        isAdmin={user?.role?.toUpperCase() === 'ADMIN'}
+        onLogout={handleLogout}
+      />
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
@@ -3744,30 +3662,36 @@ export default function App() {
                                 </div>
                               ))}
                             </div>
-                            <button 
-                              onClick={() => setActiveTab('pacientes')}
-                              className="apple-btn font-normal  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto text-sm"
-                            >
-                              <UserPlus size={16} />
-                              Cadastrar primeiro paciente
-                            </button>
+                            <div className="flex w-full justify-center">
+                              <button 
+                                type="button"
+                                onClick={() => setActiveTab('pacientes')}
+                                className="apple-btn gap-2 text-[15px]"
+                              >
+                                <UserPlus size={16} />
+                                Cadastrar primeiro paciente
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="py-12 sm:py-16 text-center space-y-5 max-w-md mx-auto">
-                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
-                              <Calendar className="text-slate-300" size={28} />
+                          <div className="flex flex-col items-center py-12 sm:py-16 text-center space-y-5">
+                            <div className="w-16 h-16 bg-[#f5f5f7] rounded-full flex items-center justify-center">
+                              <Calendar className="text-[#86868b]" size={28} />
                             </div>
                             <div className="space-y-2">
                               <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Agenda livre neste dia</p>
-                              <p className="text-sm text-slate-500">Sua agenda está livre. Que tal encaixar um paciente?</p>
+                              <p className="text-[15px] text-[#86868b]">Nenhuma consulta marcada</p>
                             </div>
-                            <button 
-                              onClick={openAppointmentModal}
-                              className="apple-btn font-normal  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
-                            >
-                              <Plus size={16} />
-                              Agendar consulta
-                            </button>
+                            <div className="flex w-full justify-center">
+                              <button 
+                                type="button"
+                                onClick={openAppointmentModal}
+                                className="apple-btn gap-2"
+                              >
+                                <Plus size={16} />
+                                Agendar consulta
+                              </button>
+                            </div>
                           </div>
                         );
                       }
@@ -5705,17 +5629,20 @@ export default function App() {
             )}
 
             {activeTab === 'documentos' && (
-              <div className="space-y-8">
-                <div className="mb-8">
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Documentos</h2>
-                  <p className="text-sm text-slate-500">Emissão de receitas, atestados e contratos</p>
-                </div>
-                <Documents patients={patients} profile={profile} apiFetch={apiFetch} imprimirDocumento={imprimirDocumento} />
-              </div>
+              <Documents patients={patients} profile={profile} apiFetch={apiFetch} imprimirDocumento={imprimirDocumento} />
             )}
 
             {activeTab === 'inteligencia' && (
               <MLInsights openPatientRecord={openPatientRecord} product={getCurrentProduct()} />
+            )}
+
+            {activeTab === 'configuracoes' && user && !profile && (
+              <div className="max-w-2xl mx-auto space-y-6 pb-8">
+                <div className="bg-white rounded-[28px] p-6">
+                  <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f] truncate">{user.name}</h2>
+                  <p className="text-[15px] text-[#86868b] mt-1">{user.email}</p>
+                </div>
+              </div>
             )}
 
             {activeTab === 'configuracoes' && profile && (

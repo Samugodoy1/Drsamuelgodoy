@@ -3,7 +3,6 @@ import { API_URL } from '../config';
 import {
   FileText,
   User,
-  CalendarIcon,
   Printer,
   Download,
   ChevronLeft,
@@ -67,6 +66,9 @@ interface DocumentsProps {
 
 type DocType = 'receituario' | 'declaracao' | 'atestado' | 'encaminhamento' | 'ficha' | 'orcamento';
 
+const fieldLabel = 'block text-[13px] text-[#86868b] mb-2 tracking-[-0.011em]';
+const fieldInput = 'ios-input w-full text-[17px]';
+
 export function Documents({ patients, profile, apiFetch, imprimirDocumento }: DocumentsProps) {
   const [selectedDoc, setSelectedDoc] = useState<DocType | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
@@ -75,10 +77,9 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
   const [docDate, setDocDate] = useState(new Date().toISOString().split('T')[0]);
   const [isPreview, setIsPreview] = useState(false);
 
-  // Specific fields
-  const [prescription, setPrescription] = useState({ 
-    items: [{ medication: '', dosage: '' }], 
-    instructions: '' 
+  const [prescription, setPrescription] = useState({
+    items: [{ medication: '', dosage: '' }],
+    instructions: ''
   });
   const [certificate, setCertificate] = useState({ period: '', reason: '' });
   const [referral, setReferral] = useState({ specialist: '', reason: '' });
@@ -163,7 +164,6 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
       if (res.ok) {
         const data = await res.json();
         const token = localStorage.getItem('token');
-        // Trigger PDF download via browser with token in query string
         window.location.href = `${API_URL}/api/documents/${data.id}/pdf?token=${token}`;
       } else {
         alert('Erro ao salvar documento para gerar PDF.');
@@ -206,71 +206,72 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
   const totalBudget = budget.items.reduce((acc, item) => acc + Number(item.value), 0);
 
-  const docTypes = [
-    { id: 'receituario', label: 'Receituário', icon: Stethoscope, description: 'Prescrição de medicamentos' },
-    { id: 'declaracao', label: 'Declaração', icon: FileCheck, description: 'Declaração de comparecimento' },
-    { id: 'atestado', label: 'Atestado', icon: ClipboardList, description: 'Atestado de afastamento' },
-    { id: 'encaminhamento', label: 'Encaminhamento', icon: Send, description: 'Encaminhamento para especialista' },
-    { id: 'ficha', label: 'Ficha Clínica', icon: User, description: 'Resumo clínico do paciente' },
-    { id: 'orcamento', label: 'Orçamento', icon: Calculator, description: 'Orçamento de tratamento' },
+  const docTypes: { id: DocType; label: string; hint: string; icon: typeof Stethoscope; featured?: boolean }[] = [
+    { id: 'receituario', label: 'Receituário', hint: 'Prescrição com a sua assinatura', icon: Stethoscope, featured: true },
+    { id: 'atestado', label: 'Atestado', hint: 'Afastamento', icon: ClipboardList },
+    { id: 'declaracao', label: 'Declaração', hint: 'Comparecimento', icon: FileCheck },
+    { id: 'encaminhamento', label: 'Encaminhamento', hint: 'Especialista', icon: Send },
+    { id: 'ficha', label: 'Ficha clínica', hint: 'Resumo do prontuário', icon: User },
+    { id: 'orcamento', label: 'Orçamento', hint: 'Plano de tratamento', icon: Calculator },
   ];
+
+  const clinicName = profile?.clinic_name || 'Sua clínica';
+  const selectedMeta = docTypes.find(d => d.id === selectedDoc);
 
   if (isPreview) {
     return (
       <div className="space-y-6 font-sans">
-        <div className="flex justify-between items-center no-print">
-          <button 
+        <div className="flex flex-wrap justify-between items-center gap-3 no-print">
+          <button
+            type="button"
             onClick={() => setIsPreview(false)}
-            className="flex items-center gap-2 text-[#64748B] hover:text-[#0F172A] font-bold transition-colors"
+            className="apple-link flex items-center gap-1"
           >
-            <ChevronLeft size={20} />
-            Voltar para Edição
+            <ChevronLeft size={18} />
+            Editar
           </button>
-          <div className="flex gap-3">
-            <button 
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
               onClick={saveAndDownloadPDF}
-              className="flex items-center gap-2 bg-[#0F172A] text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-[#1E293B] transition-colors shadow-sm"
+              className="apple-btn-light gap-2"
             >
-              <Download size={18} />
-              Gerar PDF
+              <Download size={16} />
+              PDF
             </button>
-            <button 
+            <button
+              type="button"
               onClick={saveAndPrint}
-              className="flex items-center gap-2 bg-[#22C55E] text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-[#16A34A] transition-colors shadow-sm"
+              className="apple-btn gap-2"
             >
-              <Printer size={18} />
-              Imprimir Agora
+              <Printer size={16} />
+              Imprimir
             </button>
           </div>
         </div>
-        
-        <div className="no-print bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-sm">
-          <Info size={18} className="shrink-0 mt-0.5" />
-          <p>
-            <strong>Dica:</strong> Se a janela de impressão não abrir, clique no ícone de "Abrir em nova aba" no canto superior direito do aplicativo e tente novamente. Alguns navegadores bloqueiam a impressão dentro de quadros (iframes).
-          </p>
+
+        <div className="no-print bg-[#f5f5f7] p-4 rounded-[18px] flex items-start gap-3 text-[#6e6e73] text-[13px]">
+          <Info size={16} className="shrink-0 mt-0.5" />
+          <p>Se a impressão não abrir, use o PDF. Alguns navegadores bloqueiam impressão em quadro.</p>
         </div>
 
-        {/* Paper Layout */}
-        <div className="bg-white shadow-xl mx-auto max-w-[21cm] min-h-[29.7cm] p-[2cm] font-serif text-[#0F172A] print:shadow-none print:p-0 rounded-[4px]">
-          {/* Header */}
-          <div className="text-center border-b border-slate-100 pb-6 mb-10">
-            <h1 className="text-3xl font-bold text-[#0F172A] uppercase tracking-widest">
+        <div className="bg-white mx-auto max-w-[21cm] min-h-[29.7cm] p-[2cm] font-serif text-[#1d1d1f] print:shadow-none print:p-0">
+          <div className="text-center border-b border-[#d2d2d7] pb-6 mb-10">
+            <h1 className="text-3xl font-semibold tracking-[-0.025em] text-[#1d1d1f]">
               {profile?.clinic_name || 'Clínica Odontológica'}
             </h1>
-            <p className="text-sm text-[#64748B] mt-1">
+            <p className="text-sm text-[#6e6e73] mt-1">
               {profile?.clinic_address || 'Endereço não informado'}
             </p>
-            <p className="text-sm text-[#64748B]">
+            <p className="text-sm text-[#6e6e73]">
               Tel: {profile?.phone || 'Telefone não informado'}
             </p>
           </div>
 
-          {/* Content */}
           <div className="space-y-8 min-h-[15cm]">
             <div className="text-center mb-12">
-              <h2 className="text-2xl font-bold uppercase border-b-2 border-[#22C55E] inline-block pb-1">
-                {docTypes.find(d => d.id === selectedDoc)?.label}
+              <h2 className="text-2xl font-semibold tracking-[-0.025em] inline-block pb-1 border-b border-[#1d1d1f]">
+                {selectedMeta?.label}
               </h2>
             </div>
 
@@ -280,17 +281,17 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
               {selectedDoc === 'receituario' && (
                 <div className="mt-10 space-y-8">
-                  <p className="font-bold text-xl mb-4 text-[#0F172A]">Uso Interno:</p>
+                  <p className="font-semibold text-xl mb-4 text-[#1d1d1f]">Uso interno</p>
                   {prescription.items.map((item, i) => (
-                    <div key={i} className="border-l-4 border-[#22C55E] pl-4 mb-6">
-                      <p className="font-bold text-lg">{item.medication}</p>
-                      <p className="text-[#64748B] italic">{item.dosage}</p>
+                    <div key={i} className="border-l-2 border-[#1d1d1f] pl-4 mb-6">
+                      <p className="font-semibold text-lg">{item.medication}</p>
+                      <p className="text-[#6e6e73] italic">{item.dosage}</p>
                     </div>
                   ))}
                   {prescription.instructions && (
-                    <div className="mt-8 pt-6 border-t border-black/5">
-                      <p className="font-bold mb-2">Instruções:</p>
-                      <p className="text-[#64748B] whitespace-pre-wrap">{prescription.instructions}</p>
+                    <div className="mt-8 pt-6 border-t border-[#d2d2d7]">
+                      <p className="font-semibold mb-2">Instruções</p>
+                      <p className="text-[#6e6e73] whitespace-pre-wrap">{prescription.instructions}</p>
                     </div>
                   )}
                 </div>
@@ -317,11 +318,11 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
 
               {selectedDoc === 'encaminhamento' && (
                 <div className="mt-10 space-y-6">
-                  <p><strong>Ao Especialista:</strong> {referral.specialist}</p>
+                  <p><strong>Ao especialista:</strong> {referral.specialist}</p>
                   <p className="text-justify">
                     Encaminho o(a) paciente <strong>{selectedPatient?.name}</strong> para avaliação e conduta especializada.
                   </p>
-                  <p><strong>Motivo/Histórico:</strong> {referral.reason}</p>
+                  <p><strong>Motivo:</strong> {referral.reason}</p>
                 </div>
               )}
 
@@ -329,61 +330,61 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                 <div className="mt-10 space-y-8">
                   <div className="grid grid-cols-2 gap-4 text-sm font-sans">
                     <p><strong>CPF:</strong> {selectedPatient?.cpf}</p>
-                    <p><strong>Data de Nasc.:</strong> {selectedPatient?.birth_date ? new Date(selectedPatient.birth_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+                    <p><strong>Nascimento:</strong> {selectedPatient?.birth_date ? new Date(selectedPatient.birth_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
                     <p><strong>E-mail:</strong> {selectedPatient?.email}</p>
                     <p><strong>Telefone:</strong> {selectedPatient?.phone}</p>
                     <p className="col-span-2"><strong>Endereço:</strong> {selectedPatient?.address || 'Não informado'}</p>
                   </div>
-                  
+
                   <div className="space-y-6 font-sans">
                     <div className="space-y-4">
-                      <h4 className="font-bold border-b-2 border-[#22C55E] pb-1 text-[#0F172A] uppercase tracking-wider">Histórico Clínico (Anamnese)</h4>
+                      <h4 className="font-semibold border-b border-[#1d1d1f] pb-1 text-[#1d1d1f]">Histórico clínico</h4>
                       <div className="grid grid-cols-1 gap-4 text-sm">
                         <div>
-                          <p className="font-bold text-[#64748B] text-[10px] uppercase">Histórico Médico:</p>
+                          <p className="text-[#86868b] text-[13px] mb-1">Histórico médico</p>
                           <p>{selectedPatient?.anamnesis?.medical_history || 'Nenhum histórico registrado.'}</p>
                         </div>
                         <div>
-                          <p className="font-bold text-[#64748B] text-[10px] uppercase">Alergias:</p>
-                          <p className={hasRecordedAllergie(selectedPatient?.anamnesis?.allergies) ? 'text-rose-600 font-bold' : ''}>
+                          <p className="text-[#86868b] text-[13px] mb-1">Alergias</p>
+                          <p className={hasRecordedAllergie(selectedPatient?.anamnesis?.allergies) ? 'text-[#ff3b30] font-semibold' : ''}>
                             {formatAllergieLabel(selectedPatient?.anamnesis?.allergies)}
                           </p>
                         </div>
                         <div>
-                          <p className="font-bold text-[#64748B] text-[10px] uppercase">Medicações em Uso:</p>
+                          <p className="text-[#86868b] text-[13px] mb-1">Medicações em uso</p>
                           <p>{formatMedicationLabel(selectedPatient?.anamnesis?.medications)}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-bold border-b-2 border-[#22C55E] pb-1 text-[#0F172A] uppercase tracking-wider">Odontograma Atual</h4>
+                      <h4 className="font-semibold border-b border-[#1d1d1f] pb-1 text-[#1d1d1f]">Odontograma</h4>
                       <div className="scale-90 origin-top">
-                        <Odontogram 
-                          data={selectedPatient?.odontogram || {}} 
+                        <Odontogram
+                          data={selectedPatient?.odontogram || {}}
                           history={selectedPatient?.toothHistory || []}
-                          onChange={() => {}} 
-                          readOnly={true} 
+                          onChange={() => {}}
+                          readOnly={true}
                         />
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-bold border-b-2 border-[#22C55E] pb-1 text-[#0F172A] uppercase tracking-wider">Histórico de Atendimentos (Evolução)</h4>
+                      <h4 className="font-semibold border-b border-[#1d1d1f] pb-1 text-[#1d1d1f]">Atendimentos</h4>
                       {selectedPatient?.evolution && selectedPatient.evolution.length > 0 ? (
                     <div className="space-y-4">
                       {selectedPatient.evolution.map((evo, i) => (
-                        <div key={`${evo.id}-${i}`} className="border-b border-slate-100 pb-3">
+                        <div key={`${evo.id}-${i}`} className="border-b border-[#d2d2d7] pb-3">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold text-[#22C55E]">{new Date(evo.date).toLocaleDateString('pt-BR')}</span>
-                            <span className="text-xs font-bold text-[#64748B] uppercase">{evo.procedure_performed}</span>
+                            <span className="text-xs font-semibold text-[#1d1d1f]">{new Date(evo.date).toLocaleDateString('pt-BR')}</span>
+                            <span className="text-xs text-[#6e6e73]">{evo.procedure_performed}</span>
                           </div>
-                          <p className="text-sm text-[#64748B] italic">{evo.notes}</p>
+                          <p className="text-sm text-[#6e6e73] italic">{evo.notes}</p>
                         </div>
                       ))}
                     </div>
                       ) : (
-                        <p className="text-sm text-[#64748B] italic">Nenhum atendimento registrado até o momento.</p>
+                        <p className="text-sm text-[#86868b]">Nenhum atendimento registrado.</p>
                       )}
                     </div>
                   </div>
@@ -394,25 +395,25 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
                 <div className="mt-10 space-y-6 font-sans">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-[#f5f5f7] text-[#0F172A]">
-                        <th className="border border-black/5 p-3 text-left">Procedimento</th>
-                        <th className="border border-black/5 p-3 text-right">Valor</th>
+                      <tr className="bg-[#f5f5f7] text-[#1d1d1f]">
+                        <th className="border border-[#d2d2d7] p-3 text-left font-semibold">Procedimento</th>
+                        <th className="border border-[#d2d2d7] p-3 text-right font-semibold">Valor</th>
                       </tr>
                     </thead>
                     <tbody>
                       {budget.items.map((item, i) => (
                         <tr key={i}>
-                          <td className="border border-black/5 p-3">{item.procedure}</td>
-                          <td className="border border-black/5 p-3 text-right">
+                          <td className="border border-[#d2d2d7] p-3">{item.procedure}</td>
+                          <td className="border border-[#d2d2d7] p-3 text-right">
                             {Number(item.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="font-bold bg-[#f5f5f7]">
-                        <td className="border border-black/5 p-3 text-right">Total</td>
-                        <td className="border border-black/5 p-3 text-right text-[#22C55E]">
+                      <tr className="font-semibold bg-[#f5f5f7]">
+                        <td className="border border-[#d2d2d7] p-3 text-right">Total</td>
+                        <td className="border border-[#d2d2d7] p-3 text-right text-[#1d1d1f]">
                           {totalBudget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </td>
                       </tr>
@@ -423,11 +424,10 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
             </div>
           </div>
 
-          {/* Footer / Signature */}
           <div className="mt-20 flex flex-col items-center">
-            <div className="w-64 border-t border-black/10 mb-2"></div>
-            <p className="font-bold text-lg">{profile?.name}</p>
-            <p className="text-[#64748B]">Cirurgião-Dentista • CRO: {profile?.cro}</p>
+            <div className="w-64 border-t border-[#d2d2d7] mb-2"></div>
+            <p className="font-semibold text-lg">{profile?.name}</p>
+            <p className="text-[#6e6e73]">Cirurgião-Dentista · CRO {profile?.cro}</p>
           </div>
         </div>
       </div>
@@ -435,259 +435,269 @@ export function Documents({ patients, profile, apiFetch, imprimirDocumento }: Do
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 font-sans p-4 md:p-0">
+    <div className="max-w-3xl mx-auto font-sans pb-8">
       {!selectedDoc ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {docTypes.map((doc) => (
-            <button
-              key={doc.id}
-              onClick={() => setSelectedDoc(doc.id as DocType)}
-              className="bg-white p-8 rounded-[32px] shadow-sm hover:shadow-md transition-all text-left group border-none"
-            >
-              <div className="w-14 h-14 bg-[#f5f5f7] text-[#22C55E] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <doc.icon size={28} />
-              </div>
-              <h3 className="text-xl font-bold text-[#0F172A]">{doc.label}</h3>
-              <p className="text-sm text-[#64748B] mt-2 leading-relaxed">{doc.description}</p>
-            </button>
-          ))}
+        <div className="space-y-8">
+          <header className="px-1 pt-2">
+            <p className="text-[13px] text-[#86868b] tracking-[-0.011em]">{clinicName}</p>
+            <h1 className="apple-display-ink text-[34px] sm:text-[40px] mt-1">Papéis da clínica.</h1>
+            <p className="text-[17px] text-[#86868b] mt-2 tracking-[-0.011em]">Receita, atestado e o que o paciente leva embora.</p>
+          </header>
+
+          <div className="grid grid-cols-2 gap-3">
+            {docTypes.map((doc) => {
+              const Icon = doc.icon;
+              return (
+                <button
+                  key={doc.id}
+                  type="button"
+                  onClick={() => setSelectedDoc(doc.id)}
+                  className={`bg-white text-left transition-transform active:scale-[0.98] ${
+                    doc.featured
+                      ? 'col-span-2 rounded-[28px] p-7 min-h-[168px] flex flex-col justify-between'
+                      : 'rounded-[24px] p-5 min-h-[132px] flex flex-col justify-between'
+                  }`}
+                >
+                  <div className={`flex items-center justify-center bg-[#f5f5f7] text-[#1d1d1f] ${
+                    doc.featured ? 'w-12 h-12 rounded-[16px]' : 'w-10 h-10 rounded-[14px]'
+                  }`}>
+                    <Icon size={doc.featured ? 24 : 20} />
+                  </div>
+                  <div className={doc.featured ? 'mt-8' : 'mt-5'}>
+                    <h2 className={`font-semibold tracking-[-0.025em] text-[#1d1d1f] ${doc.featured ? 'text-[28px]' : 'text-[17px]'}`}>
+                      {doc.label}
+                    </h2>
+                    <p className="text-[13px] text-[#86868b] mt-1">{doc.hint}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : (
-        <div className="bg-white rounded-[32px] shadow-sm overflow-hidden border-none">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
-            <button 
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <button
+              type="button"
               onClick={() => setSelectedDoc(null)}
-              className="flex items-center gap-2 text-[#64748B] hover:text-[#0F172A] font-bold transition-colors"
+              className="apple-link flex items-center gap-1"
             >
-              <ChevronLeft size={20} />
-              Voltar
+              <ChevronLeft size={18} />
+              Papéis
             </button>
-            <h3 className="font-bold text-lg text-[#0F172A]">
-              Gerar {docTypes.find(d => d.id === selectedDoc)?.label}
-            </h3>
-            <div className="w-20"></div>
           </div>
 
-          <div className="p-8 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              {/* Common Fields */}
-              <div className="space-y-6">
-                <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Informações Básicas</h4>
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Selecionar Paciente</label>
-                    <div className="relative">
-                      <select 
-                        value={selectedPatientId}
-                        onChange={(e) => setSelectedPatientId(e.target.value)}
-                        className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none appearance-none text-[#0F172A] shadow-sm"
-                      >
-                        <option value="">Selecione um paciente...</option>
-                        {patients.map((p, idx) => (
-                          <option key={`${p.id}-${idx}`} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                      {isLoadingPatient && (
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                          <div className="w-4 h-4 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                      )}
+          <header className="px-1">
+            <h1 className="apple-display-ink text-[34px]">{selectedMeta?.label}.</h1>
+            <p className="text-[17px] text-[#86868b] mt-1">{selectedMeta?.hint}</p>
+          </header>
+
+          <div className="bg-white rounded-[28px] p-6 sm:p-8 space-y-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <label className={fieldLabel}>Paciente</label>
+                <div className="relative">
+                  <select
+                    value={selectedPatientId}
+                    onChange={(e) => setSelectedPatientId(e.target.value)}
+                    className={`${fieldInput} appearance-none`}
+                  >
+                    <option value="">Escolher paciente</option>
+                    {patients.map((p, idx) => (
+                      <option key={`${p.id}-${idx}`} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {isLoadingPatient && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
                     </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Data do Documento</label>
-                    <input 
-                      type="date" 
-                      value={docDate}
-                      onChange={(e) => setDocDate(e.target.value)}
-                      className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-[#0F172A] shadow-sm"
-                    />
-                  </div>
+                  )}
                 </div>
               </div>
-
-              {/* Specific Fields */}
-              <div className="space-y-6">
-                <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Conteúdo do Documento</h4>
-                
-                {selectedDoc === 'receituario' && (
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      {prescription.items.map((item, i) => (
-                        <div key={i} className="p-5 bg-[#f5f5f7] rounded-2xl border-none shadow-sm space-y-4 relative group">
-                          {prescription.items.length > 1 && (
-                            <button 
-                              onClick={() => removePrescriptionItem(i)}
-                              className="absolute top-3 right-3 p-1.5 text-rose-500 hover:bg-rose-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                          <div>
-                            <label className="text-[10px] font-bold text-[#64748B] mb-1.5 block uppercase">Medicamento {i + 1}</label>
-                            <input 
-                              type="text" 
-                              value={item.medication}
-                              onChange={(e) => updatePrescriptionItem(i, 'medication', e.target.value)}
-                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-base text-[#0F172A] shadow-sm"
-                              placeholder="Ex: Amoxicilina 500mg"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-[#64748B] mb-1.5 block uppercase">Dosagem / Posologia</label>
-                            <input 
-                              type="text" 
-                              value={item.dosage}
-                              onChange={(e) => updatePrescriptionItem(i, 'dosage', e.target.value)}
-                              className="w-full p-3 bg-white border-none rounded-xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-base text-[#0F172A] shadow-sm"
-                              placeholder="Ex: Tomar 1 comprimido a cada 8 horas"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <button 
-                      onClick={addPrescriptionItem}
-                      className="flex items-center gap-2 text-[#22C55E] text-sm font-bold hover:opacity-80 transition-opacity"
-                    >
-                      <Plus size={16} />
-                      Adicionar Medicamento
-                    </button>
-
-                    <div className="pt-6 border-t border-slate-100">
-                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Instruções Adicionais</label>
-                      <textarea 
-                        rows={3}
-                        value={prescription.instructions || ''}
-                        onChange={(e) => setPrescription({...prescription, instructions: e.target.value})}
-                        className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-base text-[#0F172A] shadow-sm"
-                        placeholder="Orientações sobre alimentação, repouso, etc."
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {selectedDoc === 'atestado' && (
-                  <div className="space-y-6">
-                    <div>
-                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Período de Afastamento</label>
-                      <input 
-                        type="text" 
-                        value={certificate.period}
-                        onChange={(e) => setCertificate({...certificate, period: e.target.value})}
-                        className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-[#0F172A] shadow-sm"
-                        placeholder="Ex: 03 (três) dias"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Motivo (Opcional)</label>
-                      <textarea 
-                        rows={4}
-                        value={certificate.reason || ''}
-                        onChange={(e) => setCertificate({...certificate, reason: e.target.value})}
-                        className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-[#0F172A] shadow-sm"
-                        placeholder="Ex: Extração de siso"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {selectedDoc === 'encaminhamento' && (
-                  <div className="space-y-6">
-                    <div>
-                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Especialista / Área</label>
-                      <input 
-                        type="text" 
-                        value={referral.specialist}
-                        onChange={(e) => setReferral({...referral, specialist: e.target.value})}
-                        className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none text-[#0F172A] shadow-sm"
-                        placeholder="Ex: Dr. João (Endodontista)"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-[#64748B] mb-2 block uppercase">Motivo do Encaminhamento</label>
-                      <textarea 
-                        rows={5}
-                        value={referral.reason || ''}
-                        onChange={(e) => setReferral({...referral, reason: e.target.value})}
-                        className="w-full p-4 bg-[#f5f5f7] border-none rounded-2xl focus:ring-2 focus:ring-[#22C55E]/20 outline-none resize-none text-[#0F172A] shadow-sm"
-                        placeholder="Descreva o caso clínico..."
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {selectedDoc === 'orcamento' && (
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      {budget.items.map((item, i) => (
-                        <div key={i} className="flex gap-3 items-end bg-[#f5f5f7] p-4 rounded-2xl border-none shadow-sm">
-                          <div className="flex-1">
-                            <label className="text-[10px] font-bold text-[#64748B] uppercase mb-1.5 block">Procedimento</label>
-                            <input 
-                              type="text" 
-                              value={item.procedure}
-                              onChange={(e) => updateBudgetItem(i, 'procedure', e.target.value)}
-                              className="w-full p-2.5 bg-white border-none rounded-xl text-base outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
-                            />
-                          </div>
-                          <div className="w-32">
-                            <label className="text-[10px] font-bold text-[#64748B] uppercase mb-1.5 block">Valor (R$)</label>
-                            <input 
-                              type="number" 
-                              value={item.value}
-                              onChange={(e) => updateBudgetItem(i, 'value', e.target.value)}
-                              className="w-full p-2.5 bg-white border-none rounded-xl text-base outline-none focus:ring-2 focus:ring-[#22C55E]/20 text-[#0F172A] shadow-sm"
-                            />
-                          </div>
-                          <button 
-                            onClick={() => removeBudgetItem(i)}
-                            className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button 
-                      onClick={addBudgetItem}
-                      className="flex items-center gap-2 text-[#22C55E] text-sm font-bold hover:opacity-80 transition-opacity"
-                    >
-                      <Plus size={16} />
-                      Adicionar Item
-                    </button>
-                    <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
-                      <span className="font-bold text-[#0F172A]">Total:</span>
-                      <span className="text-2xl font-black text-[#22C55E]">
-                        {totalBudget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {(selectedDoc === 'declaracao' || selectedDoc === 'ficha') && (
-                  <div className="p-8 bg-[#f5f5f7] rounded-[32px] border border-dashed border-slate-200 text-center">
-                    <p className="text-sm text-[#64748B] leading-relaxed">
-                      Este documento será gerado automaticamente com os dados do paciente selecionado.
-                    </p>
-                  </div>
-                )}
+              <div>
+                <label className={fieldLabel}>Data</label>
+                <input
+                  type="date"
+                  value={docDate}
+                  onChange={(e) => setDocDate(e.target.value)}
+                  className={fieldInput}
+                />
               </div>
             </div>
 
-            <div className="pt-10 border-t border-slate-100 flex justify-end">
+            {selectedDoc === 'receituario' && (
+              <div className="space-y-5">
+                {prescription.items.map((item, i) => (
+                  <div key={i} className="p-5 bg-[#f5f5f7] rounded-[20px] space-y-4 relative">
+                    {prescription.items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePrescriptionItem(i)}
+                        className="absolute top-3 right-3 p-1.5 text-[#ff3b30]"
+                        aria-label="Remover medicamento"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                    <div>
+                      <label className={fieldLabel}>Medicamento {i + 1}</label>
+                      <input
+                        type="text"
+                        value={item.medication}
+                        onChange={(e) => updatePrescriptionItem(i, 'medication', e.target.value)}
+                        className="ios-input w-full bg-white text-[17px]"
+                        placeholder="Amoxicilina 500 mg"
+                      />
+                    </div>
+                    <div>
+                      <label className={fieldLabel}>Posologia</label>
+                      <input
+                        type="text"
+                        value={item.dosage}
+                        onChange={(e) => updatePrescriptionItem(i, 'dosage', e.target.value)}
+                        className="ios-input w-full bg-white text-[17px]"
+                        placeholder="1 comprimido a cada 8 horas"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addPrescriptionItem}
+                  className="apple-link flex items-center gap-1 text-[15px]"
+                >
+                  <Plus size={16} />
+                  Outro medicamento
+                </button>
+
+                <div>
+                  <label className={fieldLabel}>Instruções</label>
+                  <textarea
+                    rows={3}
+                    value={prescription.instructions || ''}
+                    onChange={(e) => setPrescription({...prescription, instructions: e.target.value})}
+                    className={`${fieldInput} resize-none`}
+                    placeholder="Alimentação, repouso, demais orientações"
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedDoc === 'atestado' && (
+              <div className="space-y-5">
+                <div>
+                  <label className={fieldLabel}>Período de afastamento</label>
+                  <input
+                    type="text"
+                    value={certificate.period}
+                    onChange={(e) => setCertificate({...certificate, period: e.target.value})}
+                    className={fieldInput}
+                    placeholder="3 (três) dias"
+                  />
+                </div>
+                <div>
+                  <label className={fieldLabel}>Motivo</label>
+                  <textarea
+                    rows={4}
+                    value={certificate.reason || ''}
+                    onChange={(e) => setCertificate({...certificate, reason: e.target.value})}
+                    className={`${fieldInput} resize-none`}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedDoc === 'encaminhamento' && (
+              <div className="space-y-5">
+                <div>
+                  <label className={fieldLabel}>Especialista</label>
+                  <input
+                    type="text"
+                    value={referral.specialist}
+                    onChange={(e) => setReferral({...referral, specialist: e.target.value})}
+                    className={fieldInput}
+                    placeholder="Endodontia"
+                  />
+                </div>
+                <div>
+                  <label className={fieldLabel}>Motivo</label>
+                  <textarea
+                    rows={5}
+                    value={referral.reason || ''}
+                    onChange={(e) => setReferral({...referral, reason: e.target.value})}
+                    className={`${fieldInput} resize-none`}
+                    placeholder="Resumo do caso"
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedDoc === 'orcamento' && (
+              <div className="space-y-4">
+                {budget.items.map((item, i) => (
+                  <div key={i} className="flex gap-3 items-end bg-[#f5f5f7] p-4 rounded-[20px]">
+                    <div className="flex-1">
+                      <label className={fieldLabel}>Procedimento</label>
+                      <input
+                        type="text"
+                        value={item.procedure}
+                        onChange={(e) => updateBudgetItem(i, 'procedure', e.target.value)}
+                        className="ios-input w-full bg-white text-[17px]"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <label className={fieldLabel}>Valor</label>
+                      <input
+                        type="number"
+                        value={item.value}
+                        onChange={(e) => updateBudgetItem(i, 'value', e.target.value)}
+                        className="ios-input w-full bg-white text-[17px]"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeBudgetItem(i)}
+                      className="p-2.5 text-[#ff3b30]"
+                      aria-label="Remover item"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addBudgetItem}
+                  className="apple-link flex items-center gap-1 text-[15px]"
+                >
+                  <Plus size={16} />
+                  Outro item
+                </button>
+                <div className="pt-4 flex justify-between items-baseline">
+                  <span className="text-[15px] text-[#86868b]">Total</span>
+                  <span className="text-[28px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">
+                    {totalBudget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {(selectedDoc === 'declaracao' || selectedDoc === 'ficha') && (
+              <p className="text-[15px] text-[#86868b] leading-relaxed">
+                Montamos com os dados do paciente escolhido.
+              </p>
+            )}
+
+            <div className="flex justify-center pt-2">
               <button
+                type="button"
                 disabled={!selectedPatientId}
                 onClick={() => setIsPreview(true)}
-                className={`flex items-center gap-3 px-10 py-4 rounded-2xl font-bold transition-all ${
-                  selectedPatientId 
-                    ? 'bg-[#22C55E] text-white hover:bg-[#16A34A] shadow-md' 
-                    : 'bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed'
-                }`}
+                className={`apple-btn gap-2 ${!selectedPatientId ? 'opacity-40 pointer-events-none' : ''}`}
               >
-                <FileText size={20} />
-                Visualizar Documento
+                <FileText size={18} />
+                Visualizar
               </button>
             </div>
           </div>
