@@ -7565,11 +7565,11 @@ function ForgotPassword() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <h1 className="text-[26px] font-semibold text-[#1d1d1f] tracking-[-0.4px] leading-[1.2] mb-2.5">
-            Redefinir sua senha
+          <h1 className="apple-display-ink text-[40px] mb-3">
+            Redefinir senha.
           </h1>
-          <p className="text-[15px] text-[#86868b] leading-relaxed">
-            Informe seu e-mail para receber as instruções de acesso.
+          <p className="apple-subhead text-[17px]">
+            Informe seu e-mail.
           </p>
         </motion.div>
 
@@ -7615,7 +7615,7 @@ function ForgotPassword() {
               whileHover={{ scale: loading ? 1 : 1.005 }}
               whileTap={{ scale: loading ? 1 : 0.98 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
-              className="w-full h-[48px] bg-[#1d1d1f] hover:bg-[#1d1d1f] disabled:hover:bg-[#1d1d1f] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(0,0,0,0.14),0_1px_2px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] duration-[160ms] ease-in-out"
+              className="w-full apple-btn disabled:opacity-50"
               style={{ willChange: 'transform' }}
             >
               {loading ? 'Enviando...' : 'Enviar instruções'}
@@ -7685,12 +7685,11 @@ function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-md">
-          <AlertTriangle className="mx-auto text-rose-500 mb-4" size={48} />
-          <h1 className="text-2xl font-bold mb-2">Link Inválido</h1>
-          <p className="text-slate-500 mb-6">Este link de recuperação de senha é inválido ou expirou.</p>
-          <Link to="/" className="bg-primary text-white px-6 py-3 rounded-xl font-bold inline-block">
+      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <h1 className="apple-display-ink text-[32px] mb-3">Link inválido.</h1>
+          <p className="apple-subhead text-[17px] mb-8">Este link expirou.</p>
+          <Link to="/" className="apple-btn inline-block">
             Voltar para o login
           </Link>
         </div>
@@ -7699,52 +7698,39 @@ function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 font-sans">
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+        className="w-full max-w-[400px]"
       >
-        <div className="p-8 md:p-12">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary/20">
-              <Lock size={32} strokeWidth={3} />
-            </div>
-          </div>
-          <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Nova Senha</h1>
-            <p className="text-slate-500">Crie uma nova senha segura para sua conta</p>
-          </div>
+        <div>
+          <h1 className="apple-display-ink text-[40px] mb-3">Nova senha.</h1>
+          <p className="apple-subhead text-[17px] mb-10">Escolha uma senha.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nova Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
+              <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Nova senha</label>
+              <input 
                   type="password" 
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="ios-input w-full h-[48px] text-[17px]"
                 />
-              </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Confirmar Nova Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
+              <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Confirmar senha</label>
+              <input 
                   type="password" 
                   required
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="ios-input w-full h-[48px] text-[17px]"
                 />
-              </div>
             </div>
 
             {error && (
@@ -7764,9 +7750,9 @@ function ResetPassword() {
             <button 
               type="submit"
               disabled={loading || success}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold  hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full apple-btn disabled:opacity-50"
             >
-              {loading ? 'Processando...' : 'Redefinir Senha'}
+              {loading ? 'Processando' : 'Redefinir senha'}
             </button>
           </form>
 
