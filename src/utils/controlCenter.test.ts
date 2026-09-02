@@ -8,6 +8,7 @@ import {
   formatUntil,
   getControlPhase,
   greetingForHour,
+  pickMobileGlance,
 } from './controlCenter';
 import type { ControlAppointment, ControlCenterInput } from './controlCenter';
 
@@ -249,5 +250,72 @@ describe('control center widgets', () => {
       ],
     }));
     expect(view.widgets.some(widget => widget.id === 'caixa')).toBe(false);
+  });
+});
+
+describe('mobile glance', () => {
+  it('keeps at most two useful chips and prefers the chair then the next patient', () => {
+    const chips = pickMobileGlance(input(at('2026-09-02T14:10:00'), {
+      portalPendingCount: 4,
+      appointments: [
+        appt({ id: 1, patient_id: 9, patient_name: 'João Lima', start_time: '2026-09-02T14:00:00', end_time: '2026-09-02T14:40:00', status: 'IN_PROGRESS' }),
+        appt({ id: 2, patient_id: 11, patient_name: 'Ana Clara', start_time: '2026-09-02T15:00:00', end_time: '2026-09-02T15:40:00' }),
+        appt({ id: 3, patient_name: 'Lia', start_time: '2026-09-03T09:00:00', end_time: '2026-09-03T09:40:00', status: 'SCHEDULED' }),
+      ],
+    }));
+
+    expect(chips).toHaveLength(2);
+    expect(chips[0]).toMatchObject({ id: 'sala', label: 'João', detail: 'na cadeira', patientId: 9 });
+    expect(chips[1]).toMatchObject({ id: 'proximo', label: 'Ana', patientId: 11 });
+    expect(chips[1].detail).toMatch(/em 50 min|às 15:00/);
+  });
+
+  it('shows the next patient and confirmations when the next visit is close', () => {
+    const chips = pickMobileGlance(input(at('2026-09-02T08:50:00'), {
+      appointments: [
+        appt({ id: 1, patient_id: 4, patient_name: 'Ana Clara', start_time: '2026-09-02T09:00:00', end_time: '2026-09-02T09:40:00' }),
+        appt({ id: 2, patient_name: 'Lia', start_time: '2026-09-03T09:00:00', end_time: '2026-09-03T09:40:00', status: 'SCHEDULED' }),
+        appt({ id: 3, patient_name: 'Rui', start_time: '2026-09-03T11:00:00', end_time: '2026-09-03T11:40:00', status: 'SCHEDULED' }),
+      ],
+    }));
+
+    expect(chips.map(chip => chip.id)).toEqual(['proximo', 'confirmar']);
+    expect(chips[0].label).toBe('Ana');
+    expect(chips[0].detail).toBe('em 10 min');
+    expect(chips[1].label).toBe('2 confirmar');
+  });
+
+  it('stays quiet when the next patient is still far and nothing else needs the dentist', () => {
+    const chips = pickMobileGlance(input(at('2026-09-02T10:00:00'), {
+      appointments: [
+        appt({ id: 1, patient_name: 'Ana', start_time: '2026-09-02T14:00:00', end_time: '2026-09-02T14:40:00' }),
+      ],
+    }));
+    expect(chips).toEqual([]);
+  });
+
+  it('hides chips that would only open the screen the dentist is already on', () => {
+    const payload = input(at('2026-09-02T10:00:00'), {
+      portalPendingCount: 2,
+      noShowRescheduleCount: 3,
+      appointments: [
+        appt({ id: 2, patient_name: 'Lia', start_time: '2026-09-03T09:00:00', end_time: '2026-09-03T09:40:00', status: 'SCHEDULED' }),
+      ],
+    });
+
+    expect(pickMobileGlance(payload, 'agenda').map(chip => chip.id)).toEqual(['recuperar', 'portal']);
+    expect(pickMobileGlance(payload, 'dashboard').map(chip => chip.id)).toEqual(['confirmar', 'portal']);
+    expect(pickMobileGlance(payload, 'pacientes').map(chip => chip.id)).toEqual(['confirmar', 'recuperar']);
+  });
+
+  it('surfaces recoveries or the portal when the day is empty', () => {
+    const chips = pickMobileGlance(input(at('2026-09-02T11:00:00'), {
+      noShowRescheduleCount: 1,
+      portalPendingCount: 2,
+      appointments: [],
+    }));
+    expect(chips.map(chip => chip.id)).toEqual(['recuperar', 'portal']);
+    expect(chips[0].label).toBe('Recuperar');
+    expect(chips[1].label).toBe('2 no portal');
   });
 });

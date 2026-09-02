@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { Calendar, DollarSign, Home, Settings, Users } from '../icons';
+import { ClinicControlMobile } from './ClinicControlMobile';
 import { ClinicRail, type RailTab } from './ClinicRail';
 import type { ControlAppointment } from '../utils/controlCenter';
 
@@ -147,6 +149,45 @@ export function ControlCenterPreview() {
         <p className="text-[13px] text-[#86868b]">
           Relógio da cena: {String(scene.hours).padStart(2, '0')}:{String(scene.minutes).padStart(2, '0')} · aba ativa: {activeTab}
         </p>
+
+        <div className="max-w-[390px]">
+          <p className="text-[13px] text-[#86868b] mb-3">No celular ela só aparece quando ajuda — no máximo dois avisos, acima da tab bar.</p>
+          <div className="relative overflow-hidden rounded-[36px] border border-[#d2d2d7] bg-[#f5f5f7] px-3 pt-10 pb-4">
+            <div className="h-48 rounded-[22px] bg-white/70" />
+            <div className="mt-6">
+              <ClinicControlMobile
+                snapshot={snapshot}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                navigate={() => undefined}
+              />
+              <nav className="liquid-glass-tabbar mx-auto flex max-w-[430px] items-stretch px-1.5 py-1">
+                {[
+                  { id: 'dashboard', label: 'Início', Icon: Home },
+                  { id: 'agenda', label: 'Agenda', Icon: Calendar },
+                  { id: 'pacientes', label: 'Pacientes', Icon: Users },
+                  { id: 'financeiro', label: 'Financeiro', Icon: DollarSign },
+                  { id: 'configuracoes', label: 'Perfil', Icon: Settings },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTab(item.id as RailTab)}
+                    className={`relative flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[22px] ${
+                      activeTab === item.id ? 'text-[#1d1d1f]' : 'text-[#86868b]'
+                    }`}
+                  >
+                    {activeTab === item.id && (
+                      <span className="liquid-glass-item-active pointer-events-none absolute inset-0 rounded-[22px]" />
+                    )}
+                    <item.Icon size={22} className="relative" />
+                    <span className="relative text-[10px] leading-none">{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
