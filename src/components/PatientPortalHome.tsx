@@ -135,7 +135,7 @@ export function PatientPortalHome({
       </div>
 
       <div className="fixed inset-x-0 bottom-3 z-40 px-4">
-        <div className="mx-auto grid w-full max-w-md grid-cols-3 ios-glass px-2 py-1 min-h-[44px]">
+        <div className="mx-auto liquid-glass-tabbar grid w-full max-w-md grid-cols-3 px-1.5 py-1">
           <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'inicio' ? 'text-[#1d1d1f]' : 'text-[#6B7280]'}`} onClick={() => onChangeTab('inicio')}>
             <Home size={22} />
             <span className="text-[13px] font-medium">Início</span>

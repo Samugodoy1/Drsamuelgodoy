@@ -311,22 +311,26 @@ const SidebarItem = ({ id, icon: Icon, label, activeTab, setActiveTab, setIsSide
   </button>
 );
 
-const BottomNavItem = ({ id, icon: Icon, label, activeTab, setActiveTab, navigate }: any) => (
-  <button
-    onClick={() => {
-      setActiveTab(id);
-      navigate('/');
-    }}
-    className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors ${
-      activeTab === id
-        ? 'text-[#1d1d1f]'
-        : 'text-[#86868b]'
-    }`}
-  >
-    <Icon size={22} strokeWidth={activeTab === id ? 1.75 : 1.25} />
-    <span className="text-[10px] font-normal tracking-[-0.01em]">{label}</span>
-  </button>
-);
+const BottomNavItem = ({ id, icon: Icon, label, activeTab, setActiveTab, navigate }: any) => {
+  const active = activeTab === id;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setActiveTab(id);
+        navigate('/');
+      }}
+      className={`relative flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[22px] px-1 py-1.5 transition-colors duration-200 ${
+        active ? 'text-[#1d1d1f]' : 'text-[#86868b]'
+      }`}
+      aria-current={active ? 'page' : undefined}
+    >
+      {active && <span className="liquid-glass-item-active pointer-events-none absolute inset-0 rounded-[22px]" />}
+      <Icon size={22} className="relative" />
+      <span className="relative text-[10px] font-normal tracking-[-0.01em] leading-none">{label}</span>
+    </button>
+  );
+};
 
 const StatusBadge = ({ app, now }: { app: Appointment; now: Date }) => {
   const startTime = new Date(app.start_time);
@@ -3429,7 +3433,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 pb-36 md:pb-8">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
         {/* ── Floating Guide Banner ── */}
         {(() => {
           const guide = getGuideStep();
@@ -5715,47 +5719,44 @@ export default function App() {
             )}
 
             {activeTab === 'configuracoes' && profile && (
-              <div className="max-w-2xl mx-auto space-y-6">
+              <div className="max-w-2xl mx-auto space-y-6 pb-8">
 
                 {/* ── PROFILE HEADER ── */}
-                <div className="bg-white rounded-[28px] overflow-hidden">
-                  <div className="h-16 bg-[#f5f5f7]" />
-                  <div className="px-8 pb-8 -mt-14">
-                    <div className="flex items-end gap-5">
-                      <div className="relative group shrink-0">
-                        <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                          {profile.photo_url ? (
-                            <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <UserCircle size={64} />
-                          )}
-                        </div>
-                        <label className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all">
-                          <Camera size={14} />
-                          <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-                        </label>
-                      </div>
-                      <div className="pb-1 min-w-0">
-                        <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f] truncate">{profile.name}</h2>
-                        {user.role === 'DENTIST' && profile.specialty && (
-                          <p className="text-sm text-primary font-medium">{profile.specialty}</p>
-                        )}
-                        {user.role === 'DENTIST' && profile.cro && (
-                          <p className="text-xs text-slate-400 mt-0.5">CRO {profile.cro}</p>
+                <div className="bg-white rounded-[28px] p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="relative group shrink-0">
+                      <div className="w-20 h-20 rounded-full overflow-hidden bg-[#f5f5f7] flex items-center justify-center text-[#86868b]">
+                        {profile.photo_url ? (
+                          <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <UserCircle size={48} />
                         )}
                       </div>
+                      <label className="absolute bottom-0 right-0 bg-[#0071e3] text-white p-1.5 rounded-full cursor-pointer">
+                        <Camera size={14} />
+                        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                      </label>
                     </div>
-
-                    {!isProfileEditing && (
-                      <button
-                        onClick={startProfileEditing}
-                        className="mt-5 flex items-center gap-2 text-sm font-semibold text-primary hover:text-[#2997ff]/80 transition-colors"
-                      >
-                        <Pencil size={14} />
-                        Editar perfil
-                      </button>
-                    )}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f] truncate">{profile.name}</h2>
+                      {user.role === 'DENTIST' && profile.specialty && (
+                        <p className="text-[15px] text-[#86868b]">{profile.specialty}</p>
+                      )}
+                      {user.role === 'DENTIST' && profile.cro && (
+                        <p className="text-[13px] text-[#86868b] mt-0.5">CRO {profile.cro}</p>
+                      )}
+                    </div>
                   </div>
+
+                  {!isProfileEditing && (
+                    <button
+                      onClick={startProfileEditing}
+                      className="mt-5 apple-link text-[15px] flex items-center gap-2"
+                    >
+                      <Pencil size={14} />
+                      Editar perfil
+                    </button>
+                  )}
                 </div>
 
                 {/* ── VIEW MODE ── */}
@@ -7301,15 +7302,16 @@ export default function App() {
 
       {/* Notifications */}
       {/* Primary Action & Mobile Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 tablet-l:hidden no-print">
-        {/* Bottom Navigation */}
-        <nav className="ios-glass border-t border-[#d2d2d7] px-2 pt-1.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex justify-around items-center h-11 min-h-[44px]">
-          <BottomNavItem id="dashboard" label="Início" icon={Home} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-          <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-          <BottomNavItem id="pacientes" label="Pacientes" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-          <BottomNavItem id="financeiro" label="Financeiro" icon={DollarSign} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-          <BottomNavItem id="configuracoes" label="Mais" icon={Settings} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
-        </nav>
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 tablet-l:hidden no-print">
+        <div className="px-3 pt-2 pb-[max(10px,env(safe-area-inset-bottom))]">
+          <nav className="liquid-glass-tabbar pointer-events-auto mx-auto flex max-w-[430px] items-stretch px-1.5 py-1">
+            <BottomNavItem id="dashboard" label="Início" icon={Home} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+            <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+            <BottomNavItem id="pacientes" label="Pacientes" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+            <BottomNavItem id="financeiro" label="Financeiro" icon={DollarSign} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+            <BottomNavItem id="configuracoes" label="Perfil" icon={Settings} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+          </nav>
+        </div>
       </div>
 
       <AnimatePresence>

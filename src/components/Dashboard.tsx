@@ -937,7 +937,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <p className="text-[13px] font-medium text-[#86868b] tracking-wide">
               {timeGreeting.text}{getGreetingName() ? `, ${getGreetingName()}` : ''}
             </p>
-            <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1d1d1f] leading-[1.25]">
+            <h1 className="apple-display-ink text-[28px] sm:text-[32px]">
               O OdontoHub fica mais útil conforme conhece sua rotina.
             </h1>
             <div className="space-y-4 text-[16px] text-[#3A3A3C] leading-[1.65]">
@@ -1119,7 +1119,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-10 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-10 px-5 max-w-2xl mx-auto">
+    <div className="flex flex-col gap-10 pb-6 pt-6 px-1 sm:px-5 max-w-2xl mx-auto">
       {/* 1. HEADER + CONTEXTO PRÉ-HERO */}
       <div className="space-y-5">
         {/* Saudação — caption level */}
@@ -1141,11 +1141,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             className="rounded-[28px] bg-white p-5 space-y-4"
           >
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-sky-100 rounded-[14px] flex items-center justify-center shrink-0">
-                <ClipboardList size={20} className="text-sky-600" />
+              <div className="w-10 h-10 bg-[#f5f5f7] rounded-[14px] flex items-center justify-center shrink-0">
+                <ClipboardList size={20} className="text-[#1d1d1f]" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-bold text-[#1d1d1f]">Falta um passo para ativar seu consultório</p>
+                <p className="text-[15px] font-semibold text-[#1d1d1f]">Falta um passo para ativar seu consultório</p>
                 <p className="text-[13px] text-[#636366] mt-1 leading-relaxed">
                   Abra o prontuário de {firstPatient.name?.split(' ')[0]} para registrar evoluções, odontograma e plano de tratamento.
                 </p>
@@ -1154,7 +1154,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => openPatientRecord(firstPatient.id)}
-              className="w-full flex items-center justify-center gap-2 bg-sky-600 text-white py-3.5 rounded-[16px] text-[14px] font-bold hover:bg-sky-700 transition-colors"
+              className="w-full apple-btn"
             >
               Abrir prontuário agora
               <ArrowRight size={15} />
@@ -1167,21 +1167,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.15 }}
-            className={`flex items-start gap-3 rounded-2xl px-4 py-3.5 ${
-              insightCard.accent === 'violet' ? 'bg-violet-50/70' :
-              insightCard.accent === 'rose' ? 'bg-rose-50/70' :
-              insightCard.accent === 'amber' ? 'bg-amber-50/70' :
-              insightCard.accent === 'sky' ? 'bg-sky-50/60' :
-              'bg-emerald-50/70'
-            }`}
+            className="flex items-start gap-3 rounded-[20px] bg-white px-4 py-3.5"
           >
-            <span className={`mt-0.5 shrink-0 ${
-              insightCard.accent === 'violet' ? 'text-violet-500' :
-              insightCard.accent === 'rose' ? 'text-rose-500' :
-              insightCard.accent === 'amber' ? 'text-amber-500' :
-              insightCard.accent === 'sky' ? 'text-sky-500' :
-              'text-emerald-500'
-            }`}>
+            <span className="mt-0.5 shrink-0 text-[#86868b]">
               {insightCard.icon}
             </span>
             <p className="text-[14px] font-medium text-[#3A3A3C] leading-snug">
@@ -1200,11 +1188,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             whileTap={{ scale: 0.98 }}
             className="w-full flex items-center gap-3 bg-white rounded-[28px] px-4 py-3.5 text-left"
           >
-            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
-              <Calendar size={17} className="text-white" />
+            <div className="w-9 h-9 bg-[#f5f5f7] rounded-full flex items-center justify-center shrink-0">
+              <Calendar size={17} className="text-[#1d1d1f]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-bold text-slate-800">
+              <p className="text-[15px] font-semibold text-[#1d1d1f]">
                 {portalPendingCount === 1
                   ? 'Você tem 1 solicitação de consulta'
                   : `Você tem ${portalPendingCount} solicitações de consulta`}
@@ -1246,8 +1234,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className={`overflow-hidden rounded-[28px] flex flex-col ${gradientClass}`}
-              style={{ minHeight: 'min(52svh, 480px)' }}>
+            <div className={`overflow-hidden rounded-[28px] flex flex-col ${gradientClass}`}>
 
               {/* ── TOPO: identidade do paciente ── */}
               <div className="flex-1 px-7 pt-9 pb-6 flex flex-col gap-5">
@@ -1295,14 +1282,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {/* horário + procedimento */}
                 <div className="flex items-end justify-between gap-4 mt-auto pt-4">
                   <div>
-                    <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.12em]">Procedimento</span>
+                    <span className="text-white/50 text-[13px] font-normal">Procedimento</span>
                     <p className="text-[18px] font-semibold text-white mt-0.5 leading-snug line-clamp-2">
                       {heroPatient.notes || 'Avaliação Geral'}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.12em]">Horário</span>
-                    <p className="text-[32px] font-bold text-white leading-none mt-0.5">
+                    <span className="text-white/50 text-[13px] font-normal">Horário</span>
+                    <p className="text-[32px] font-semibold text-white leading-none mt-0.5">
                       {startFormatted}
                     </p>
                   </div>
@@ -1382,11 +1369,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* 2b. QUICK ACTIONS — anchored to hero (only when hero is visible) */}
-      {heroPatient && <div className="-mt-4 flex items-center justify-end gap-2 px-0.5">
+      {heroPatient && <div className="mt-3 flex items-center justify-end gap-2 px-0.5">
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => setActiveTab('pacientes')}
-            className="flex items-center gap-1.5 px-3.5 py-[11px] rounded-[12px] bg-primary/10 text-primary text-[12px] font-bold transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-[11px] rounded-full bg-[#f5f5f7] text-[#1d1d1f] text-[13px] font-normal transition-all"
           >
             <Plus size={13} strokeWidth={2.5} />
             Paciente
@@ -1403,15 +1390,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* 3. RETORNOS VENCIDOS — prioridade máxima nas primeiras semanas */}
       {intelligence && intelligence.overdueReturns.length > 0 && (
-        <section className="-mx-5 px-5 py-6 bg-[#f5f5f7] rounded-[20px] space-y-4">
+        <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Retornos vencidos</h3>
+              <h3 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">Retornos vencidos</h3>
             </div>
-            <span className="text-[12px] font-bold text-rose-400">{intelligence.overdueReturns.length}</span>
+            <span className="text-[13px] text-[#86868b]">{intelligence.overdueReturns.length}</span>
           </div>
-          <div className="rounded-[20px] overflow-hidden bg-white/80 backdrop-blur-sm border border-rose-100/40 shadow-[0_2px_12px_rgba(244,63,94,0.06)]">
+          <div className="rounded-[20px] overflow-hidden bg-white">
             {intelligence.overdueReturns.slice(0, 5).map((item) => (
               <motion.div
                 key={`return-${item.patient_id}`}
@@ -1460,7 +1446,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <span className="text-[12px] font-bold text-[#86868b]">{noShowsNeedingReschedule.length}</span>
           </div>
-          <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+          <div className="rounded-[20px] overflow-hidden bg-white">
             {noShowsNeedingReschedule.slice(0, 5).map((item, index) => (
               <motion.div
                 key={`noshow-${item.id}`}
@@ -1517,15 +1503,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </motion.div>
           </section>
         ) : (
-        <section className="-mx-5 px-5 py-6 bg-[#f5f5f7] rounded-[20px] space-y-4">
+        <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Precisam da sua ação</h3>
+              <h3 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">Precisam da sua ação</h3>
             </div>
-            <span className="text-[12px] font-bold text-rose-400">{intelligence.needsActionToday.length}</span>
+            <span className="text-[13px] text-[#86868b]">{intelligence.needsActionToday.length}</span>
           </div>
-          <div className="rounded-[20px] overflow-hidden bg-white/80 backdrop-blur-sm border border-rose-100/40 shadow-[0_2px_12px_rgba(244,63,94,0.06)]">
+          <div className="rounded-[20px] overflow-hidden bg-white">
             {intelligence.needsActionToday.slice(0, 5).map(p => renderIntelligencePatient(p))}
           </div>
           {intelligence.needsActionToday.length > 5 && (
@@ -1621,12 +1606,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {otherAppointments.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Próximos da agenda</h3>
+            <h3 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">Próximos da agenda</h3>
             <button onClick={() => setActiveTab('agenda')} className="text-[13px] font-semibold text-primary">
               Ver tudo
             </button>
           </div>
-          <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+          <div className="rounded-[20px] overflow-hidden bg-white">
             {otherAppointments.map((app, index) => (
               <motion.div
                 key={app.id}
@@ -1637,7 +1622,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               >
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-center shrink-0 w-11">
-                    <span className="text-[15px] font-bold text-primary leading-none">
+                    <span className="text-[15px] font-semibold text-[#1d1d1f] leading-none">
                       {new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -1685,12 +1670,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <section className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2.5">
-                <div className="w-1 h-5 rounded-full bg-amber-400" />
-                <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Precisam de atenção</h3>
+                <h3 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">Precisam de atenção</h3>
               </div>
               <span className="text-[12px] font-bold text-[#86868b]">{combined.length}</span>
             </div>
-            <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+            <div className="rounded-[20px] overflow-hidden bg-white">
               {combined.slice(0, 5).map(p => renderIntelligencePatient(p, false))}
             </div>
             {combined.length > 5 && (
@@ -1707,12 +1691,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-1 h-5 rounded-full bg-violet-400" />
-              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Sugestões de encaixe</h3>
+              <h3 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">Sugestões de encaixe</h3>
             </div>
             <span className="text-[12px] font-bold text-[#86868b]">{availableSchedulingSuggestions.length}</span>
           </div>
-          <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+          <div className="rounded-[20px] overflow-hidden bg-white">
             {availableSchedulingSuggestions.slice(0, 4).map((sug, i) => {
               const dayLabel = (() => {
                 const d = new Date(sug.suggested_slot.date + 'T12:00:00');
