@@ -84,7 +84,7 @@ export const PROSTHETIC_STAGES: ProstheticStage[] = [
   { key: 'molding', label: 'Aguardando moldagem', short: 'Moldagem', dotClass: 'bg-slate-400', toneClass: 'bg-slate-50 text-slate-600 border-slate-200' },
   { key: 'sent', label: 'Enviada ao protético', short: 'Enviada', dotClass: 'bg-amber-500', toneClass: 'bg-amber-50 text-amber-700 border-amber-200' },
   { key: 'awaiting', label: 'Aguardando protético', short: 'Aguardando', dotClass: 'bg-sky-500', toneClass: 'bg-sky-50 text-sky-700 border-sky-200' },
-  { key: 'installed', label: 'Prótese instalada', short: 'Instalada', dotClass: 'bg-emerald-500', toneClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', terminal: true },
+  { key: 'installed', label: 'Prótese instalada', short: 'Instalada', dotClass: 'bg-primary', toneClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', terminal: true },
 ];
 
 export const DEFAULT_PROSTHETIC_STAGE_KEY = PROSTHETIC_STAGES[0].key;

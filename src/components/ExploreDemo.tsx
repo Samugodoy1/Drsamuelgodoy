@@ -126,7 +126,7 @@ export function ExploreDemo() {
           whileTap={!isLoading ? { scale: 0.98 } : {}}
           onClick={handleExplore}
           disabled={isLoading}
-          className="w-full h-14 bg-primary hover:bg-primary/90 text-white text-base font-semibold rounded-[18px] shadow-[0_12px_32px_rgba(38,78,54,0.15)] hover:shadow-[0_16px_40px_rgba(38,78,54,0.2)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full h-14 bg-primary hover:bg-primary/90 text-white text-base font-semibold rounded-[18px] shadow-[0_12px_32px_rgba(0,0,0,0.15)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <motion.div

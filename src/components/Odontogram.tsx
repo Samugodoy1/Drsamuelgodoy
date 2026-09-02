@@ -156,7 +156,7 @@ const legendItems: LegendItem[] = [
     key: 'in-progress',
     label: 'Em andamento',
     swatchClass: 'bg-white border border-slate-300',
-    markerClass: 'bg-emerald-500',
+    markerClass: 'bg-primary',
     markerPosition: 'top',
   },
   {
@@ -307,7 +307,7 @@ const Tooth: React.FC<ToothProps> = ({
           <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border border-white bg-amber-400" />
         )}
         {isInTreatment && !isPending && !isUrgent && (
-          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
+          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border border-white bg-primary" />
         )}
         {isCompleted && !isPending && !isUrgent && !isInTreatment && (
           <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border border-white bg-sky-500" />

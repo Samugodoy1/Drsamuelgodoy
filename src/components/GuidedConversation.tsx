@@ -116,7 +116,7 @@ export function GuidedConversation({
         >
           <div className="flex items-center justify-between px-6 pt-4">
             <div className="w-10 h-1 bg-[#E5E5EA] rounded-full" />
-            <button onClick={onClose} className="p-2 -mr-2 text-[#8E8E93] hover:text-[#1C1C1E] transition-colors">
+            <button onClick={onClose} className="p-2 -mr-2 text-[#86868b] hover:text-[#1d1d1f] transition-colors">
               <X size={20} />
             </button>
           </div>
@@ -125,17 +125,17 @@ export function GuidedConversation({
             <AnimatePresence mode="wait">
               {state.step === 0 && (
                 <motion.div key="step-0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                  <h2 className="text-[#1C1C1E] text-[24px] font-bold tracking-tight mb-8">O que está incomodando?</h2>
+                  <h2 className="text-[#1d1d1f] text-[24px] font-bold tracking-tight mb-8">O que está incomodando?</h2>
                   <div className="space-y-3">
                     {complaintOptions.map(option => (
                       <motion.button key={option.value} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => handleComplaintSelect(option.value)}
-                        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#E5E5EA] hover:border-[#0C9B72] hover:bg-[#0C9B72]/5 transition-all duration-200">
+                        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#E5E5EA] hover:border-[#0071e3] hover:bg-[#0071e3]/5 transition-all duration-200">
                         <div className="flex items-center gap-4">
                           <span className="text-[20px]">{option.icon}</span>
-                          <span className="text-[#1C1C1E] text-[16px] font-semibold text-left">{option.label}</span>
+                          <span className="text-[#1d1d1f] text-[16px] font-semibold text-left">{option.label}</span>
                         </div>
-                        <ChevronRight size={18} className="text-[#C6C6C8]" />
+                        <ChevronRight size={18} className="text-[#d2d2d7]" />
                       </motion.button>
                     ))}
                   </div>
@@ -144,20 +144,20 @@ export function GuidedConversation({
 
               {state.step === 1 && (
                 <motion.div key="step-1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                  <h2 className="text-[#1C1C1E] text-[24px] font-bold tracking-tight mb-2">Qual o melhor período?</h2>
-                  <p className="text-[#8E8E93] text-[15px] mb-8">Escolha sua preferência de atendimento</p>
+                  <h2 className="text-[#1d1d1f] text-[24px] font-bold tracking-tight mb-2">Qual o melhor período?</h2>
+                  <p className="text-[#86868b] text-[15px] mb-8">Escolha sua preferência de atendimento</p>
                   <div className="space-y-3">
                     {periodOptions.map(option => (
                       <motion.button key={option.value} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => handlePeriodSelect(option.value)}
-                        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#E5E5EA] hover:border-[#0C9B72] hover:bg-[#0C9B72]/5 transition-all duration-200">
-                        <span className="text-[#1C1C1E] text-[16px] font-semibold text-left">{option.label}</span>
-                        <ChevronRight size={18} className="text-[#C6C6C8]" />
+                        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#E5E5EA] hover:border-[#0071e3] hover:bg-[#0071e3]/5 transition-all duration-200">
+                        <span className="text-[#1d1d1f] text-[16px] font-semibold text-left">{option.label}</span>
+                        <ChevronRight size={18} className="text-[#d2d2d7]" />
                       </motion.button>
                     ))}
                   </div>
                   <motion.button onClick={() => setState(prev => ({ ...prev, step: 0 }))}
-                    className="mt-8 w-full text-[#0C9B72] text-[15px] font-semibold py-3 hover:opacity-70 transition-opacity">
+                    className="mt-8 w-full text-[#0071e3] text-[15px] font-semibold py-3 hover:opacity-70 transition-opacity">
                     ← Voltar
                   </motion.button>
                 </motion.div>
@@ -165,15 +165,15 @@ export function GuidedConversation({
 
               {state.step === 2 && (
                 <motion.div key="step-2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                  <h2 className="text-[#1C1C1E] text-[24px] font-bold tracking-tight mb-3">Confirmar solicitação</h2>
-                  <p className="text-[#8E8E93] text-[14px] mb-6">Você pode adicionar uma observação opcional antes de enviar.</p>
+                  <h2 className="text-[#1d1d1f] text-[24px] font-bold tracking-tight mb-3">Confirmar solicitação</h2>
+                  <p className="text-[#86868b] text-[14px] mb-6">Você pode adicionar uma observação opcional antes de enviar.</p>
 
                   <textarea
                     placeholder="Ex.: dor no lado direito, preferência por WhatsApp..."
                     value={state.answers.observation || ''}
                     onChange={(e) => setState(prev => ({ ...prev, answers: { ...prev.answers, observation: e.target.value } }))}
                     rows={4}
-                    className="w-full p-3 rounded-xl border border-[#E5E5EA] text-[14px] outline-none focus:border-[#0C9B72]/40"
+                    className="w-full p-3 rounded-xl border border-[#E5E5EA] text-[14px] outline-none focus:border-[#0071e3]/40"
                   />
 
                   {(state.answers.complaint === 'dor' || (hasActivePostOperative && state.answers.complaint === 'dor')) && (
@@ -181,16 +181,16 @@ export function GuidedConversation({
                   )}
 
                   {hasActivePostOperative && postOperativeDaysElapsed >= 0 && (
-                    <p className="text-[#8E8E93] text-[12px] mt-2">Pós-operatório ativo há {postOperativeDaysElapsed} dia(s).</p>
+                    <p className="text-[#86868b] text-[12px] mt-2">Pós-operatório ativo há {postOperativeDaysElapsed} dia(s).</p>
                   )}
 
                   <div className="space-y-3 mt-6">
                     <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }} onClick={handleScheduleConfirm} disabled={isSubmitting}
-                      className="w-full h-12 rounded-full text-white text-[15px] font-semibold tracking-tight bg-gradient-to-r from-[#0C9B72] to-[#0A7D5C] disabled:opacity-50">
+                      className="w-full h-12 rounded-full text-white text-[15px] font-semibold tracking-tight bg-gradient-to-r from-[#0071e3] to-[#0A7D5C] disabled:opacity-50">
                       {isSubmitting ? 'Enviando...' : 'Confirmar solicitação'}
                     </motion.button>
                     <motion.button onClick={() => setState(prev => ({ ...prev, step: 1 }))} disabled={isSubmitting}
-                      className="w-full h-12 rounded-full border-2 border-[#0C9B72]/30 text-[#1C1C1E] text-[15px] font-semibold tracking-tight disabled:opacity-50">
+                      className="w-full h-12 rounded-full border-2 border-[#0071e3]/30 text-[#1d1d1f] text-[15px] font-semibold tracking-tight disabled:opacity-50">
                       Voltar
                     </motion.button>
                   </div>
@@ -199,13 +199,13 @@ export function GuidedConversation({
 
               {state.step === 3 && (
                 <motion.div key="step-3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="text-center py-12">
-                  <div className="w-16 h-16 bg-[#34C759] rounded-full flex items-center justify-center mx-auto mb-6">
+                  <div className="w-16 h-16 bg-[#30d158] rounded-full flex items-center justify-center mx-auto mb-6">
                     <span className="text-[32px]">✓</span>
                   </div>
-                  <h2 className="text-[#1C1C1E] text-[24px] font-bold tracking-tight mb-3">Solicitação enviada!</h2>
-                  <p className="text-[#8E8E93] text-[15px] leading-relaxed mb-8">A clínica recebeu seu pedido e vai retornar em breve.</p>
+                  <h2 className="text-[#1d1d1f] text-[24px] font-bold tracking-tight mb-3">Solicitação enviada!</h2>
+                  <p className="text-[#86868b] text-[15px] leading-relaxed mb-8">A clínica recebeu seu pedido e vai retornar em breve.</p>
                   <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }} onClick={onClose}
-                    className="w-full h-12 rounded-full bg-[#0C9B72]/10 text-[#0C9B72] text-[15px] font-semibold tracking-tight hover:bg-[#0C9B72]/20 transition-all">
+                    className="w-full h-12 rounded-full bg-[#0071e3]/10 text-[#0071e3] text-[15px] font-semibold tracking-tight hover:bg-[#0071e3]/20 transition-all">
                     Voltar à Home
                   </motion.button>
                 </motion.div>

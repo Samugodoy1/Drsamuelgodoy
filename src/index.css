@@ -1,15 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  
-  --color-primary: #0C9B72;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #0071e3;
+  --color-primary-hover: #0077ed;
+
+  --color-apple-black: #000000;
+  --color-apple-ink: #1d1d1f;
+  --color-apple-gray: #86868b;
+  --color-apple-gray-2: #6e6e73;
+  --color-apple-surface: #f5f5f7;
+  --color-apple-elevated: #ffffff;
+  --color-apple-line: #d2d2d7;
+  --color-apple-blue: #0071e3;
+  --color-apple-blue-hover: #0077ed;
+  --color-apple-link: #2997ff;
+  --color-apple-green: #30d158;
+  --color-apple-red: #ff3b30;
 }
 
 @layer base {
   html {
-    background-color: #F2F2F7;
+    background-color: #f5f5f7;
     color-scheme: light;
   }
 
@@ -20,53 +34,203 @@
   }
 
   body {
-    @apply bg-[#F2F2F7] text-[#1C1C1E] antialiased selection:bg-primary/10 selection:text-primary;
-    font-family: 'Inter', sans-serif;
-    letter-spacing: -0.01em;
+    @apply bg-apple-surface text-apple-ink antialiased selection:bg-apple-blue/10 selection:text-apple-ink;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11", "calt";
+    letter-spacing: -0.011em;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     overflow-y: auto;
+  }
+
+  h1, h2, h3 {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
   }
 }
 
 @layer utilities {
   .ios-card {
-    @apply bg-white border-none shadow-[0_4px_24px_rgba(0,0,0,0.03)] rounded-[28px] p-6;
+    @apply bg-white rounded-[28px] p-6;
+    border: none;
+    box-shadow: none;
   }
-  
+
   .ios-button-primary {
-    @apply bg-primary text-white rounded-[24px] font-bold px-6 py-4.5 hover:opacity-95 active:scale-[0.98] transition-all duration-200 ease-in-out flex items-center justify-center gap-2.5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #0071e3;
+    color: #fff;
+    border-radius: 980px;
+    padding: 12px 22px;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .ios-button-primary:hover {
+    background: #0077ed;
+  }
+  .ios-button-primary:active {
+    transform: scale(0.98);
   }
 
   .ios-button-secondary {
-    @apply bg-[#F2F2F7] text-[#1C1C1E] rounded-[24px] font-bold px-6 py-4.5 hover:bg-[#E5E5EA] active:scale-[0.98] transition-all duration-200 ease-in-out flex items-center justify-center gap-2.5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    border-radius: 980px;
+    padding: 12px 22px;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .ios-button-secondary:hover {
+    background: #e8e8ed;
+  }
+  .ios-button-secondary:active {
+    transform: scale(0.98);
   }
 
   .ios-input {
-    @apply bg-[#E9E9EB] border-none rounded-[12px] px-4 py-3 focus:ring-2 focus:ring-primary/10 transition-all outline-none text-[#1C1C1E] placeholder:text-[#8E8E93] font-medium;
+    @apply bg-apple-surface border-none rounded-[14px] px-4 py-3 outline-none text-apple-ink placeholder:text-apple-gray;
+    font-weight: 400;
+    letter-spacing: -0.011em;
+    transition: box-shadow 0.2s ease, background 0.2s ease;
+  }
+  .ios-input:focus {
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.16);
+    background: #fff;
   }
 
   .ios-separator {
-    @apply h-[0.5px] w-full bg-[#C6C6C8];
+    @apply h-px w-full bg-apple-line;
   }
 
   .ios-list-item {
-    @apply flex items-center gap-5 py-5 border-b border-[#C6C6C8]/10 hover:bg-[#F2F2F7] transition-all duration-200 ease-in-out active:bg-[#E5E5EA] cursor-pointer;
+    @apply flex items-center gap-5 py-5 border-b border-apple-line cursor-pointer;
+    font-size: 17px;
+  }
+  .ios-list-item:last-child {
+    border-bottom: none;
   }
 
   .ios-title {
-    @apply text-[34px] font-bold tracking-tight text-[#1C1C1E] leading-tight;
+    @apply text-[34px] text-apple-ink;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
   }
 
   .ios-subtitle {
-    @apply text-[22px] font-semibold text-[#1C1C1E] tracking-tight;
+    @apply text-[22px] text-apple-ink;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
   }
 
   .ios-text-secondary {
-    @apply text-[15px] font-medium text-[#8E8E93];
+    @apply text-[17px] text-apple-gray;
+    font-weight: 400;
+    letter-spacing: -0.011em;
   }
 
   .ios-number-highlight {
-    @apply text-[40px] font-bold text-[#1C1C1E] tracking-tighter;
+    @apply text-[40px] text-apple-ink;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+
+  .apple-display {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    color: #f5f5f7;
+  }
+
+  .apple-display-ink {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    color: #1d1d1f;
+  }
+
+  .apple-subhead {
+    font-weight: 400;
+    letter-spacing: -0.016em;
+    line-height: 1.333;
+    color: #86868b;
+  }
+
+  .apple-link {
+    color: #2997ff;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.011em;
+    transition: color 0.2s ease;
+  }
+  .apple-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .apple-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #0071e3;
+    color: #fff;
+    border-radius: 980px;
+    padding: 12px 22px;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .apple-btn:hover {
+    background: #0077ed;
+  }
+  .apple-btn:active {
+    transform: scale(0.98);
+  }
+
+  .apple-btn-light {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #1d1d1f;
+    border-radius: 980px;
+    padding: 12px 22px;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .apple-btn-light:hover {
+    background: #f5f5f7;
+  }
+  .apple-btn-light:active {
+    transform: scale(0.98);
+  }
+
+  .apple-hairline {
+    height: 1px;
+    background: #d2d2d7;
   }
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -78,37 +242,21 @@
   to   { opacity: 1;   transform: scale(1); }
 }
 
-/* Apple-style breathing pulse for priority indicators */
 @keyframes breathe {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(0.88); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
-/* Gentle glow pulse for highlighted elements */
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
-  50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.08); }
-}
-
-/* iOS-style shimmer loading */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-/* Subtle float for empty state icons */
-@keyframes gentleFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-/* Success checkmark draw */
 @keyframes checkDraw {
   0% { stroke-dashoffset: 24; }
   100% { stroke-dashoffset: 0; }
 }
 
-/* Fade in up for staggered lists */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -119,38 +267,28 @@
     animation: breathe 3.2s ease-in-out infinite;
   }
 
-  .animate-glow-pulse {
-    animation: glowPulse 2s ease-in-out infinite;
-  }
-
   .animate-shimmer {
     background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%);
     background-size: 200% 100%;
     animation: shimmer 1.8s ease-in-out infinite;
   }
 
-  .animate-gentle-float {
-    animation: gentleFloat 3s ease-in-out infinite;
-  }
-
   .animate-fade-in-up {
     animation: fadeInUp 0.35s ease-out both;
   }
 
-  /* iOS-style frosted glass */
   .ios-glass {
-    @apply bg-white/80 backdrop-blur-2xl;
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
-    backdrop-filter: blur(40px) saturate(180%);
+    background: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
   }
 
-  .ios-glass-heavy {
-    @apply bg-white/92 backdrop-blur-3xl;
-    -webkit-backdrop-filter: blur(60px) saturate(200%);
-    backdrop-filter: blur(60px) saturate(200%);
+  .ios-glass-dark {
+    background: rgba(22, 22, 23, 0.8);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
   }
 
-  /* Smooth spring-like interaction */
   .ios-press {
     @apply transition-transform duration-150 ease-out active:scale-[0.96];
   }
@@ -159,17 +297,35 @@
     @apply transition-transform duration-200 ease-out active:scale-[0.98];
   }
 
-  /* iOS drag handle */
   .ios-drag-handle {
-    @apply w-9 h-[5px] rounded-full bg-slate-300/60 mx-auto mb-4;
+    @apply w-9 h-[5px] rounded-full bg-apple-line mx-auto mb-4;
   }
 
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
   }
 
-  /* Refined card hover */
   .ios-hover-lift {
-    @apply transition-all duration-300 ease-out hover:translate-y-[-1px] hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)];
+    transition: none;
+  }
+  .ios-hover-lift:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .animate-glow-pulse {
+    animation: none;
+  }
+
+  .animate-gentle-float {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ChevronDown, Sparkles, Check, Phone, Plus, ClipboardList, MessageCircle } from '../../icons';
+import { ArrowRight, ChevronDown, Check, Phone, ClipboardList, MessageCircle } from '../../icons';
 
-// OdontoHub Core green — used for the immersive welcome/closing screens.
-const CORE_GREEN = '#1B4D3E';
+// Welcome and closing screens use Apple black.
+const CORE_INK = '#000000';
 
 interface OnboardingFlowProps {
   userName: string;
@@ -134,9 +134,8 @@ export function OnboardingFlow({
           transition={{ duration: 0.5, ease: easing }}
           className="fixed top-0 inset-x-0 z-[120] flex justify-center px-3 pt-3 pointer-events-none"
         >
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#1B4D3E] text-white/95 shadow-lg shadow-black/10 px-4 py-2.5 max-w-[640px] w-full">
-            <span className="text-[15px] leading-none">🟢</span>
-            <p className="text-[13px] font-medium leading-snug">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#000000] text-white/90 px-4 py-2.5 max-w-[640px] w-full">
+            <p className="text-[13px] font-normal leading-snug">
               Esta é uma demonstração. É assim que o OdontoHub vai funcionar com seus pacientes reais.
             </p>
           </div>
@@ -149,19 +148,18 @@ export function OnboardingFlow({
           transition={{ duration: 0.5, ease: easing, delay: 0.15 }}
           className="fixed bottom-0 inset-x-0 z-[120] flex justify-center px-3 pb-4 pointer-events-none"
         >
-          <div className="pointer-events-auto flex flex-col sm:flex-row sm:items-center gap-3 rounded-[20px] bg-white shadow-xl shadow-black/10 border border-slate-100 px-5 py-4 max-w-[640px] w-full">
+          <div className="pointer-events-auto flex flex-col sm:flex-row sm:items-center gap-3 rounded-[28px] bg-white px-5 py-4 max-w-[640px] w-full">
             <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-semibold text-slate-900">Gostou? Agora é a sua vez.</p>
-              <p className="text-[13px] text-slate-500 mt-0.5">
+              <p className="text-[15px] font-semibold tracking-[-0.016em] text-[#1d1d1f]">Agora é a sua vez.</p>
+              <p className="text-[13px] text-[#86868b] mt-0.5">
                 Criar seu primeiro paciente remove a demonstração e deixa a home sua.
               </p>
             </div>
             <button
               onClick={() => setStep('form')}
-              className="shrink-0 inline-flex items-center justify-center gap-2 bg-primary text-white rounded-[14px] font-semibold px-5 py-3 hover:opacity-95 active:scale-[0.98] transition-all"
+              className="shrink-0 apple-btn"
             >
               Criar meu primeiro paciente
-              <ArrowRight size={18} />
             </button>
           </div>
         </motion.div>
@@ -182,38 +180,23 @@ export function OnboardingFlow({
             exit={{ opacity: 0, transition: { duration: 0.35, ease: easing } }}
             transition={{ duration: 0.5, ease: easing }}
             className="relative min-h-full flex items-center justify-center px-6 py-16 text-white overflow-hidden"
-            style={{ backgroundColor: CORE_GREEN }}
+            style={{ backgroundColor: CORE_INK }}
           >
-            {/* Depth: soft top glow + grounding vignette so the flat green reads
-                as a crafted surface rather than a plain fill. */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{ background: 'radial-gradient(125% 80% at 50% -15%, rgba(86,170,135,0.45) 0%, rgba(27,77,62,0) 58%)' }}
-            />
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{ background: 'radial-gradient(100% 65% at 50% 118%, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0) 62%)' }}
-            />
-
             <motion.div
               variants={{ hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.08 } } }}
               initial="hidden"
               animate="show"
               className="relative max-w-[420px] w-full text-center"
             >
-              {/* Crafted product mark — frosted glass tile + wordmark */}
-              <motion.div variants={fadeUp} className="mx-auto mb-9 flex flex-col items-center gap-3.5">
-                <div className="w-16 h-16 rounded-[20px] bg-white/10 ring-1 ring-white/15 backdrop-blur-md flex items-center justify-center shadow-[0_12px_40px_rgba(0,0,0,0.28)]">
-                  <Plus size={30} strokeWidth={3} className="text-white" />
-                </div>
-                <span className="text-[11px] font-semibold tracking-[0.22em] uppercase text-white/45">
+              <motion.div variants={fadeUp} className="mx-auto mb-10">
+                <span className="text-[13px] font-normal tracking-[-0.011em] text-white/45">
                   OdontoHub
                 </span>
               </motion.div>
 
               <motion.h1
                 variants={fadeUp}
-                className="text-[34px] sm:text-[40px] font-semibold tracking-[-1px] leading-[1.07]"
+                className="apple-display text-[40px] sm:text-[48px]"
               >
                 Bem-vindo,
                 <br />
@@ -221,30 +204,27 @@ export function OnboardingFlow({
               </motion.h1>
               <motion.p
                 variants={fadeUp}
-                className="mt-5 text-[17px] text-white/65 leading-relaxed max-w-[342px] mx-auto"
+                className="mt-5 text-[17px] text-[#86868b] leading-[1.333] max-w-[342px] mx-auto"
               >
-                Antes de começar, deixa eu te mostrar como vai ser seu dia a dia aqui.
+                Antes de começar, deixa eu te mostrar como vai ser o seu dia a dia aqui.
               </motion.p>
 
-              <motion.div variants={fadeUp} className="mt-11 space-y-4">
+              <motion.div variants={fadeUp} className="mt-12 space-y-5">
                 <button
                   onClick={handleStart}
                   disabled={busy}
-                  className="group w-full inline-flex items-center justify-center gap-2 bg-white text-[#1B4D3E] rounded-full font-semibold text-[16px] px-6 py-4 shadow-[0_10px_40px_rgba(0,0,0,0.22)] hover:shadow-[0_16px_52px_rgba(0,0,0,0.30)] hover:-translate-y-px active:translate-y-0 active:scale-[0.99] transition-all duration-300 disabled:opacity-60 disabled:hover:translate-y-0"
+                  className="w-full apple-btn disabled:opacity-60"
                 >
-                  {busy ? 'Preparando seu consultório…' : 'Ver meu consultório funcionando'}
-                  {!busy && (
-                    <ArrowRight size={18} className="transition-transform duration-300 group-hover:translate-x-0.5" />
-                  )}
+                  {busy ? 'Preparando' : 'Ver meu consultório'}
                 </button>
                 <button
                   onClick={handleSkip}
                   disabled={busy}
-                  className="block w-full text-[13.5px] text-white/50 hover:text-white/80 transition-colors disabled:opacity-50"
+                  className="block w-full text-[17px] text-[#2997ff] disabled:opacity-50"
                 >
-                  Prefiro explorar sozinho
+                  Explorar sozinho ›
                 </button>
-                {error && <p className="text-[13px] text-rose-200">{error}</p>}
+                {error && <p className="text-[13px] text-[#ff3b30]">{error}</p>}
               </motion.div>
             </motion.div>
           </motion.div>
@@ -258,7 +238,7 @@ export function OnboardingFlow({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: easing }}
-            className="min-h-full flex items-center justify-center px-6 py-16 bg-[#F8FAFC]"
+            className="min-h-full flex items-center justify-center px-6 py-16 bg-[#f5f5f7]"
           >
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -285,7 +265,7 @@ export function OnboardingFlow({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Maria Silva"
-                    className="w-full h-[50px] px-4 bg-white border border-slate-200 rounded-[12px] text-base text-slate-900 placeholder-slate-300 outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgba(12,155,114,0.08)] transition-all"
+                    className="ios-input w-full h-[50px] text-[17px]"
                   />
                 </div>
                 <div>
@@ -298,7 +278,7 @@ export function OnboardingFlow({
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="(11) 99999-9999"
-                      className="w-full h-[50px] pl-11 pr-4 bg-white border border-slate-200 rounded-[12px] text-base text-slate-900 placeholder-slate-300 outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgba(12,155,114,0.08)] transition-all"
+                      className="ios-input w-full h-[50px] pl-11 pr-4 text-[17px]"
                     />
                   </div>
                 </div>
@@ -331,7 +311,7 @@ export function OnboardingFlow({
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="maria@email.com"
-                          className="w-full h-[50px] px-4 bg-white border border-slate-200 rounded-[12px] text-base text-slate-900 placeholder-slate-300 outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgba(12,155,114,0.08)] transition-all"
+                          className="ios-input w-full h-[50px] text-[17px]"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -342,7 +322,7 @@ export function OnboardingFlow({
                             value={cpf}
                             onChange={(e) => setCpf(e.target.value)}
                             placeholder="000.000.000-00"
-                            className="w-full h-[50px] px-4 bg-white border border-slate-200 rounded-[12px] text-base text-slate-900 placeholder-slate-300 outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgba(12,155,114,0.08)] transition-all"
+                            className="ios-input w-full h-[50px] text-[17px]"
                           />
                         </div>
                         <div>
@@ -351,7 +331,7 @@ export function OnboardingFlow({
                             type="date"
                             value={birthDate}
                             onChange={(e) => setBirthDate(e.target.value)}
-                            className="w-full h-[50px] px-4 bg-white border border-slate-200 rounded-[12px] text-base text-slate-900 outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgba(12,155,114,0.08)] transition-all"
+                            className="ios-input w-full h-[50px] text-[17px]"
                           />
                         </div>
                       </div>
@@ -368,7 +348,7 @@ export function OnboardingFlow({
                 <button
                   type="submit"
                   disabled={busy || !name.trim() || !phone.trim()}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-white rounded-[16px] font-semibold text-[16px] px-6 py-4 hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-50 mt-2"
+                  className="w-full apple-btn disabled:opacity-50 mt-2"
                 >
                   {busy ? 'Criando…' : 'Criar paciente'}
                 </button>
@@ -385,7 +365,7 @@ export function OnboardingFlow({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: easing }}
-            className="min-h-full flex items-center justify-center px-6 py-16 bg-[#F8FAFC]"
+            className="min-h-full flex items-center justify-center px-6 py-16 bg-[#f5f5f7]"
           >
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -436,14 +416,13 @@ export function OnboardingFlow({
                 </div>
               </div>
 
-              <div className="mt-5 flex items-start gap-2 text-[13px] text-slate-400 leading-relaxed">
-                <Sparkles size={15} className="text-primary shrink-0 mt-0.5" />
-                <span>Você encontra os dois no prontuário de cada paciente, no botão "Link Portal do Paciente".</span>
+              <div className="mt-5 flex items-start gap-2 text-[13px] text-[#86868b] leading-relaxed">
+                <span>Você encontra os dois no prontuário de cada paciente, no botão Link Portal do Paciente.</span>
               </div>
 
               <button
                 onClick={() => setStep('done')}
-                className="mt-7 w-full inline-flex items-center justify-center gap-2 bg-primary text-white rounded-[16px] font-semibold text-[16px] px-6 py-4 hover:opacity-95 active:scale-[0.98] transition-all"
+                className="mt-7 w-full apple-btn"
               >
                 Entendi, continuar
                 <ArrowRight size={18} />
@@ -461,7 +440,7 @@ export function OnboardingFlow({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.45, ease: easing }}
             className="min-h-full flex items-center justify-center px-6 py-16 text-white"
-            style={{ backgroundColor: CORE_GREEN }}
+            style={{ backgroundColor: CORE_INK }}
           >
             <div className="max-w-md w-full text-center">
               <motion.div
@@ -495,7 +474,7 @@ export function OnboardingFlow({
                 transition={{ delay: 0.36, duration: 0.5, ease: easing }}
                 onClick={handleFinish}
                 disabled={busy}
-                className="mt-12 w-full inline-flex items-center justify-center gap-2.5 bg-white text-[#1B4D3E] rounded-[18px] font-semibold text-[16px] px-6 py-4.5 hover:bg-white/95 active:scale-[0.98] transition-all disabled:opacity-60"
+                className="mt-12 w-full apple-btn-light"
               >
                 Ver minha home
                 <ArrowRight size={19} />

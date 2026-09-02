@@ -51,10 +51,10 @@ const urgencyConfig = {
     contextBg: 'bg-[#FFD60A]/20',
   },
   low: {
-    bg: 'from-[#0C9B72]/15 to-[#34C759]/10',
-    border: 'border-[#0C9B72]/40',
-    accent: '#0C9B72',
-    contextBg: 'bg-[#0C9B72]/20',
+    bg: 'from-[#0071e3]/15 to-[#30d158]/10',
+    border: 'border-[#0071e3]/40',
+    accent: '#0071e3',
+    contextBg: 'bg-[#0071e3]/20',
   },
 };
 
@@ -124,7 +124,7 @@ export const ConversationalMoment: React.FC<ConversationalMomentProps> = ({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
-              className={`${config.contextBg} text-[#1C1C1E] px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap flex-shrink-0`}
+              className={`${config.contextBg} text-[#1d1d1f] px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap flex-shrink-0`}
               style={{
                 color: config.accent,
               }}
@@ -139,7 +139,7 @@ export const ConversationalMoment: React.FC<ConversationalMomentProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="text-[#1C1C1E] text-[24px] sm:text-[28px] font-bold tracking-tight leading-tight mb-6"
+          className="text-[#1d1d1f] text-[24px] sm:text-[28px] font-bold tracking-tight leading-tight mb-6"
         >
           {question}
         </motion.h2>
@@ -153,12 +153,12 @@ export const ConversationalMoment: React.FC<ConversationalMomentProps> = ({
             className="space-y-2 mb-7 pb-6 border-b border-white/20"
           >
             {doctorMessage && (
-              <p className="text-[#8E8E93] text-[13px]">
+              <p className="text-[#86868b] text-[13px]">
                 <span style={{ color: config.accent }}>💙</span> {doctorMessage}
               </p>
             )}
             {lastUpdate && (
-              <p className="text-[#8E8E93] text-[12px]">
+              <p className="text-[#86868b] text-[12px]">
                 ⏱ {lastUpdate}
               </p>
             )}
@@ -212,7 +212,7 @@ export const ConversationalMoment: React.FC<ConversationalMomentProps> = ({
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={cta.onClick}
-                  className="w-full h-11 px-5 rounded-full text-[14px] font-medium transition-all hover:bg-white/10 text-[#8E8E93] hover:text-[#1C1C1E]"
+                  className="w-full h-11 px-5 rounded-full text-[14px] font-medium transition-all hover:bg-white/10 text-[#86868b] hover:text-[#1d1d1f]"
                 >
                   {cta.type === 'dismiss' && '↺ '}
                   {cta.label}
@@ -228,7 +228,7 @@ export const ConversationalMoment: React.FC<ConversationalMomentProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-[#8E8E93] text-[11px] mt-4 text-center italic"
+            className="text-[#86868b] text-[11px] mt-4 text-center italic"
           >
             Você receberá um lembrete 24h antes
           </motion.p>

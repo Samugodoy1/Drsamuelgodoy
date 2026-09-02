@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../config';
-import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, Sparkles, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, AlertCircle } from '../icons';
+import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, AlertCircle } from '../icons';
 import type { PortalActivity } from '../types/portal';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -482,7 +482,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         text: suggestionsCount === 1
           ? 'Achei um horário perfeito pra encaixar um paciente que precisa voltar.'
           : `Encontrei ${suggestionsCount} encaixes inteligentes. Quer que eu mostre?`,
-        icon: <Sparkles size={16} />,
+        icon: <Calendar size={16} />,
         accent: 'violet',
       };
     }
@@ -532,7 +532,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (operationalInsight?.text) {
       return {
         text: operationalInsight.text,
-        icon: <Sparkles size={16} />,
+        icon: <Calendar size={16} />,
         accent: 'sky',
       };
     }
@@ -738,9 +738,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return (
       <motion.div
         key={p.patient_id}
-        whileTap={{ backgroundColor: '#F2F2F7' }}
+        whileTap={{ backgroundColor: '#f5f5f7' }}
         transition={{ duration: 0.2 }}
-        className="flex items-center gap-4 p-5 cursor-pointer border-b border-[#C6C6C8]/5 last:border-b-0"
+        className="flex items-center gap-4 p-5 cursor-pointer border-b border-[#d2d2d7]/5 last:border-b-0"
         onClick={() => openPatientRecord(p.patient_id)}
       >
         <div className="relative">
@@ -754,8 +754,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full ${dotColor} border-2 border-white`} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{p.patient_name}</p>
-          <p className="text-[12px] text-[#8E8E93] mt-0.5 truncate">
+          <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{p.patient_name}</p>
+          <p className="text-[12px] text-[#86868b] mt-0.5 truncate">
             {formatDaysAgo(p.days_since_last_visit)} · {statusLabels[p.status] || p.status}
           </p>
         </div>
@@ -769,13 +769,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); openWhatsApp(p.phone, p.patient_name); }}
-              className="w-[44px] h-[44px] flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+              className="w-[44px] h-[44px] flex items-center justify-center rounded-xl text-[#86868b] hover:text-emerald-600 hover:bg-[#f5f5f7] transition-colors"
               title="WhatsApp"
             >
               <MessageCircle size={15} />
             </button>
           )}
-          <ChevronRight size={16} className="text-[#C6C6C8]" />
+          <ChevronRight size={16} className="text-[#d2d2d7]" />
         </div>
       </motion.div>
     );
@@ -819,12 +819,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           className="space-y-3 px-2 pt-4"
         >
           <div className="w-12 h-12 bg-primary/10 rounded-[16px] flex items-center justify-center">
-            <Sparkles size={24} className="text-primary" />
+            <Calendar size={24} className="text-[#1d1d1f]" />
           </div>
-          <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2]">
+          <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1d1d1f] leading-[1.2]">
             Daqui a alguns minutos, esta será sua rotina.
           </h1>
-          <p className="text-[15px] text-[#8E8E93] leading-relaxed">
+          <p className="text-[15px] text-[#86868b] leading-relaxed">
             Próximos pacientes, retornos pendentes e oportunidades organizados em um só lugar.
           </p>
         </motion.header>
@@ -836,16 +836,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           className="space-y-3"
         >
           <div className="px-2 flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-widest">
+            <p className="text-[11px] font-bold text-[#86868b] uppercase tracking-widest">
               Exemplo de como o OdontoHub organiza o dia
             </p>
-            <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-[#8E8E93]">
+            <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-[#86868b]">
               Exemplo
             </span>
           </div>
 
-          <div className="rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1E4430] via-[#264E36] to-[#3A6B4E] p-6 shadow-[0_16px_48px_rgba(30,68,48,0.2)] ring-1 ring-black/5">
-            <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
+          <div className="rounded-[28px] overflow-hidden bg-[#1d1d1f] p-6">
+            <span className="text-white/50 text-[13px] font-normal">
               Próximo atendimento
             </span>
             <div className="flex items-start justify-between gap-4 mt-2">
@@ -859,7 +859,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="mt-4 flex items-center gap-2">
               <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 text-white">Confirmado</span>
-              <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-white text-[#1E4430]">09:00</span>
+              <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-white text-[#1d1d1f]">09:00</span>
             </div>
           </div>
 
@@ -869,8 +869,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <UserX size={20} className="text-rose-500" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[#1C1C1E]">Paciente sem retorno</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">Em tratamento · 4 meses sem visita</p>
+                <p className="text-[13px] font-bold text-[#1d1d1f]">Paciente sem retorno</p>
+                <p className="text-[12px] text-[#86868b] mt-0.5">Em tratamento · 4 meses sem visita</p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 shrink-0">Urgente</span>
             </div>
@@ -880,8 +880,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Calendar size={20} className="text-amber-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[#1C1C1E]">Consulta sem confirmação</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">Amanhã · 14:00 · aguardando resposta</p>
+                <p className="text-[13px] font-bold text-[#1d1d1f]">Consulta sem confirmação</p>
+                <p className="text-[12px] text-[#86868b] mt-0.5">Amanhã · 14:00 · aguardando resposta</p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 shrink-0">Pendente</span>
             </div>
@@ -891,8 +891,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <DollarSign size={20} className="text-emerald-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[#1C1C1E]">Faturamento do dia</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">Consultas realizadas e pendentes</p>
+                <p className="text-[13px] font-bold text-[#1d1d1f]">Faturamento do dia</p>
+                <p className="text-[12px] text-[#86868b] mt-0.5">Consultas realizadas e pendentes</p>
               </div>
               <p className="text-[18px] font-bold text-emerald-600 shrink-0">R$ ···</p>
             </div>
@@ -911,12 +911,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setWelcomeSeen(true);
               onDismissWelcome();
             }}
-            className="w-full flex items-center justify-center gap-3 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all"
+            className="w-full flex items-center justify-center gap-3 apple-btn"
           >
             Cadastrar primeiro paciente
             <ArrowRight size={18} />
           </motion.button>
-          <p className="text-center text-[12px] text-[#8E8E93]">
+          <p className="text-center text-[12px] text-[#86868b]">
             Leva menos de 2 minutos · em seguida você agenda a primeira consulta
           </p>
         </motion.div>
@@ -934,10 +934,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           className="space-y-8"
         >
           <div className="space-y-5">
-            <p className="text-[13px] font-medium text-[#8E8E93] tracking-wide">
+            <p className="text-[13px] font-medium text-[#86868b] tracking-wide">
               {timeGreeting.text}{getGreetingName() ? `, ${getGreetingName()}` : ''}
             </p>
-            <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1C1C1E] leading-[1.25]">
+            <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#1d1d1f] leading-[1.25]">
               O OdontoHub fica mais útil conforme conhece sua rotina.
             </h1>
             <div className="space-y-4 text-[16px] text-[#3A3A3C] leading-[1.65]">
@@ -959,7 +959,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setOnboardingDismissed(true);
               onDismissOnboarding();
             }}
-            className="w-full flex items-center justify-center gap-2.5 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_8px_28px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
+            className="w-full flex items-center justify-center gap-2.5 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_8px_28px_rgba(0,0,0,0.12)] hover:opacity-90 transition-all"
           >
             Começar minha rotina
             <ArrowRight size={17} />
@@ -993,7 +993,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }}
             />
           </div>
-          <span className="text-[12px] font-bold text-[#8E8E93] shrink-0">
+          <span className="text-[12px] font-bold text-[#86868b] shrink-0">
             {completedSteps} de {totalSteps}
           </span>
         </motion.div>
@@ -1008,7 +1008,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span className="text-[11px] font-bold text-primary uppercase tracking-widest">
             Passo {currentOnboardingStep} de {totalSteps}
           </span>
-          <h1 className="text-[24px] sm:text-[28px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2]">
+          <h1 className="text-[24px] sm:text-[28px] font-bold tracking-tight text-[#1d1d1f] leading-[1.2]">
             {stepTitles[currentOnboardingStep]}
           </h1>
         </motion.header>
@@ -1026,7 +1026,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="w-12 h-12 bg-primary/10 rounded-[18px] flex items-center justify-center shrink-0">
                   <UserPlus size={22} className="text-primary" />
                 </div>
-                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                <p className="text-[14px] text-[#86868b] leading-relaxed pt-1">
                   Com um paciente cadastrado, o painel que você viu passa a refletir a sua rotina real.
                 </p>
               </div>
@@ -1034,15 +1034,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">?</div>
                   <div>
-                    <p className="text-[13px] font-semibold text-[#1C1C1E]">Seu primeiro paciente</p>
-                    <p className="text-[11px] text-[#8E8E93]">Prontuário · Odontograma · Evolução · Financeiro</p>
+                    <p className="text-[13px] font-semibold text-[#1d1d1f]">Seu primeiro paciente</p>
+                    <p className="text-[11px] text-[#86868b]">Prontuário · Odontograma · Evolução · Financeiro</p>
                   </div>
                 </div>
               </div>
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setIsPatientModalOpen(true)}
-                className="flex items-center gap-2.5 bg-primary text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.12)] hover:opacity-90 transition-all"
+                className="flex items-center gap-2.5 apple-btn text-[15px]"
               >
                 Cadastrar primeiro paciente
                 <ArrowRight size={15} />
@@ -1056,16 +1056,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="w-12 h-12 bg-violet-50 rounded-[18px] flex items-center justify-center shrink-0">
                   <Calendar size={22} className="text-violet-500" />
                 </div>
-                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                <p className="text-[14px] text-[#86868b] leading-relaxed pt-1">
                   {firstPatient
                     ? `Agende a consulta de ${firstPatient.name?.split(' ')[0] || 'seu paciente'} e eu passo a acompanhar retornos, confirmações e alertas.`
                     : 'Agende a primeira consulta e eu passo a acompanhar retornos, confirmações e alertas.'}
                 </p>
               </div>
               <div className="bg-[#F9FAFB] rounded-2xl p-4 space-y-2 border border-slate-100/50">
-                <span className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">Próximo passo na agenda</span>
+                <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Próximo passo na agenda</span>
                 <div className="flex items-center gap-3 py-1.5">
-                  <span className="text-[12px] font-bold text-[#1C1C1E] w-10 shrink-0">—</span>
+                  <span className="text-[12px] font-bold text-[#1d1d1f] w-10 shrink-0">—</span>
                   <div className="flex-1 px-3 py-2 rounded-xl text-[12px] font-medium bg-primary/10 text-primary">
                     {firstPatient?.name?.split(' ')[0] || 'Paciente'} · Primeira consulta
                   </div>
@@ -1088,7 +1088,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="w-12 h-12 bg-sky-50 rounded-[18px] flex items-center justify-center shrink-0">
                   <ClipboardList size={22} className="text-sky-500" />
                 </div>
-                <p className="text-[14px] text-[#8E8E93] leading-relaxed pt-1">
+                <p className="text-[14px] text-[#86868b] leading-relaxed pt-1">
                   Odontograma, evolução clínica e plano de tratamento ficam organizados no prontuário de {firstPatient.name?.split(' ')[0]}.
                 </p>
               </div>
@@ -1098,8 +1098,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {(firstPatient.name || '?')[0]?.toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-[13px] font-semibold text-[#1C1C1E]">{firstPatient.name}</p>
-                    <p className="text-[11px] text-[#8E8E93]">Anamnese · Odontograma · Evolução</p>
+                    <p className="text-[13px] font-semibold text-[#1d1d1f]">{firstPatient.name}</p>
+                    <p className="text-[11px] text-[#86868b]">Anamnese · Odontograma · Evolução</p>
                   </div>
                 </div>
               </div>
@@ -1123,12 +1123,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* 1. HEADER + CONTEXTO PRÉ-HERO */}
       <div className="space-y-5">
         {/* Saudação — caption level */}
-        <p className="text-[13px] font-medium text-[#8E8E93] px-1 tracking-wide">
-          {timeGreeting.text}, {getGreetingName()} {timeGreeting.emoji}
+        <p className="text-[13px] font-normal text-[#86868b] px-1 tracking-[-0.011em]">
+          {timeGreeting.text}{getGreetingName() ? `, ${getGreetingName()}` : ''}
         </p>
 
         {/* Mensagem principal — headline dominante */}
-        <h1 className="text-[28px] font-bold tracking-tight text-[#1C1C1E] leading-[1.2] px-1">
+        <h1 className="apple-display-ink text-[28px] sm:text-[32px] px-1">
           {getSmartMessage()}
         </h1>
 
@@ -1145,7 +1145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <ClipboardList size={20} className="text-sky-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-bold text-[#1C1C1E]">Falta um passo para ativar seu consultório</p>
+                <p className="text-[15px] font-bold text-[#1d1d1f]">Falta um passo para ativar seu consultório</p>
                 <p className="text-[13px] text-[#636366] mt-1 leading-relaxed">
                   Abra o prontuário de {firstPatient.name?.split(' ')[0]} para registrar evoluções, odontograma e plano de tratamento.
                 </p>
@@ -1198,7 +1198,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             transition={{ duration: 0.3 }}
             onClick={() => onOpenPortalInbox?.()}
             whileTap={{ scale: 0.98 }}
-            className="w-full flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-4 py-3.5 text-left transition-all"
+            className="w-full flex items-center gap-3 bg-white rounded-[28px] px-4 py-3.5 text-left"
           >
             <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
               <Calendar size={17} className="text-white" />
@@ -1225,19 +1225,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const badge = getStatusBadge(heroPatient);
         const countdown = getCountdown(heroPatient);
         const gradientClass = isInProgress
-          ? 'from-[#0F2744] via-[#1A365D] to-[#234876]'
+          ? 'bg-[#1d1d1f]'
           : isNoShow
-          ? 'from-[#4A1C1C] via-[#6B2D2D] to-[#7A3535]'
+          ? 'bg-[#1d1d1f]'
           : isFinished
-          ? 'from-slate-500 via-slate-400 to-slate-400'
-          : 'from-[#1E4430] via-[#264E36] to-[#3A6B4E]';
-        const ctaColor = isInProgress
-          ? '#1A365D'
-          : isNoShow
-          ? '#9B2C2C'
-          : isFinished
-          ? '#374151'
-          : '#1E4430';
+          ? 'bg-[#6e6e73]'
+          : 'bg-[#1d1d1f]';
+        const ctaColor = '#1d1d1f';
         const startFormatted = new Date(heroPatient.start_time)
           .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         const heroLabel = heroIsAttending
@@ -1252,17 +1246,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className={`overflow-hidden rounded-[32px] shadow-[0_24px_80px_rgba(0,0,0,0.10)] flex flex-col bg-gradient-to-br ${gradientClass}`}
-              style={{ minHeight: 'min(60svh, 520px)' }}>
+            <div className={`overflow-hidden rounded-[28px] flex flex-col ${gradientClass}`}
+              style={{ minHeight: 'min(52svh, 480px)' }}>
 
               {/* ── TOPO: identidade do paciente ── */}
               <div className="flex-1 px-7 pt-9 pb-6 flex flex-col gap-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.14em]">
+                    <span className="text-white/50 text-[13px] font-normal tracking-[-0.011em]">
                       {heroLabel}
                     </span>
-                    <h2 className="text-[36px] sm:text-[40px] font-bold text-white leading-[1.1] tracking-[-0.025em] mt-1.5 break-words">
+                    <h2 className="apple-display text-[36px] sm:text-[40px] mt-2 break-words">
                       {heroPatient.patient_name}
                     </h2>
                   </div>
@@ -1283,7 +1277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* status + countdown */}
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${badge.className}`}>
+                  <span className={`px-3 py-1.5 rounded-full text-[12px] font-normal ${badge.className}`}>
                     {badge.label}
                   </span>
                   {!isFinished && !isNoShow && (
@@ -1325,7 +1319,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       ? onReschedule?.(heroPatient)
                       : openPatientRecord(heroPatient.patient_id)
                   }
-                  className="w-full py-[20px] rounded-[26px] text-[18px] font-bold bg-white shadow-[0_8px_32px_rgba(0,0,0,0.18)] transition-all"
+                  className="w-full apple-btn-light py-[14px] text-[17px] border-0"
                   style={{ color: ctaColor }}
                 >
                   {isFinished ? 'Ver prontuário' : isNoShow ? 'Remarcar consulta' : isInProgress ? 'Atender agora' : 'Atender'}
@@ -1335,7 +1329,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     whileTap={{ scale: 0.98, opacity: 0.9 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
                     onClick={() => sendReminder(heroPatient)}
-                    className="flex items-center justify-center gap-2 px-5 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
+                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-[980px] bg-white/12 text-[15px] font-normal text-white transition-colors"
                   >
                     <MessageCircle size={16} />
                     WhatsApp
@@ -1348,7 +1342,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ? onMarkNoShow?.(heroPatient)
                         : onReschedule?.(heroPatient)
                     }
-                    className="flex items-center justify-center gap-2 py-[15px] rounded-[20px] bg-white/15 border border-white/20 text-[14px] font-bold text-white transition-all"
+                    className="flex items-center justify-center gap-2 py-3 rounded-[980px] bg-white/12 text-[15px] font-normal text-white transition-colors"
                   >
                     {isInProgress ? 'Paciente faltou' : 'Reagendar'}
                   </motion.button>
@@ -1359,12 +1353,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
         );
       })() : (
         <section className="space-y-5">
-          <div className="w-16 h-16 bg-[#F2F2F7] rounded-full flex items-center justify-center text-[#8E8E93] mx-auto">
+          <div className="w-16 h-16 bg-[#f5f5f7] rounded-full flex items-center justify-center text-[#86868b] mx-auto">
             <Calendar size={32} />
           </div>
           <div className="space-y-1.5 text-center">
-            <p className="text-[19px] font-bold text-[#1C1C1E]">Agenda livre</p>
-            <p className="text-[14px] text-[#8E8E93]">
+            <p className="text-[19px] font-bold text-[#1d1d1f]">Agenda livre</p>
+            <p className="text-[14px] text-[#86868b]">
               {availableSchedulingSuggestions.length > 0
                 ? `${availableSchedulingSuggestions.length} paciente${availableSchedulingSuggestions.length === 1 ? '' : 's'} aguardando encaixe`
                 : 'Nenhuma consulta por agora'}
@@ -1373,16 +1367,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2.5 bg-primary text-white w-full py-[18px] rounded-[22px] text-[16px] font-bold shadow-[0_12px_36px_rgba(38,78,54,0.12)] mx-auto max-w-xs"
+            className="flex items-center justify-center gap-2.5 apple-btn w-full mx-auto max-w-xs"
           >
             <CalendarPlus size={18} />
             Agendar consulta
           </motion.button>
           <button
             onClick={() => setActiveTab('agenda')}
-            className="block text-[13px] font-semibold text-primary text-center mx-auto mt-1"
+            className="block text-[17px] text-[#2997ff] text-center mx-auto mt-3"
           >
-            Ver agenda completa
+            Ver agenda completa ›
           </button>
         </section>
       )}
@@ -1413,7 +1407,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Retornos vencidos</h3>
+              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Retornos vencidos</h3>
             </div>
             <span className="text-[12px] font-bold text-rose-400">{intelligence.overdueReturns.length}</span>
           </div>
@@ -1421,9 +1415,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {intelligence.overdueReturns.slice(0, 5).map((item) => (
               <motion.div
                 key={`return-${item.patient_id}`}
-                whileTap={{ backgroundColor: '#F2F2F7' }}
+                whileTap={{ backgroundColor: '#f5f5f7' }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center gap-4 p-5 cursor-pointer border-b border-[#C6C6C8]/5 last:border-b-0"
+                className="flex items-center gap-4 p-5 cursor-pointer border-b border-[#d2d2d7]/5 last:border-b-0"
                 onClick={() => openPatientRecord(item.patient_id)}
               >
                 <div className="w-11 h-11 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-sm overflow-hidden border border-rose-100 shrink-0">
@@ -1434,8 +1428,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{item.patient_name}</p>
-                  <p className="text-[12px] text-[#8E8E93] mt-0.5 truncate">
+                  <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{item.patient_name}</p>
+                  <p className="text-[12px] text-[#86868b] mt-0.5 truncate">
                     Retorno venceu há {item.days_overdue} dia{item.days_overdue === 1 ? '' : 's'}
                     {item.procedure_performed ? ` · ${item.procedure_performed}` : ''}
                   </p>
@@ -1462,22 +1456,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-1 h-5 rounded-full bg-amber-400" />
-              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Faltou e não remarcou</h3>
+              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Faltou e não remarcou</h3>
             </div>
-            <span className="text-[12px] font-bold text-[#8E8E93]">{noShowsNeedingReschedule.length}</span>
+            <span className="text-[12px] font-bold text-[#86868b]">{noShowsNeedingReschedule.length}</span>
           </div>
           <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
             {noShowsNeedingReschedule.slice(0, 5).map((item, index) => (
               <motion.div
                 key={`noshow-${item.id}`}
-                whileTap={{ backgroundColor: '#F2F2F7' }}
+                whileTap={{ backgroundColor: '#f5f5f7' }}
                 transition={{ duration: 0.15 }}
                 onClick={() => onReschedule?.(item)}
-                className={`flex items-center justify-between px-5 py-[16px] transition-colors cursor-pointer ${index !== Math.min(noShowsNeedingReschedule.length, 5) - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+                className={`flex items-center justify-between px-5 py-[16px] transition-colors cursor-pointer ${index !== Math.min(noShowsNeedingReschedule.length, 5) - 1 ? 'border-b border-[#f5f5f7]' : ''}`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{item.patient_name}</p>
-                  <p className="text-[12px] text-[#8E8E93] mt-0.5">
+                  <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{item.patient_name}</p>
+                  <p className="text-[12px] text-[#86868b] mt-0.5">
                     Faltou em {new Date(item.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                     {item.notes ? ` · ${item.notes}` : ''}
                   </p>
@@ -1511,15 +1505,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-400 border-2 border-white" />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{intelligence.needsActionToday[0].patient_name}</p>
-                <p className="text-[12px] text-[#8E8E93]">
+                <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{intelligence.needsActionToday[0].patient_name}</p>
+                <p className="text-[12px] text-[#86868b]">
                   {formatDaysAgo(intelligence.needsActionToday[0].days_since_last_visit)} · {statusLabels[intelligence.needsActionToday[0].status] || intelligence.needsActionToday[0].status}
                 </p>
               </div>
               <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${priorityConfig[intelligence.needsActionToday[0].priority].bg} ${priorityConfig[intelligence.needsActionToday[0].priority].text} shrink-0`}>
                 {priorityConfig[intelligence.needsActionToday[0].priority].label}
               </span>
-              <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
+              <ChevronRight size={16} className="text-[#d2d2d7] shrink-0" />
             </motion.div>
           </section>
         ) : (
@@ -1527,7 +1521,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Precisam da sua ação</h3>
+              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Precisam da sua ação</h3>
             </div>
             <span className="text-[12px] font-bold text-rose-400">{intelligence.needsActionToday.length}</span>
           </div>
@@ -1561,16 +1555,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
                   className="relative w-full sm:max-w-xl bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden border border-white/30 max-h-[88vh] flex flex-col"
                 >
-                  <div className="px-6 pt-6 pb-4 border-b border-[#C6C6C8]/20 flex items-start justify-between gap-4">
+                  <div className="px-6 pt-6 pb-4 border-b border-[#d2d2d7]/20 flex items-start justify-between gap-4">
                     <div>
-                      <h4 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Confirmações de amanhã</h4>
-                      <p className="text-[14px] text-[#8E8E93] mt-1">
+                      <h4 className="text-[20px] font-bold text-[#1d1d1f] tracking-tight">Confirmações de amanhã</h4>
+                      <p className="text-[14px] text-[#86868b] mt-1">
                         {tomorrowUnconfirmedAppointments.length} paciente{tomorrowUnconfirmedAppointments.length === 1 ? '' : 's'} aguardando mensagem de confirmação
                       </p>
                     </div>
                     <button
                       onClick={() => setIsReminderModalOpen(false)}
-                      className="w-9 h-9 rounded-full bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E] transition-colors flex items-center justify-center shrink-0"
+                      className="w-9 h-9 rounded-full bg-[#f5f5f7] text-[#86868b] hover:text-[#1d1d1f] transition-colors flex items-center justify-center shrink-0"
                     >
                       <X size={18} />
                     </button>
@@ -1582,16 +1576,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       return (
                         <div
                           key={appointment.id}
-                          className="rounded-[24px] border border-[#C6C6C8]/15 bg-[#FCFCFD] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                          className="rounded-[24px] border border-[#d2d2d7]/15 bg-[#FCFCFD] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2.5 flex-wrap">
-                              <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{appointment.patient_name}</p>
+                              <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{appointment.patient_name}</p>
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700">
                                 Pendente
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1.5 text-[13px] text-[#8E8E93] font-medium flex-wrap">
+                            <div className="flex items-center gap-2 mt-1.5 text-[13px] text-[#86868b] font-medium flex-wrap">
                               <span>{startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                               <span>•</span>
                               <span>{appointment.notes || 'Consulta'}</span>
@@ -1600,7 +1594,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <motion.button
                             whileTap={{ scale: 0.98 }}
                             onClick={() => sendReminder(appointment)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[18px] bg-primary text-white text-[13px] font-bold shadow-[0_8px_24px_rgba(38,78,54,0.1)]"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[18px] bg-primary text-white text-[13px] font-bold shadow-[0_8px_24px_rgba(0,0,0,0.1)]"
                           >
                             <MessageCircle size={15} />
                             Enviar confirmação
@@ -1610,10 +1604,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     })}
                   </div>
 
-                  <div className="px-6 py-4 border-t border-[#C6C6C8]/20 bg-white">
+                  <div className="px-6 py-4 border-t border-[#d2d2d7]/20 bg-white">
                     <button
                       onClick={() => setIsReminderModalOpen(false)}
-                      className="w-full h-[46px] rounded-[16px] bg-[#F2F2F7] text-[#4B5250] text-[14px] font-medium hover:bg-[#E9E9EE] transition-colors"
+                      className="w-full h-[46px] rounded-[16px] bg-[#f5f5f7] text-[#6e6e73] text-[14px] font-medium hover:bg-[#E9E9EE] transition-colors"
                     >
                       Fechar
                     </button>
@@ -1627,7 +1621,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {otherAppointments.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Próximos da agenda</h3>
+            <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Próximos da agenda</h3>
             <button onClick={() => setActiveTab('agenda')} className="text-[13px] font-semibold text-primary">
               Ver tudo
             </button>
@@ -1636,10 +1630,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {otherAppointments.map((app, index) => (
               <motion.div
                 key={app.id}
-                whileTap={{ backgroundColor: '#F2F2F7' }}
+                whileTap={{ backgroundColor: '#f5f5f7' }}
                 transition={{ duration: 0.15 }}
                 onClick={() => openPatientRecord(app.patient_id)}
-                className={`flex items-center justify-between px-5 py-[16px] transition-colors cursor-pointer ${index !== otherAppointments.length - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+                className={`flex items-center justify-between px-5 py-[16px] transition-colors cursor-pointer ${index !== otherAppointments.length - 1 ? 'border-b border-[#f5f5f7]' : ''}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-center shrink-0 w-11">
@@ -1649,11 +1643,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                   <div className="w-px h-8 bg-primary/15 shrink-0" />
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[15px] font-semibold text-[#1C1C1E]">{app.patient_name}</span>
-                    <span className="text-[12px] text-[#8E8E93]">{app.notes || 'Consulta'}</span>
+                    <span className="text-[15px] font-semibold text-[#1d1d1f]">{app.patient_name}</span>
+                    <span className="text-[12px] text-[#86868b]">{app.notes || 'Consulta'}</span>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-[#C6C6C8]" />
+                <ChevronRight size={16} className="text-[#d2d2d7]" />
               </motion.div>
             ))}
           </div>
@@ -1667,16 +1661,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
             type="button"
             whileTap={{ scale: 0.98, opacity: 0.9 }}
             onClick={handleDaySummaryClick}
-            className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all text-left"
+            className="w-full flex items-center gap-4 bg-[#f5f5f7] rounded-[20px] px-5 py-4 transition-all text-left"
           >
             <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-primary shadow-sm shrink-0">
               {React.createElement(daySummaryIcon, { size: 20 })}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-semibold text-[#1C1C1E]">{getDaySummaryTitle()}</p>
-              <p className="text-[12px] text-[#8E8E93] mt-0.5 leading-snug">{getDaySummarySubtitle()}</p>
+              <p className="text-[15px] font-semibold text-[#1d1d1f]">{getDaySummaryTitle()}</p>
+              <p className="text-[12px] text-[#86868b] mt-0.5 leading-snug">{getDaySummarySubtitle()}</p>
             </div>
-            <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
+            <ChevronRight size={16} className="text-[#d2d2d7] shrink-0" />
           </motion.button>
         </section>
       )}
@@ -1692,9 +1686,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2.5">
                 <div className="w-1 h-5 rounded-full bg-amber-400" />
-                <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Precisam de atenção</h3>
+                <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Precisam de atenção</h3>
               </div>
-              <span className="text-[12px] font-bold text-[#8E8E93]">{combined.length}</span>
+              <span className="text-[12px] font-bold text-[#86868b]">{combined.length}</span>
             </div>
             <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
               {combined.slice(0, 5).map(p => renderIntelligencePatient(p, false))}
@@ -1714,9 +1708,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-1 h-5 rounded-full bg-violet-400" />
-              <h3 className="text-[15px] font-bold text-[#1C1C1E] tracking-tight">Sugestões de encaixe</h3>
+              <h3 className="text-[15px] font-bold text-[#1d1d1f] tracking-tight">Sugestões de encaixe</h3>
             </div>
-            <span className="text-[12px] font-bold text-[#8E8E93]">{availableSchedulingSuggestions.length}</span>
+            <span className="text-[12px] font-bold text-[#86868b]">{availableSchedulingSuggestions.length}</span>
           </div>
           <div className="rounded-[20px] overflow-hidden bg-white border border-[#E5E5EA]/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
             {availableSchedulingSuggestions.slice(0, 4).map((sug, i) => {
@@ -1731,9 +1725,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               return (
                 <motion.div
                   key={`sug-${i}`}
-                  whileTap={{ backgroundColor: '#F2F2F7' }}
+                  whileTap={{ backgroundColor: '#f5f5f7' }}
                   transition={{ duration: 0.15 }}
-                  className={`flex items-center gap-4 px-5 py-[14px] cursor-pointer ${i !== Math.min(availableSchedulingSuggestions.length, 4) - 1 ? 'border-b border-[#F2F2F7]' : ''}`}
+                  className={`flex items-center gap-4 px-5 py-[14px] cursor-pointer ${i !== Math.min(availableSchedulingSuggestions.length, 4) - 1 ? 'border-b border-[#f5f5f7]' : ''}`}
                   onClick={() => openPatientRecord(sug.patient.patient_id)}
                 >
                   <div className="w-10 h-10 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-[13px] overflow-hidden border border-violet-100 shrink-0">
@@ -1744,8 +1738,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold text-[#1C1C1E] truncate">{sug.patient.patient_name}</p>
-                    <p className="text-[12px] text-[#8E8E93] truncate">
+                    <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{sug.patient.patient_name}</p>
+                    <p className="text-[12px] text-[#86868b] truncate">
                       {dayLabel} · {sug.suggested_slot.start} · {sug.procedure || 'Consulta'}
                     </p>
                   </div>
@@ -1774,7 +1768,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <motion.button
             whileTap={{ scale: 0.98, opacity: 0.9 }}
             onClick={() => setActiveTab('financeiro')}
-            className="w-full flex items-center gap-4 bg-[#F2F2F7] rounded-[20px] px-5 py-4 transition-all text-left"
+            className="w-full flex items-center gap-4 bg-[#f5f5f7] rounded-[20px] px-5 py-4 transition-all text-left"
           >
             <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
               <DollarSign size={20} />
@@ -1782,11 +1776,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex-1 min-w-0">
               {todayRevenue > 0 ? (
                 <>
-                  <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                  <p className="text-[15px] font-semibold text-[#1d1d1f]">
                     {todayRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} faturados hoje
                   </p>
                   {(weekRevenue > todayRevenue || pendingReceivablesTotal > 0) && (
-                    <p className="text-[12px] text-[#8E8E93] mt-0.5 leading-snug">
+                    <p className="text-[12px] text-[#86868b] mt-0.5 leading-snug">
                       {weekRevenue > todayRevenue
                         ? `Semana: ${weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
                         : ''}
@@ -1799,21 +1793,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </>
               ) : pendingReceivablesTotal > 0 ? (
                 <>
-                  <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                  <p className="text-[15px] font-semibold text-[#1d1d1f]">
                     {pendingReceivablesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} a receber
                   </p>
-                  <p className="text-[12px] text-[#8E8E93] mt-0.5">Pendências de pagamento</p>
+                  <p className="text-[12px] text-[#86868b] mt-0.5">Pendências de pagamento</p>
                 </>
               ) : (
                 <>
-                  <p className="text-[15px] font-semibold text-[#1C1C1E]">
+                  <p className="text-[15px] font-semibold text-[#1d1d1f]">
                     {weekRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} esta semana
                   </p>
-                  <p className="text-[12px] text-[#8E8E93] mt-0.5">Ver movimentações</p>
+                  <p className="text-[12px] text-[#86868b] mt-0.5">Ver movimentações</p>
                 </>
               )}
             </div>
-            <ChevronRight size={16} className="text-[#C6C6C8] shrink-0" />
+            <ChevronRight size={16} className="text-[#d2d2d7] shrink-0" />
           </motion.button>
         </section>
       )}

@@ -205,7 +205,7 @@ export function PaymentModal({
         >
           {/* Drag Indicator (mobile only) */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden">
-            <div className="w-9 h-1 bg-[#C6C6C8] rounded-full" />
+            <div className="w-9 h-1 bg-[#d2d2d7] rounded-full" />
           </div>
 
           {/* ═══ STEP 1: SELECT PAYMENT METHOD ═══ */}
@@ -214,7 +214,7 @@ export function PaymentModal({
               <div className="flex items-center justify-between mb-6">
                 <h3
                   id="payment-modal-title"
-                  className="text-[18px] font-semibold text-[#1C1C1E]"
+                  className="text-[18px] font-semibold text-[#1d1d1f]"
                 >
                   Escolha o método de pagamento
                 </h3>
@@ -224,7 +224,7 @@ export function PaymentModal({
                   aria-label="Fechar"
                   className="w-8 h-8 bg-[#E5E5EA] rounded-full flex items-center justify-center hover:bg-[#D1D1D6] transition-colors"
                 >
-                  <X size={16} className="text-[#8E8E93]" />
+                  <X size={16} className="text-[#86868b]" />
                 </button>
               </div>
 
@@ -241,8 +241,8 @@ export function PaymentModal({
                 >
                   <div className="flex items-center justify-between">
                     <div className="text-left">
-                      <p className="font-semibold text-[#1C1C1E]">PIX</p>
-                      <p className="text-[#8E8E93] text-sm">Transferência instantânea</p>
+                      <p className="font-semibold text-[#1d1d1f]">PIX</p>
+                      <p className="text-[#86868b] text-sm">Transferência instantânea</p>
                     </div>
                     <div
                       className={`w-5 h-5 border-2 rounded-full flex items-center justify-center transition-all ${
@@ -266,7 +266,7 @@ export function PaymentModal({
                 >
                   <div className="flex items-center justify-between">
                     <div className="text-left">
-                      <p className="font-semibold text-[#8E8E93]">Transferência Bancária</p>
+                      <p className="font-semibold text-[#86868b]">Transferência Bancária</p>
                       <p className="text-[#AEAEB2] text-sm">Em breve</p>
                     </div>
                   </div>
@@ -285,7 +285,7 @@ export function PaymentModal({
                 type="button"
                 onClick={handleProceedToConfirm}
                 disabled={loading}
-                className="w-full h-12 bg-[#0C9B72] text-white rounded-xl font-semibold text-[15px] hover:bg-[#0A8560] active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full h-12 bg-[#0071e3] text-white rounded-xl font-semibold text-[15px] hover:bg-[#0077ed] active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 Continuar
               </button>
@@ -295,14 +295,14 @@ export function PaymentModal({
           {/* ═══ STEP 2: CONFIRM AMOUNT + COPY PIX ═══ */}
           {step === 'confirm' && selectedMethod === 'pix' && (
             <div className="px-5 py-6">
-              <h3 className="text-[18px] font-semibold text-[#1C1C1E] mb-6">
+              <h3 className="text-[18px] font-semibold text-[#1d1d1f] mb-6">
                 Confirme o Pagamento
               </h3>
 
               {/* Amount Summary */}
-              <div className="bg-[#F2F2F7] rounded-xl p-4 mb-6 text-center">
-                <p className="text-[#8E8E93] text-[12px] font-medium mb-2">{label}</p>
-                <p className="text-[#1C1C1E] text-[28px] font-bold tracking-tight">
+              <div className="bg-[#f5f5f7] rounded-xl p-4 mb-6 text-center">
+                <p className="text-[#86868b] text-[12px] font-medium mb-2">{label}</p>
+                <p className="text-[#1d1d1f] text-[28px] font-bold tracking-tight">
                   R$ {amount.toFixed(2)}
                 </p>
               </div>
@@ -310,26 +310,26 @@ export function PaymentModal({
               {/* PIX Key Section */}
               {pixInfo ? (
                 <div className="mb-6">
-                  <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-widest mb-3">
+                  <p className="text-[#86868b] text-[11px] font-semibold uppercase tracking-widest mb-3">
                     Chave PIX
                   </p>
                   <button
                     type="button"
                     onClick={handleCopyPix}
-                    className="w-full flex items-center gap-3 p-3.5 bg-[#F2F2F7] rounded-xl active:bg-[#E5E5EA] hover:bg-[#E5E5EA] transition-colors"
+                    className="w-full flex items-center gap-3 p-3.5 bg-[#f5f5f7] rounded-xl active:bg-[#E5E5EA] hover:bg-[#E5E5EA] transition-colors"
                   >
-                    <div className="w-10 h-10 bg-[#0C9B72]/10 rounded-xl flex items-center justify-center shrink-0">
-                      <DollarSign size={18} className="text-[#0C9B72]" />
+                    <div className="w-10 h-10 bg-[#0071e3]/10 rounded-xl flex items-center justify-center shrink-0">
+                      <DollarSign size={18} className="text-[#0071e3]" />
                     </div>
                     <div className="flex-1 text-left min-w-0">
-                      <p className="text-[#1C1C1E] text-[15px] font-medium truncate">
+                      <p className="text-[#1d1d1f] text-[15px] font-medium truncate">
                         {pixInfo.pix_key}
                       </p>
-                      <p className="text-[#8E8E93] text-[12px] mt-0.5">
+                      <p className="text-[#86868b] text-[12px] mt-0.5">
                         {pixInfo.pix_key_type} • {pixInfo.beneficiary_name}
                       </p>
                     </div>
-                    <span className="text-[#0C9B72] text-[12px] font-semibold shrink-0">
+                    <span className="text-[#0071e3] text-[12px] font-semibold shrink-0">
                       {copied ? '✓ Copiado!' : 'Copiar'}
                     </span>
                   </button>
@@ -343,8 +343,8 @@ export function PaymentModal({
               )}
 
               {/* Instructions */}
-              <div className="bg-[#0C9B72]/5 border border-[#0C9B72]/15 rounded-xl p-4 mb-6">
-                <p className="text-[#1C1C1E] text-[13px] leading-relaxed font-medium mb-2">
+              <div className="bg-[#0071e3]/5 border border-[#0071e3]/15 rounded-xl p-4 mb-6">
+                <p className="text-[#1d1d1f] text-[13px] leading-relaxed font-medium mb-2">
                   Como pagar:
                 </p>
                 <ol className="text-[#3A3A3C] text-[12px] space-y-1 list-decimal list-inside">
@@ -368,7 +368,7 @@ export function PaymentModal({
                 type="button"
                 onClick={handleConfirmPayment}
                 disabled={loading || !pixInfo}
-                className="w-full h-12 bg-[#34C759] text-white rounded-xl font-semibold text-[15px] hover:bg-[#31B54D] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center mb-3"
+                className="w-full h-12 bg-[#30d158] text-white rounded-xl font-semibold text-[15px] hover:bg-[#31B54D] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center mb-3"
               >
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -381,7 +381,7 @@ export function PaymentModal({
                 type="button"
                 onClick={handleBackToMethod}
                 disabled={loading}
-                className="w-full h-12 border border-[#D1D1D6] text-[#1C1C1E] rounded-xl font-semibold text-[15px] hover:bg-[#F2F2F7] active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full h-12 border border-[#D1D1D6] text-[#1d1d1f] rounded-xl font-semibold text-[15px] hover:bg-[#f5f5f7] active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 Voltar para Métodos
               </button>
@@ -391,13 +391,13 @@ export function PaymentModal({
           {/* ═══ STEP 3: SUCCESS ═══ */}
           {step === 'success' && (
             <div className="text-center py-12 px-6">
-              <div className="w-14 h-14 bg-[#34C759]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 size={28} className="text-[#34C759]" />
+              <div className="w-14 h-14 bg-[#30d158]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 size={28} className="text-[#30d158]" />
               </div>
-              <h3 className="text-[18px] font-semibold text-[#1C1C1E] mb-2">
+              <h3 className="text-[18px] font-semibold text-[#1d1d1f] mb-2">
                 Pagamento Informado
               </h3>
-              <p className="text-[#8E8E93] text-[14px]">
+              <p className="text-[#86868b] text-[14px]">
                 Avisaremos a clínica. Eles confirmarão em breve.
               </p>
             </div>
@@ -409,10 +409,10 @@ export function PaymentModal({
               <div className="w-14 h-14 bg-[#FF3B30]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle size={28} className="text-[#FF3B30]" />
               </div>
-              <h3 className="text-[18px] font-semibold text-[#1C1C1E] mb-2 text-center">
+              <h3 className="text-[18px] font-semibold text-[#1d1d1f] mb-2 text-center">
                 Erro ao Confirmar
               </h3>
-              <p className="text-[#8E8E93] text-[14px] text-center mb-6">
+              <p className="text-[#86868b] text-[14px] text-center mb-6">
                 {error || 'Algo deu errado. Tente novamente.'}
               </p>
 
@@ -429,7 +429,7 @@ export function PaymentModal({
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="w-full h-12 border border-[#D1D1D6] text-[#1C1C1E] rounded-xl font-semibold text-[15px] hover:bg-[#F2F2F7] active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full h-12 border border-[#D1D1D6] text-[#1d1d1f] rounded-xl font-semibold text-[15px] hover:bg-[#f5f5f7] active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 Fechar
               </button>

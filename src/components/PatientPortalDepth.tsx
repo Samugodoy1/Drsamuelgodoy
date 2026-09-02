@@ -138,12 +138,12 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-4 pb-4 border-b border-[#E5E5EA]">
               <div className="w-10 h-1 bg-[#E5E5EA] rounded-full" />
-              <h2 className="text-[#1C1C1E] text-[18px] font-bold tracking-tight flex-1 text-center">
+              <h2 className="text-[#1d1d1f] text-[18px] font-bold tracking-tight flex-1 text-center">
                 Seu Histórico
               </h2>
               <button
                 onClick={onClose}
-                className="p-2 text-[#8E8E93] hover:text-[#1C1C1E] transition-colors"
+                className="p-2 text-[#86868b] hover:text-[#1d1d1f] transition-colors"
               >
                 <X size={20} />
               </button>
@@ -163,17 +163,17 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                     >
                       <button
                         onClick={() => setExpandedSection(isExpanded ? null : section.id)}
-                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-[#F9FAFB] hover:bg-[#F2F2F7] transition-colors duration-200"
+                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-[#F9FAFB] hover:bg-[#f5f5f7] transition-colors duration-200"
                       >
                         <div className="flex items-center gap-4 flex-1 min-w-0">
-                          <div className="w-10 h-10 rounded-full bg-[#0C9B72]/10 flex items-center justify-center shrink-0">
-                            <SectionIcon size={18} className="text-[#0C9B72]" />
+                          <div className="w-10 h-10 rounded-full bg-[#0071e3]/10 flex items-center justify-center shrink-0">
+                            <SectionIcon size={18} className="text-[#0071e3]" />
                           </div>
                           <div className="text-left min-w-0 flex-1">
-                            <p className="text-[#1C1C1E] text-[15px] font-semibold">
+                            <p className="text-[#1d1d1f] text-[15px] font-semibold">
                               {section.label}
                             </p>
-                            <p className="text-[#8E8E93] text-[12px] mt-0.5">
+                            <p className="text-[#86868b] text-[12px] mt-0.5">
                               {section.preview}
                             </p>
                           </div>
@@ -181,7 +181,7 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                         <motion.div
                           animate={{ rotate: isExpanded ? 180 : 0 }}
                           transition={{ duration: 0.2 }}
-                          className="shrink-0 text-[#C6C6C8]"
+                          className="shrink-0 text-[#d2d2d7]"
                         >
                           <ChevronDown size={18} />
                         </motion.div>
@@ -203,14 +203,14 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                                   data.appointments.map(apt => (
                                     <div key={apt.id} className="p-3 bg-white rounded-xl border border-[#E5E5EA]">
                                       <div className="flex items-start justify-between gap-3 mb-2">
-                                        <p className="text-[#1C1C1E] text-[13px] font-semibold">
+                                        <p className="text-[#1d1d1f] text-[13px] font-semibold">
                                           {formatDateBR(apt.start_time)} às {formatTimeBR(apt.start_time)}
                                         </p>
-                                        <span className="text-[#8E8E93] text-[11px] font-medium bg-[#F2F2F7] px-2.5 py-1 rounded-full">
+                                        <span className="text-[#86868b] text-[11px] font-medium bg-[#f5f5f7] px-2.5 py-1 rounded-full">
                                           {apt.status}
                                         </span>
                                       </div>
-                                      <p className="text-[#8E8E93] text-[12px]">
+                                      <p className="text-[#86868b] text-[12px]">
                                         Dr(a). {apt.dentist_name}
                                       </p>
                                       {apt.notes && (
@@ -221,7 +221,7 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                                     </div>
                                   ))
                                 ) : (
-                                  <p className="text-[#8E8E93] text-[13px] text-center py-4">
+                                  <p className="text-[#86868b] text-[13px] text-center py-4">
                                     Nenhuma consulta registrada
                                   </p>
                                 )}
@@ -234,11 +234,11 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                                   data.evolution.map(evo => (
                                     <div key={evo.id} className="p-3 bg-white rounded-xl border border-[#E5E5EA]">
                                       <div className="flex items-start justify-between gap-3 mb-2">
-                                        <p className="text-[#1C1C1E] text-[13px] font-semibold">
+                                        <p className="text-[#1d1d1f] text-[13px] font-semibold">
                                           {formatDateBR(evo.date)}
                                         </p>
                                       </div>
-                                      <p className="text-[#0C9B72] text-[12px] font-medium mb-1">
+                                      <p className="text-[#0071e3] text-[12px] font-medium mb-1">
                                         {evo.procedure_performed}
                                       </p>
                                       {evo.notes && (
@@ -246,13 +246,13 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                                           {evo.notes}
                                         </p>
                                       )}
-                                      <p className="text-[#8E8E93] text-[11px] mt-2">
+                                      <p className="text-[#86868b] text-[11px] mt-2">
                                         {evo.dentist_name}
                                       </p>
                                     </div>
                                   ))
                                 ) : (
-                                  <p className="text-[#8E8E93] text-[13px] text-center py-4">
+                                  <p className="text-[#86868b] text-[13px] text-center py-4">
                                     Sem anotações clínicas
                                   </p>
                                 )}
@@ -268,21 +268,21 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                                       href={file.file_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="flex items-center justify-between p-3 bg-white rounded-xl border border-[#E5E5EA] hover:border-[#0C9B72] hover:bg-[#0C9B72]/5 transition-all"
+                                      className="flex items-center justify-between p-3 bg-white rounded-xl border border-[#E5E5EA] hover:border-[#0071e3] hover:bg-[#0071e3]/5 transition-all"
                                     >
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-[#0C9B72] text-[13px] font-semibold truncate">
+                                        <p className="text-[#0071e3] text-[13px] font-semibold truncate">
                                           {file.description || file.file_type}
                                         </p>
-                                        <p className="text-[#8E8E93] text-[11px] mt-0.5">
+                                        <p className="text-[#86868b] text-[11px] mt-0.5">
                                           {formatDateBR(file.created_at)}
                                         </p>
                                       </div>
-                                      <ChevronDown size={16} className="text-[#C6C6C8] shrink-0 ml-2 rotate-90" />
+                                      <ChevronDown size={16} className="text-[#d2d2d7] shrink-0 ml-2 rotate-90" />
                                     </a>
                                   ))
                                 ) : (
-                                  <p className="text-[#8E8E93] text-[13px] text-center py-4">
+                                  <p className="text-[#86868b] text-[13px] text-center py-4">
                                     Nenhum documento
                                   </p>
                                 )}
@@ -293,19 +293,19 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                               <div className="space-y-2">
                                 {data.payment_plans.length > 0 && (
                                   <div>
-                                    <p className="text-[#1C1C1E] text-[12px] font-semibold mb-2 px-1">
+                                    <p className="text-[#1d1d1f] text-[12px] font-semibold mb-2 px-1">
                                       Planos de Pagamento
                                     </p>
                                     {data.payment_plans.map(plan => (
                                       <div key={plan.id} className="p-3 bg-white rounded-xl border border-[#E5E5EA] mb-2">
-                                        <p className="text-[#1C1C1E] text-[13px] font-semibold">
+                                        <p className="text-[#1d1d1f] text-[13px] font-semibold">
                                           {plan.procedure}
                                         </p>
                                         <div className="mt-2 space-y-1">
-                                          <p className="text-[#8E8E93] text-[12px]">
+                                          <p className="text-[#86868b] text-[12px]">
                                             Total: R$ {plan.total_amount.toFixed(2)}
                                           </p>
-                                          <p className="text-[#8E8E93] text-[12px]">
+                                          <p className="text-[#86868b] text-[12px]">
                                             {plan.installments_count}x • Status: {plan.status}
                                           </p>
                                         </div>
@@ -316,24 +316,24 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
 
                                 {data.transactions.length > 0 && (
                                   <div>
-                                    <p className="text-[#1C1C1E] text-[12px] font-semibold mb-2 px-1 mt-4">
+                                    <p className="text-[#1d1d1f] text-[12px] font-semibold mb-2 px-1 mt-4">
                                       Transações
                                     </p>
                                     {data.transactions.map(tx => (
                                       <div key={tx.id} className="p-3 bg-white rounded-xl border border-[#E5E5EA] mb-2 flex items-center justify-between">
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-[#1C1C1E] text-[13px] font-semibold">
+                                          <p className="text-[#1d1d1f] text-[13px] font-semibold">
                                             {tx.description}
                                           </p>
-                                          <p className="text-[#8E8E93] text-[11px] mt-1">
+                                          <p className="text-[#86868b] text-[11px] mt-1">
                                             {formatDateBR(tx.date)}
                                           </p>
                                         </div>
                                         <div className="text-right ml-4 shrink-0">
-                                          <p className="text-[#1C1C1E] text-[13px] font-semibold">
+                                          <p className="text-[#1d1d1f] text-[13px] font-semibold">
                                             R$ {tx.amount.toFixed(2)}
                                           </p>
-                                          <p className="text-[#8E8E93] text-[11px] mt-1">
+                                          <p className="text-[#86868b] text-[11px] mt-1">
                                             {tx.status}
                                           </p>
                                         </div>
@@ -343,7 +343,7 @@ export function PatientPortalDepth({ isOpen, onClose, data }: PatientPortalDepth
                                 )}
 
                                 {data.payment_plans.length === 0 && data.transactions.length === 0 && (
-                                  <p className="text-[#8E8E93] text-[13px] text-center py-4">
+                                  <p className="text-[#86868b] text-[13px] text-center py-4">
                                     Nenhuma transação
                                   </p>
                                 )}

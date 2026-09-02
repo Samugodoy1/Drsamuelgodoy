@@ -208,7 +208,7 @@ const resolveProcedureCategory = (title: string) => {
   if (/extra|exo|cirurg|sutur|anestes|exodont/.test(lower))
     return { label: 'Cirurgia', dotCls: 'bg-rose-500', tagCls: 'bg-rose-50 text-rose-700', borderCls: 'border-l-rose-400' };
   if (/limpeza|profilax|raspagem|t[aá]rtaro|calcul|poliment/.test(lower))
-    return { label: 'Profilaxia', dotCls: 'bg-emerald-500', tagCls: 'bg-emerald-50 text-emerald-700', borderCls: 'border-l-emerald-400' };
+    return { label: 'Profilaxia', dotCls: 'bg-primary', tagCls: 'bg-emerald-50 text-emerald-700', borderCls: 'border-l-emerald-400' };
   if (/avalia|consulta|retorno|anamnese|revisão|revisao/.test(lower))
     return { label: 'Consulta', dotCls: 'bg-sky-500', tagCls: 'bg-sky-50 text-sky-700', borderCls: 'border-l-sky-400' };
   if (/pr[óo]tese|prot[ée]tic|protocolo|coroa|ponte|n[úu]cleo|faceta|implante/.test(lower))
@@ -217,7 +217,7 @@ const resolveProcedureCategory = (title: string) => {
 };
 
 const TIMELINE_STATUS_STYLES: Record<string, { dot: string; text: string; label: string }> = {
-  CONCLUIDO:    { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Concluído' },
+  CONCLUIDO:    { dot: 'bg-primary', text: 'text-emerald-700', label: 'Concluído' },
   EM_ANDAMENTO: { dot: 'bg-amber-500',   text: 'text-amber-700',   label: 'Em andamento' },
   OBSERVACAO:   { dot: 'bg-sky-500',     text: 'text-sky-600',     label: 'Observação' },
 };
@@ -1864,9 +1864,9 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
     'bg-slate-50/70 border border-slate-200/70';
 
   return (
-    <div className="min-h-screen bg-[#F7F7F8] pb-24 text-slate-900">
+    <div className="min-h-screen bg-[#f5f5f7] pb-24 text-slate-900">
       <div aria-live="polite" className="sr-only">{uploadFeedback || (isSavingAnamnese ? 'Salvando anamnese' : '')}</div>
-      <header className="sticky top-0 z-40 bg-[#F7F7F8]">
+      <header className="sticky top-0 z-40 bg-[#f5f5f7]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-3">
           <div className="rounded-[26px] border border-slate-200/60 bg-white px-4 py-3.5 sm:px-5 shadow-[0_6px_24px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]">
 
@@ -3087,7 +3087,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                               <div className="space-y-2">
                                 {consents.map((c: any) => (
                                   <div key={c.id} className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
                                       <Check size={11} className="text-white" />
                                     </div>
                                     <div className="min-w-0">
@@ -3224,7 +3224,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
                     exit={{ opacity: 0, y: -4 }}
                     className="text-xs text-slate-500 px-1 flex items-center gap-1.5"
                   >
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
                     {uploadFeedback}
                   </motion.p>
                 )}

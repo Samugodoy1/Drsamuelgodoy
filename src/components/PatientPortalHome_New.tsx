@@ -154,10 +154,10 @@ export function PatientPortalHome({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <p className="text-[#8E8E93] text-[13px] font-medium tracking-wide uppercase">
+          <p className="text-[#86868b] text-[13px] font-medium tracking-wide uppercase">
             {getGreeting()}
           </p>
-          <h1 className="text-[#1C1C1E] text-[28px] font-bold tracking-tight mt-1">
+          <h1 className="text-[#1d1d1f] text-[28px] font-bold tracking-tight mt-1">
             {firstName}
           </h1>
         </motion.div>
@@ -178,7 +178,7 @@ export function PatientPortalHome({
                     window.location.href = `tel:${clinic.phone}`;
                   }
                 }}
-                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0C9B72] to-[#0A7D5C] p-4 text-white transition-all hover:shadow-lg active:scale-95"
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0071e3] to-[#0A7D5C] p-4 text-white transition-all hover:shadow-lg active:scale-95"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-xl" />
                 <div className="relative z-10 flex flex-col items-center gap-2 text-center">
@@ -218,8 +218,8 @@ export function PatientPortalHome({
               {/* Status badge + days until */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-3 h-3 rounded-full bg-[#34C759] animate-pulse" />
-                  <span className="text-[#34C759] text-[12px] font-bold uppercase">
+                  <div className="w-3 h-3 rounded-full bg-[#30d158] animate-pulse" />
+                  <span className="text-[#30d158] text-[12px] font-bold uppercase">
                     Confirmado
                   </span>
                 </div>
@@ -235,10 +235,10 @@ export function PatientPortalHome({
               {/* Date, Time, Provider */}
               <div className="space-y-2.5">
                 <div>
-                  <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-wide">
+                  <p className="text-[#86868b] text-[11px] font-semibold uppercase tracking-wide">
                     Data e Hora
                   </p>
-                  <p className="text-[#1C1C1E] text-[17px] font-bold mt-1">
+                  <p className="text-[#1d1d1f] text-[17px] font-bold mt-1">
                     {new Date(nextAppointment.start_time).toLocaleDateString(
                       'pt-BR',
                       {
@@ -253,10 +253,10 @@ export function PatientPortalHome({
                 </div>
 
                 <div>
-                  <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-wide">
+                  <p className="text-[#86868b] text-[11px] font-semibold uppercase tracking-wide">
                     Profissional
                   </p>
-                  <p className="text-[#1C1C1E] text-[15px] font-semibold mt-1">
+                  <p className="text-[#1d1d1f] text-[15px] font-semibold mt-1">
                     Dr(a). {nextAppointment.dentist_name}
                   </p>
                 </div>
@@ -265,10 +265,10 @@ export function PatientPortalHome({
               {/* Procedure type */}
               {appointmentMeta?.procedure && (
                 <div className="pt-3 border-t border-[#E5E5EA]">
-                  <p className="text-[#8E8E93] text-[11px] font-semibold uppercase tracking-wide">
+                  <p className="text-[#86868b] text-[11px] font-semibold uppercase tracking-wide">
                     Tipo
                   </p>
-                  <p className="text-[#1C1C1E] text-[15px] font-semibold mt-1">
+                  <p className="text-[#1d1d1f] text-[15px] font-semibold mt-1">
                     {appointmentMeta.procedure}
                   </p>
                 </div>
@@ -284,17 +284,17 @@ export function PatientPortalHome({
             >
               <button
                 onClick={() => setExpandedChecklist(!expandedChecklist)}
-                className="w-full rounded-2xl bg-white border border-[#E5E5EA] p-5 flex items-center justify-between hover:border-[#0C9B72]/50 transition-colors"
+                className="w-full rounded-2xl bg-white border border-[#E5E5EA] p-5 flex items-center justify-between hover:border-[#0071e3]/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#0C9B72]/10 flex items-center justify-center">
-                    <CheckCircle2 size={20} className="text-[#0C9B72]" />
+                  <div className="w-10 h-10 rounded-full bg-[#0071e3]/10 flex items-center justify-center">
+                    <CheckCircle2 size={20} className="text-[#0071e3]" />
                   </div>
                   <div className="text-left">
-                    <p className="text-[#1C1C1E] text-[15px] font-semibold">
+                    <p className="text-[#1d1d1f] text-[15px] font-semibold">
                       Prepare-se para a visita
                     </p>
-                    <p className="text-[#8E8E93] text-[12px] mt-0.5">
+                    <p className="text-[#86868b] text-[12px] mt-0.5">
                       {expandedChecklist
                         ? 'Mostrar menos'
                         : `${CHECKLIST_ITEMS.length} coisas a fazer`}
@@ -303,7 +303,7 @@ export function PatientPortalHome({
                 </div>
                 <ChevronDown
                   size={20}
-                  className={`text-[#8E8E93] transition-transform ${
+                  className={`text-[#86868b] transition-transform ${
                     expandedChecklist ? 'rotate-180' : ''
                   }`}
                 />
@@ -324,14 +324,14 @@ export function PatientPortalHome({
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.05 }}
-                        className="flex gap-3 rounded-xl bg-white border border-[#E5E5EA] p-4 hover:border-[#0C9B72]/50 transition-colors"
+                        className="flex gap-3 rounded-xl bg-white border border-[#E5E5EA] p-4 hover:border-[#0071e3]/50 transition-colors"
                       >
                         <span className="text-[18px] shrink-0">{item.icon}</span>
                         <div>
-                          <p className="text-[#1C1C1E] text-[14px] font-semibold">
+                          <p className="text-[#1d1d1f] text-[14px] font-semibold">
                             {item.label}
                           </p>
-                          <p className="text-[#8E8E93] text-[12px] mt-0.5">
+                          <p className="text-[#86868b] text-[12px] mt-0.5">
                             {item.desc}
                           </p>
                         </div>
@@ -351,18 +351,18 @@ export function PatientPortalHome({
             >
               <button
                 onClick={() => onRescheduleAppointment(nextAppointment)}
-                className="rounded-xl bg-white border border-[#E5E5EA] p-3 text-center hover:border-[#0C9B72]/50 transition-colors active:scale-95"
+                className="rounded-xl bg-white border border-[#E5E5EA] p-3 text-center hover:border-[#0071e3]/50 transition-colors active:scale-95"
               >
-                <Calendar size={18} className="text-[#0C9B72] mx-auto mb-1.5" />
-                <p className="text-[#1C1C1E] text-[12px] font-semibold">Reagendar</p>
+                <Calendar size={18} className="text-[#0071e3] mx-auto mb-1.5" />
+                <p className="text-[#1d1d1f] text-[12px] font-semibold">Reagendar</p>
               </button>
 
               <button
                 onClick={onOpenDepth}
-                className="rounded-xl bg-white border border-[#E5E5EA] p-3 text-center hover:border-[#0C9B72]/50 transition-colors active:scale-95"
+                className="rounded-xl bg-white border border-[#E5E5EA] p-3 text-center hover:border-[#0071e3]/50 transition-colors active:scale-95"
               >
-                <Stethoscope size={18} className="text-[#0C9B72] mx-auto mb-1.5" />
-                <p className="text-[#1C1C1E] text-[12px] font-semibold">Traço</p>
+                <Stethoscope size={18} className="text-[#0071e3] mx-auto mb-1.5" />
+                <p className="text-[#1d1d1f] text-[12px] font-semibold">Traço</p>
               </button>
 
               <button
@@ -378,10 +378,10 @@ export function PatientPortalHome({
                     .slice(0, 15)}Z`;
                   window.open(url, '_blank');
                 }}
-                className="rounded-xl bg-white border border-[#E5E5EA] p-3 text-center hover:border-[#0C9B72]/50 transition-colors active:scale-95"
+                className="rounded-xl bg-white border border-[#E5E5EA] p-3 text-center hover:border-[#0071e3]/50 transition-colors active:scale-95"
               >
-                <MapPin size={18} className="text-[#0C9B72] mx-auto mb-1.5" />
-                <p className="text-[#1C1C1E] text-[12px] font-semibold">Localização</p>
+                <MapPin size={18} className="text-[#0071e3] mx-auto mb-1.5" />
+                <p className="text-[#1d1d1f] text-[12px] font-semibold">Localização</p>
               </button>
             </motion.div>
 
@@ -393,20 +393,20 @@ export function PatientPortalHome({
                 transition={{ duration: 0.4, delay: 0.3 }}
                 className="rounded-2xl bg-[#F9FAFB] border border-[#E5E5EA] p-5"
               >
-                <p className="text-[#0C9B72] text-[11px] font-bold uppercase tracking-wide mb-3">
+                <p className="text-[#0071e3] text-[11px] font-bold uppercase tracking-wide mb-3">
                   Acompanhamento
                 </p>
                 <div className="space-y-2">
                   {recentProcedures.slice(0, 2).map((proc, idx) => (
                     <div key={idx} className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-[#34C759] flex items-center justify-center shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-[#30d158] flex items-center justify-center shrink-0">
                         <CheckCircle2 size={14} className="text-white" />
                       </div>
                       <div>
-                        <p className="text-[#1C1C1E] text-[13px] font-semibold">
+                        <p className="text-[#1d1d1f] text-[13px] font-semibold">
                           {proc.procedure}
                         </p>
-                        <p className="text-[#8E8E93] text-[11px] mt-0.5">
+                        <p className="text-[#86868b] text-[11px] mt-0.5">
                           {formatDateBR(proc.date)}
                         </p>
                       </div>
@@ -429,10 +429,10 @@ export function PatientPortalHome({
             <div className="flex items-start gap-4 mb-4">
               <AlertCircle size={28} className="text-[#FF3B30] animate-pulse shrink-0" />
               <div>
-                <h2 className="text-[#1C1C1E] text-[22px] font-bold">
+                <h2 className="text-[#1d1d1f] text-[22px] font-bold">
                   Você está com dor aguda
                 </h2>
-                <p className="text-[#8E8E93] text-[15px] mt-1">
+                <p className="text-[#86868b] text-[15px] mt-1">
                   Podemos tentar um encaixe imediato
                 </p>
               </div>
@@ -453,13 +453,13 @@ export function PatientPortalHome({
             transition={{ duration: 0.4, delay: 0.1 }}
             className="text-center space-y-6"
           >
-            <Heart size={40} className="text-[#0C9B72] mx-auto" />
-            <h2 className="text-[#1C1C1E] text-[28px] font-bold">
+            <Heart size={40} className="text-[#0071e3] mx-auto" />
+            <h2 className="text-[#1d1d1f] text-[28px] font-bold">
               Tudo certo com seu sorriso?
             </h2>
             <button
               onClick={() => setShowGuidedConversation(true)}
-              className="w-full h-12 px-5 rounded-full bg-gradient-to-r from-[#0C9B72] to-[#0A7D5C] text-white text-[15px] font-semibold"
+              className="w-full h-12 px-5 rounded-full bg-gradient-to-r from-[#0071e3] to-[#0A7D5C] text-white text-[15px] font-semibold"
             >
               Quero Agendar
             </button>
@@ -477,7 +477,7 @@ export function PatientPortalHome({
             <p className="text-[#FF9500] text-[12px] font-bold uppercase">
               Pós-Operatório
             </p>
-            <p className="text-[#1C1C1E] text-[18px] font-bold mt-2">
+            <p className="text-[#1d1d1f] text-[18px] font-bold mt-2">
               Como você está?
             </p>
             <p className="text-[#FF9500] text-[14px] font-semibold mt-3 flex items-center gap-2">

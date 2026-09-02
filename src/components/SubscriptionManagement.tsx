@@ -294,7 +294,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
               <button
                 onClick={handleResumeSubscription}
                 disabled={createLoading}
-                className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+                className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {createLoading ? 'Processando...' : 'Continuar assinatura'}
               </button>
@@ -325,7 +325,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
                 <button
                   onClick={() => handleCreateSubscription(paidPlan.id)}
                   disabled={createLoading}
-                  className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(38,78,54,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+                  className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
                 >
                   {createLoading ? 'Processando...' : subscribeCtaLabel}
                 </button>

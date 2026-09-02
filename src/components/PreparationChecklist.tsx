@@ -34,18 +34,18 @@ export const PreparationChecklist: React.FC<PreparationChecklistProps> = ({
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="rounded-3xl bg-gradient-to-br from-[#0C9B72]/5 to-[#34C759]/5 backdrop-blur-xl border border-[#0C9B72]/20 p-8 sm:p-10"
+      className="rounded-3xl bg-white p-8 sm:p-10"
     >
       {/* Header */}
       <div className="mb-7">
-        <h3 className="text-[#0C9B72] text-[12px] font-bold uppercase tracking-wider">
+        <h3 className="text-[#86868b] text-[13px] font-normal">
           ✓ Preparação
         </h3>
-        <h2 className="text-[#1C1C1E] text-[24px] font-bold tracking-tight mt-2">
+        <h2 className="text-[#1d1d1f] text-[24px] font-bold tracking-tight mt-2">
           {title}
         </h2>
         {description && (
-          <p className="text-[#8E8E93] text-[14px] mt-3">
+          <p className="text-[#86868b] text-[14px] mt-3">
             {description}
           </p>
         )}
@@ -54,10 +54,10 @@ export const PreparationChecklist: React.FC<PreparationChecklistProps> = ({
       {/* Progress bar */}
       <div className="mb-7">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[#8E8E93] text-[13px] font-medium">
+          <span className="text-[#86868b] text-[13px] font-medium">
             Progresso
           </span>
-          <span className="text-[#0C9B72] text-[13px] font-semibold">
+          <span className="text-[#0071e3] text-[13px] font-semibold">
             {completedCount} de {items.length} ({completionPercentage}%)
           </span>
         </div>
@@ -66,7 +66,7 @@ export const PreparationChecklist: React.FC<PreparationChecklistProps> = ({
             initial={{ width: 0 }}
             animate={{ width: `${completionPercentage}%` }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="h-full bg-gradient-to-r from-[#34C759] to-[#0C9B72]"
+            className="h-full bg-[#0071e3]"
           />
         </div>
       </div>
@@ -90,7 +90,7 @@ export const PreparationChecklist: React.FC<PreparationChecklistProps> = ({
                     animate={{ scale: 1 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <CheckCircle2 size={20} className="text-[#0C9B72]" />
+                    <CheckCircle2 size={20} className="text-[#0071e3]" />
                   </motion.div>
                 ) : (
                   <Circle size={20} className="text-[#C7C7CC]" />
@@ -100,14 +100,14 @@ export const PreparationChecklist: React.FC<PreparationChecklistProps> = ({
                 <p
                   className={`text-[15px] font-medium transition-all ${
                     item.completed
-                      ? 'text-[#8E8E93] line-through'
-                      : 'text-[#1C1C1E]'
+                      ? 'text-[#86868b] line-through'
+                      : 'text-[#1d1d1f]'
                   }`}
                 >
                   {item.label}
                 </p>
                 {item.description && (
-                  <p className="text-[#8E8E93] text-[13px] mt-1">
+                  <p className="text-[#86868b] text-[13px] mt-1">
                     {item.description}
                   </p>
                 )}
@@ -123,7 +123,7 @@ export const PreparationChecklist: React.FC<PreparationChecklistProps> = ({
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.95 }}
           onClick={onComplete}
-          className="w-full h-12 px-5 rounded-full bg-gradient-to-r from-[#34C759] to-[#0C9B72] text-white text-[15px] font-semibold tracking-tight transition-all flex items-center justify-center gap-2"
+          className="w-full apple-btn transition-all flex items-center justify-center gap-2"
         >
           <CheckCircle2 size={18} />
           Tudo pronto! Confirmar presença

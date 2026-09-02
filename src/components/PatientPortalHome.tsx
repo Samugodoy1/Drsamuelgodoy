@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { API_URL } from '../config';
 import { AnimatePresence } from 'framer-motion';
-import { Calendar, CheckCircle2, ClipboardList, Lock, MessageCircle, UserRound, Home, MapPin } from '../icons';
+import { Lock, MessageCircle, Home, MapPin } from '../icons';
 import { usePatientMoment } from '../hooks/usePatientMoment';
 import { GuidedConversation } from './GuidedConversation';
 import { PostOperativeCheckIn } from './PostOperativeCheckIn';
@@ -100,59 +100,51 @@ export function PatientPortalHome({
 
   return (
     <>
-      <div className="min-h-screen bg-[#ECECEC] px-4 pb-28 pt-4">
-        <div className="mx-auto w-full max-w-md rounded-[44px] border-[10px] border-[#0F5A42] bg-[#ECECEC] px-6 pb-8 pt-10 shadow-[0_8px_28px_rgba(0,0,0,0.08)]">
-          <div className="mb-12 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#1DBA89] text-xl font-bold text-white">OH</div>
-            <p className="text-[18px] font-bold uppercase tracking-[0.12em] text-[#1C5A45]">Portal do Paciente</p>
-          </div>
+      <div className="min-h-screen bg-[#f5f5f7] px-5 pb-28 pt-10">
+        <div className="mx-auto w-full max-w-md">
+          <p className="mb-8 text-[13px] text-[#86868b]">Portal do Paciente</p>
 
-          <h1 className="text-[58px] font-semibold leading-none tracking-tight text-[#172025]">Olá, {firstName}.</h1>
-          <p className="mt-4 text-[18px] font-semibold leading-snug text-[#18B987]">{nextVisitText}</p>
+          <h1 className="apple-display-ink text-[44px]">Olá, {firstName}.</h1>
+          <p className="mt-4 apple-subhead text-[17px]">{nextVisitText}</p>
 
           <button
             onClick={() => (hasAppointment ? onConfirmAppointment(nextAppointment!.id) : setShowGuidedConversation(true))}
-            className="mt-9 flex h-[76px] w-full items-center justify-center gap-3 rounded-[24px] bg-[#18B987] px-4 text-[24px] font-semibold text-white shadow-[0_8px_14px_rgba(24,185,135,0.28)]"
+            className="mt-10 w-full apple-btn"
           >
-            <CheckCircle2 size={30} />
-            <span>{appointmentSubmittingId === nextAppointment?.id ? 'Confirmando...' : 'Confirmar minha ida'}</span>
+            <span>{appointmentSubmittingId === nextAppointment?.id ? 'Confirmando' : 'Confirmar minha ida'}</span>
           </button>
 
-          <div className="mt-6 space-y-4">
-            <button onClick={onOpenDepth} className="flex h-[84px] w-full items-center gap-4 rounded-[20px] border border-[#D7D7D7] bg-[#F7F7F7] px-6 text-left shadow-sm">
-              <ClipboardList size={30} className="text-[#1F2A2A]" />
-              <span className="text-[20px] font-semibold text-[#172025]">Orientações da cirurgia</span>
+          <div className="mt-8 space-y-3">
+            <button onClick={onOpenDepth} className="flex h-[56px] w-full items-center justify-between rounded-[16px] bg-white px-5 text-left">
+              <span className="text-[17px] text-[#1d1d1f]">Orientações da cirurgia</span>
+              <span className="text-[#2997ff]">›</span>
             </button>
-            <button onClick={() => onChangeTab('evolucao')} className="flex h-[84px] w-full items-center gap-4 rounded-[20px] border border-[#D7D7D7] bg-[#F7F7F7] px-6 text-left shadow-sm">
-              <UserRound size={30} className="text-[#1F2A2A]" />
-              <span className="text-[20px] font-semibold text-[#172025]">Atualizar ficha médica</span>
+            <button onClick={() => onChangeTab('evolucao')} className="flex h-[56px] w-full items-center justify-between rounded-[16px] bg-white px-5 text-left">
+              <span className="text-[17px] text-[#1d1d1f]">Atualizar ficha médica</span>
+              <span className="text-[#2997ff]">›</span>
             </button>
-            <button onClick={() => setShowGuidedConversation(true)} className="flex h-[84px] w-full items-center gap-4 rounded-[20px] border border-[#D7D7D7] bg-[#F7F7F7] px-6 text-left shadow-sm">
-              <MessageCircle size={30} className="text-[#1F2A2A]" />
-              <span className="text-[20px] font-semibold text-[#172025]">Dúvidas pós-atendimento</span>
+            <button onClick={() => setShowGuidedConversation(true)} className="flex h-[56px] w-full items-center justify-between rounded-[16px] bg-white px-5 text-left">
+              <span className="text-[17px] text-[#1d1d1f]">Dúvidas pós-atendimento</span>
+              <span className="text-[#2997ff]">›</span>
             </button>
           </div>
 
-          <div className="mt-14 rounded-[24px] border border-[#D7C8FC] bg-[#E9E3F7] px-6 py-6">
-            <p className="text-[16px] font-bold uppercase tracking-wide text-[#7D59E6]">Dica de hoje</p>
-            <p className="mt-3 text-[20px] leading-snug text-[#545B65]">Beba bastante água após o procedimento de amanhã.</p>
-          </div>
-
-          <div className="mt-6 flex items-center gap-2 text-sm text-[#5F676F]"><Lock size={14} /> Seus dados estão protegidos</div>
+          <p className="mt-10 text-[17px] text-[#86868b] leading-snug">Beba bastante água após o procedimento.</p>
+          <div className="mt-8 flex items-center gap-2 text-[13px] text-[#86868b]"><Lock size={14} strokeWidth={1.5} /> Dados protegidos</div>
         </div>
       </div>
 
       <div className="fixed inset-x-0 bottom-3 z-40 px-4">
-        <div className="mx-auto grid w-full max-w-md grid-cols-3 rounded-[24px] border border-white/70 bg-white/90 px-2 py-2 shadow-[0_18px_45px_rgba(12,18,32,0.18)] backdrop-blur-2xl">
-          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'inicio' ? 'text-[#08A055]' : 'text-[#6B7280]'}`} onClick={() => onChangeTab('inicio')}>
+        <div className="mx-auto grid w-full max-w-md grid-cols-3 ios-glass px-2 py-1 min-h-[44px]">
+          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'inicio' ? 'text-[#1d1d1f]' : 'text-[#6B7280]'}`} onClick={() => onChangeTab('inicio')}>
             <Home size={22} />
             <span className="text-[13px] font-medium">Início</span>
           </button>
-          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'consultas' ? 'text-[#08A055]' : 'text-[#6B7280]'}`} onClick={() => { onChangeTab('consultas'); setShowGuidedConversation(true); }}>
+          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'consultas' ? 'text-[#1d1d1f]' : 'text-[#6B7280]'}`} onClick={() => { onChangeTab('consultas'); setShowGuidedConversation(true); }}>
             <MessageCircle size={22} />
             <span className="text-[13px] font-medium">Mensagens</span>
           </button>
-          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'evolucao' ? 'text-[#08A055]' : 'text-[#6B7280]'}`} onClick={() => { onChangeTab('evolucao'); onRescheduleAppointment(nextAppointment || { id: 0 }); }}>
+          <button className={`flex flex-col items-center gap-1.5 rounded-2xl py-2 ${activeTab === 'evolucao' ? 'text-[#1d1d1f]' : 'text-[#6B7280]'}`} onClick={() => { onChangeTab('evolucao'); onRescheduleAppointment(nextAppointment || { id: 0 }); }}>
             <MapPin size={22} />
             <span className="text-[13px] font-medium">Ações</span>
           </button>
