@@ -17,12 +17,15 @@ import {
   X,
 } from '../icons';
 import {
+  SIZE_LABEL,
+  cycleWidgetSize,
   deriveControlCenter,
   firstGivenName,
   listHideableLiveWidgets,
   type ControlCenterInput,
   type ControlTab,
   type ControlWidget,
+  type WidgetSize,
   type WidgetTone,
 } from '../utils/controlCenter';
 
@@ -68,6 +71,16 @@ const WIDGET_ICONS: Record<string, typeof Home> = {
 
 const pinKey = (userId: string | number) => `odontohub.rail.${userId}`;
 const hideKey = (userId: string | number) => `odontohub.cc.hide.${userId}`;
+const layoutKey = (userId: string | number) => `odontohub.cc.layout.${userId}`;
+
+type RailLayout = {
+  hidden: string[];
+  sizes: Record<string, WidgetSize>;
+  order: string[];
+  featuredSize: WidgetSize;
+};
+
+const EMPTY_LAYOUT: RailLayout = { hidden: [], sizes: {}, order: [], featuredSize: 'l' };
 
 function loadPins(userId: string | number | undefined, allowAdmin: boolean): RailTab[] {
   const allowed = new Set(TILES.filter(t => allowAdmin || t.id !== 'admin').map(t => t.id));
@@ -89,22 +102,33 @@ function loadPins(userId: string | number | undefined, allowAdmin: boolean): Rai
   return DEFAULT_PINS.filter(id => allowed.has(id));
 }
 
-function loadHidden(userId: string | number | undefined): string[] {
-  if (userId == null) return [];
+function loadLayout(userId: string | number | undefined): RailLayout {
+  if (userId == null) return EMPTY_LAYOUT;
   try {
-    const raw = localStorage.getItem(hideKey(userId));
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+    const raw = localStorage.getItem(layoutKey(userId));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        hidden: Array.isArray(parsed.hidden) ? parsed.hidden.filter((id: unknown) => typeof id === 'string') : [],
+        sizes: parsed.sizes && typeof parsed.sizes === 'object' ? parsed.sizes : {},
+        order: Array.isArray(parsed.order) ? parsed.order.filter((id: unknown) => typeof id === 'string') : [],
+        featuredSize: parsed.featuredSize === 'm' || parsed.featuredSize === 'l' ? parsed.featuredSize : 'l',
+      };
+    }
+    const legacy = localStorage.getItem(hideKey(userId));
+    const hidden = legacy ? JSON.parse(legacy) : [];
+    return {
+      ...EMPTY_LAYOUT,
+      hidden: Array.isArray(hidden) ? hidden.filter((id: unknown) => typeof id === 'string') : [],
+    };
   } catch {
-    return [];
+    return EMPTY_LAYOUT;
   }
 }
 
-function toneValueClass(tone: WidgetTone, on: boolean) {
-  if (on) return 'text-white';
+function toneValueClass(tone: WidgetTone) {
   if (tone === 'urgent') return 'text-[#ff3b30]';
   if (tone === 'warn') return 'text-[#c77d12]';
-  if (tone === 'money' || tone === 'ok') return 'text-[#1d1d1f]';
   if (tone === 'live') return 'text-[#0071e3]';
   return 'text-[#1d1d1f]';
 }
@@ -115,6 +139,16 @@ function toneDotClass(tone: WidgetTone) {
   if (tone === 'live') return 'bg-[#0071e3]';
   if (tone === 'ok' || tone === 'money') return 'bg-[#30d158]';
   return '';
+}
+
+function sizeSpan(size: WidgetSize) {
+  if (size === 'l') {
+    return 'col-span-2 min-h-[132px] p-4 tablet-l:col-span-1 tablet-l:min-h-[52px] tablet-l:p-2 desktop:col-span-2 desktop:min-h-[132px] desktop:p-4';
+  }
+  if (size === 'm') {
+    return 'col-span-2 min-h-[88px] p-3.5 tablet-l:col-span-1 tablet-l:min-h-[52px] tablet-l:p-2 desktop:col-span-2 desktop:min-h-[88px] desktop:p-3.5';
+  }
+  return 'col-span-1 min-h-[96px] p-3.5 tablet-l:min-h-[52px] tablet-l:p-2 desktop:min-h-[96px] desktop:p-3.5';
 }
 
 export interface ClinicRailSnapshot {
@@ -164,13 +198,14 @@ export function ClinicRail({
 }: ClinicRailProps) {
   const [editing, setEditing] = useState(false);
   const [pins, setPins] = useState<RailTab[]>(() => loadPins(user?.id, isAdmin));
-  const [hiddenLive, setHiddenLive] = useState<string[]>(() => loadHidden(user?.id));
-  const [dragging, setDragging] = useState<RailTab | null>(null);
+  const [layout, setLayout] = useState<RailLayout>(() => loadLayout(user?.id));
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [focusedWidget, setFocusedWidget] = useState<string>('dashboard');
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     setPins(loadPins(user?.id, isAdmin));
-    setHiddenLive(loadHidden(user?.id));
+    setLayout(loadLayout(user?.id));
   }, [user?.id, isAdmin]);
 
   useEffect(() => {
@@ -186,10 +221,13 @@ export function ClinicRail({
     [user?.id],
   );
 
-  const persistHidden = useCallback(
-    (next: string[]) => {
-      setHiddenLive(next);
-      if (user?.id != null) localStorage.setItem(hideKey(user.id), JSON.stringify(next));
+  const persistLayout = useCallback(
+    (next: RailLayout) => {
+      setLayout(next);
+      if (user?.id != null) {
+        localStorage.setItem(layoutKey(user.id), JSON.stringify(next));
+        localStorage.setItem(hideKey(user.id), JSON.stringify(next.hidden));
+      }
     },
     [user?.id],
   );
@@ -212,19 +250,26 @@ export function ClinicRail({
   }), [now, snapshot]);
 
   const view = useMemo(
-    () => deriveControlCenter(input, { hiddenLive, pins, allowAdmin: isAdmin }),
-    [input, hiddenLive, pins, isAdmin],
+    () => deriveControlCenter(input, {
+      hiddenLive: layout.hidden,
+      pins,
+      allowAdmin: isAdmin,
+      sizes: layout.sizes,
+      order: layout.order,
+    }),
+    [input, layout, pins, isAdmin],
   );
 
   const hiddenGallery = useMemo(
-    () => listHideableLiveWidgets(input, hiddenLive),
-    [input, hiddenLive],
+    () => listHideableLiveWidgets(input, layout.hidden),
+    [input, layout.hidden],
   );
 
   const unusedTiles = catalog.filter(t => t.id !== 'dashboard' && !pins.includes(t.id));
 
-  const go = (id: RailTab) => {
+  const go = (id: RailTab, widgetId?: string) => {
     if (editing) return;
+    setFocusedWidget(widgetId || id);
     setActiveTab(id);
     setIsSidebarOpen(false);
     navigate('/');
@@ -236,40 +281,67 @@ export function ClinicRail({
     else persistPins([...pins, id]);
   };
 
+  const hideWidget = (id: string) => {
+    if (id === 'dashboard') return;
+    persistLayout({ ...layout, hidden: Array.from(new Set([...layout.hidden, id])) });
+    if (id === 'agenda' || id === 'pacientes' || id === 'financeiro' || id === 'documentos' || id === 'configuracoes' || id === 'admin') {
+      togglePin(id);
+    }
+  };
+
+  const showWidget = (id: string) => {
+    persistLayout({ ...layout, hidden: layout.hidden.filter(item => item !== id) });
+  };
+
+  const resizeWidget = (id: string, current: WidgetSize) => {
+    persistLayout({
+      ...layout,
+      sizes: { ...layout.sizes, [id]: cycleWidgetSize(current) },
+    });
+  };
+
+  const resizeFeatured = () => {
+    persistLayout({
+      ...layout,
+      featuredSize: layout.featuredSize === 'l' ? 'm' : 'l',
+    });
+  };
+
   const activateWidget = (widget: ControlWidget) => {
     if (editing) {
-      if (widget.live) persistHidden([...hiddenLive, widget.id]);
-      else if (widget.tab !== 'dashboard') togglePin(widget.tab);
+      hideWidget(widget.id);
       return;
     }
     if (widget.id === 'portal' && onOpenPortalInbox) {
+      setFocusedWidget(widget.id);
       onOpenPortalInbox();
       setIsSidebarOpen(false);
       return;
     }
-    go(widget.tab);
+    go(widget.tab, widget.id);
   };
 
-  const onDrop = (target: RailTab) => {
-    if (!dragging || dragging === target || target === 'dashboard') return;
-    const next = pins.filter(p => p !== dragging);
-    const at = next.indexOf(target);
+  const onDrop = (targetId: string) => {
+    if (!dragging || dragging === targetId) return;
+    const ids = view.widgets.map(widget => widget.id);
+    const next = ids.filter(id => id !== dragging);
+    const at = next.indexOf(targetId);
     next.splice(at < 0 ? next.length : at, 0, dragging);
-    if (!next.includes('dashboard')) next.unshift('dashboard');
-    persistPins(next);
+    persistLayout({ ...layout, order: next });
     setDragging(null);
   };
 
   const displayName = firstGivenName(profile?.name || user?.name) || 'Doutor';
   const FeaturedIcon = Home;
+  const featuredOn = focusedWidget === 'dashboard' && activeTab === 'dashboard';
 
   const widthClass = isSidebarOpen
     ? 'translate-x-0 w-[19rem]'
     : '-translate-x-full w-[19rem] tablet-l:w-[5.25rem] desktop:w-[19rem]';
 
   const tileClass = (on: boolean, extra = '') =>
-    `relative flex flex-col text-left rounded-[26px] transition-colors duration-200 ${extra} ${
-      on ? 'clinic-cc-tile-on text-white' : 'clinic-cc-tile text-[#1d1d1f] hover:bg-white'
+    `relative flex flex-col text-left rounded-[26px] transition-colors duration-200 text-[#1d1d1f] ${extra} ${
+      on ? 'clinic-cc-tile-on' : 'clinic-cc-tile hover:bg-white'
     } ${editing ? 'clinic-cc-jiggle' : ''}`;
 
   return (
@@ -307,29 +379,52 @@ export function ClinicRail({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 desktop:px-4 pb-3 no-scrollbar">
+        {editing && (
+          <p className="tablet-l:hidden desktop:block text-[12px] text-[#86868b] px-1 mb-3 leading-relaxed">
+            Arraste para reordenar. O canto altera o tamanho — 1×1, 2×1 ou 2×2.
+          </p>
+        )}
+
         <button
           type="button"
-          onClick={() => (editing ? undefined : go('dashboard'))}
-          className={`${tileClass(activeTab === 'dashboard', 'w-full min-h-[108px] p-4 tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-stretch desktop:min-h-[108px] desktop:p-4')}`}
+          onClick={() => (editing ? undefined : go('dashboard', 'dashboard'))}
+          className={tileClass(
+            featuredOn,
+            `${layout.featuredSize === 'm' ? 'min-h-[88px] p-3.5 desktop:min-h-[88px]' : 'min-h-[108px] p-4 desktop:min-h-[108px]'} w-full tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-stretch desktop:p-4`,
+          )}
         >
+          {editing && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={event => {
+                event.stopPropagation();
+                resizeFeatured();
+              }}
+              className="clinic-cc-resize tablet-l:hidden desktop:flex"
+              title={`Tamanho ${SIZE_LABEL[layout.featuredSize]}`}
+            >
+              {SIZE_LABEL[layout.featuredSize]}
+            </span>
+          )}
           <div className="flex w-full items-center justify-between tablet-l:justify-center desktop:justify-between">
             <span className="relative">
-              <FeaturedIcon size={22} className={activeTab === 'dashboard' ? 'text-white' : 'text-[#1d1d1f]'} />
+              <FeaturedIcon size={22} className="text-[#1d1d1f]" />
               {view.featured.attending && (
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#30d158] clinic-cc-live-dot" />
               )}
             </span>
-            <span className={`tablet-l:hidden desktop:block text-[22px] font-semibold tracking-[-0.025em] tabular-nums ${activeTab === 'dashboard' ? 'text-white' : 'text-[#1d1d1f]'}`}>
+            <span className="tablet-l:hidden desktop:block text-[22px] font-semibold tracking-[-0.025em] tabular-nums text-[#1d1d1f]">
               {view.featured.clock}
             </span>
           </div>
           <div className="tablet-l:hidden desktop:block mt-auto">
             <p className="text-[15px] font-semibold tracking-[-0.016em]">{view.featured.label}</p>
-            <p className={`text-[12px] mt-0.5 truncate ${activeTab === 'dashboard' ? 'text-white/55' : 'text-[#86868b]'}`}>
+            <p className="text-[12px] mt-0.5 truncate text-[#86868b]">
               {view.featured.hint}
             </p>
             {view.featured.total > 0 && (
-              <p className={`text-[11px] mt-1 tabular-nums ${activeTab === 'dashboard' ? 'text-white/40' : 'text-[#86868b]'}`}>
+              <p className="text-[11px] mt-1 tabular-nums text-[#86868b]">
                 {view.featured.done} de {view.featured.total} concluídos
               </p>
             )}
@@ -338,49 +433,54 @@ export function ClinicRail({
 
         <div className="grid grid-cols-2 tablet-l:grid-cols-1 desktop:grid-cols-2 gap-2.5 mt-2.5">
           {view.widgets.map(widget => {
-            const active = activeTab === widget.tab;
+            const on = focusedWidget === widget.id;
             const Icon = WIDGET_ICONS[widget.icon] || WIDGET_ICONS[widget.tab] || Calendar;
             const showDot = widget.live && (widget.tone === 'urgent' || widget.tone === 'warn' || widget.tone === 'live');
             return (
               <button
                 key={widget.id}
                 type="button"
-                draggable={editing && !widget.live}
-                onDragStart={() => {
-                  if (!widget.live && (widget.id === 'agenda' || widget.id === 'pacientes' || widget.id === 'financeiro' || widget.id === 'documentos' || widget.id === 'configuracoes' || widget.id === 'admin')) {
-                    setDragging(widget.id);
-                  }
-                }}
+                draggable={editing}
+                onDragStart={() => setDragging(widget.id)}
                 onDragOver={e => e.preventDefault()}
-                onDrop={() => {
-                  if (!widget.live) onDrop(widget.tab);
-                }}
+                onDrop={() => onDrop(widget.id)}
                 onClick={() => activateWidget(widget)}
                 title={`${widget.title}${widget.value ? ` · ${widget.value}` : ''} · ${widget.hint}`}
-                className={tileClass(
-                  active,
-                  'min-h-[96px] p-3.5 items-start justify-between tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-start desktop:min-h-[96px] desktop:p-3.5',
-                )}
+                className={tileClass(on, `${sizeSpan(widget.size)} items-start justify-between tablet-l:items-center tablet-l:justify-center desktop:items-start`)}
               >
                 {editing && (
                   <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#ff3b30] text-white flex items-center justify-center z-10">
                     <X size={11} />
                   </span>
                 )}
+                {editing && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={event => {
+                      event.stopPropagation();
+                      resizeWidget(widget.id, widget.size);
+                    }}
+                    className="clinic-cc-resize tablet-l:hidden desktop:flex"
+                    title={`Tamanho ${SIZE_LABEL[widget.size]}`}
+                  >
+                    {SIZE_LABEL[widget.size]}
+                  </span>
+                )}
                 {showDot && !editing && (
                   <span className={`absolute top-3 right-3 tablet-l:top-1.5 tablet-l:right-1.5 desktop:top-3 desktop:right-3 w-2 h-2 rounded-full ${toneDotClass(widget.tone)} ${widget.tone === 'live' ? 'clinic-cc-live-dot' : ''}`} />
                 )}
-                <Icon size={22} className={active ? 'text-white' : 'text-[#1d1d1f]'} />
-                <span className="tablet-l:hidden desktop:flex flex-col mt-3 w-full min-w-0">
+                <Icon size={22} className="text-[#1d1d1f]" />
+                <span className="tablet-l:hidden desktop:flex flex-col mt-3 w-full min-w-0 pr-8">
                   <span className="text-[13px] font-semibold tracking-[-0.016em] leading-tight">
                     {widget.title}
                   </span>
                   {widget.value ? (
-                    <span className={`text-[17px] font-semibold tracking-[-0.022em] tabular-nums mt-1 leading-none ${toneValueClass(widget.tone, active)}`}>
+                    <span className={`text-[17px] font-semibold tracking-[-0.022em] tabular-nums mt-1 leading-none ${toneValueClass(widget.tone)}`}>
                       {widget.value}
                     </span>
                   ) : null}
-                  <span className={`text-[11px] mt-1 leading-snug truncate ${active ? 'text-white/55' : 'text-[#86868b]'}`}>
+                  <span className="text-[11px] mt-1 leading-snug truncate text-[#86868b]">
                     {widget.hint}
                   </span>
                 </span>
@@ -391,62 +491,53 @@ export function ClinicRail({
 
         {editing && (
           <div className="mt-7 tablet-l:hidden desktop:block space-y-6">
-            <p className="text-[12px] text-[#86868b] px-1 leading-relaxed">
-              Os widgets mudam com a sua rotina — abertura, atendimento e fechamento.
-              Tire o que não usa; o que importa volta a aparecer sozinho.
-            </p>
-
-            {hiddenGallery.length > 0 && (
-              <div>
-                <p className="text-[12px] text-[#86868b] px-1 mb-2.5">Widgets da rotina</p>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {hiddenGallery.map(widget => {
-                    const Icon = WIDGET_ICONS[widget.icon] || Calendar;
-                    return (
-                      <button
-                        key={`hidden-${widget.id}`}
-                        type="button"
-                        onClick={() => persistHidden(hiddenLive.filter(id => id !== widget.id))}
-                        className="clinic-cc-tile-add relative flex flex-col items-start justify-between text-left rounded-[26px] min-h-[96px] p-3.5 text-[#86868b]"
-                      >
-                        <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#30d158] text-white flex items-center justify-center">
-                          <Plus size={11} />
-                        </span>
-                        <Icon size={22} />
-                        <span className="mt-3 text-[13px] font-semibold text-[#1d1d1f]">{widget.title}</span>
-                        <span className="text-[11px] mt-0.5">{widget.hint}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+            <div>
+              <p className="text-[12px] font-semibold text-[#1d1d1f] px-1 mb-1">Adicionar controles</p>
+              <p className="text-[12px] text-[#86868b] px-1 mb-2.5 leading-relaxed">
+                Toque no verde para devolver um widget à sua central.
+              </p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {hiddenGallery.map(widget => {
+                  const Icon = WIDGET_ICONS[widget.icon] || Calendar;
+                  return (
+                    <button
+                      key={`hidden-${widget.id}`}
+                      type="button"
+                      onClick={() => showWidget(widget.id)}
+                      className="clinic-cc-tile-add relative flex flex-col items-start justify-between text-left rounded-[26px] min-h-[96px] p-3.5 text-[#86868b]"
+                    >
+                      <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#30d158] text-white flex items-center justify-center">
+                        <Plus size={11} />
+                      </span>
+                      <Icon size={22} />
+                      <span className="mt-3 text-[13px] font-semibold text-[#1d1d1f]">{widget.title}</span>
+                      <span className="text-[11px] mt-0.5">{widget.hint}</span>
+                    </button>
+                  );
+                })}
+                {unusedTiles.map(tile => {
+                  const Icon = tile.icon;
+                  return (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      onClick={() => togglePin(tile.id)}
+                      className="clinic-cc-tile-add relative flex flex-col items-start justify-between text-left rounded-[26px] min-h-[96px] p-3.5 text-[#86868b]"
+                    >
+                      <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#30d158] text-white flex items-center justify-center">
+                        <Plus size={11} />
+                      </span>
+                      <Icon size={22} />
+                      <span className="mt-3 text-[13px] font-semibold text-[#1d1d1f]">{tile.label}</span>
+                      <span className="text-[11px] mt-0.5">{tile.hint}</span>
+                    </button>
+                  );
+                })}
+                {hiddenGallery.length === 0 && unusedTiles.length === 0 && (
+                  <p className="col-span-2 text-[12px] text-[#86868b] px-1">Todos os controles já estão na sua central.</p>
+                )}
               </div>
-            )}
-
-            {unusedTiles.length > 0 && (
-              <div>
-                <p className="text-[12px] text-[#86868b] px-1 mb-2.5">Galeria de controles</p>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {unusedTiles.map(tile => {
-                    const Icon = tile.icon;
-                    return (
-                      <button
-                        key={tile.id}
-                        type="button"
-                        onClick={() => togglePin(tile.id)}
-                        className="clinic-cc-tile-add relative flex flex-col items-start justify-between text-left rounded-[26px] min-h-[96px] p-3.5 text-[#86868b]"
-                      >
-                        <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#30d158] text-white flex items-center justify-center">
-                          <Plus size={11} />
-                        </span>
-                        <Icon size={22} />
-                        <span className="mt-3 text-[13px] font-semibold text-[#1d1d1f]">{tile.label}</span>
-                        <span className="text-[11px] mt-0.5">{tile.hint}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -458,16 +549,20 @@ export function ClinicRail({
             if (editing) persistPins(pins);
             setEditing(v => !v);
           }}
-          className="hidden desktop:block w-full text-[13px] text-[#0071e3] text-left px-1 py-2"
+          className={`w-full text-left ${
+            editing
+              ? 'h-11 rounded-full bg-[#e8e8ed] text-[#1d1d1f] text-[15px] font-semibold text-center'
+              : 'text-[13px] text-[#0071e3] px-1 py-2 tablet-l:text-center desktop:text-left'
+          }`}
         >
-          {editing ? 'OK' : 'Personalizar'}
+          {editing ? 'Concluído' : 'Personalizar'}
         </button>
 
         <button
           type="button"
           onClick={() => go('configuracoes')}
           className={`w-full flex items-center gap-3 rounded-[22px] px-2 py-2 text-left ${
-            activeTab === 'configuracoes' ? 'clinic-cc-tile' : 'hover:bg-white/50'
+            activeTab === 'configuracoes' ? 'clinic-cc-tile-on' : 'hover:bg-white/50'
           }`}
         >
           <div className="w-10 h-10 rounded-full overflow-hidden bg-white flex items-center justify-center text-[#86868b] shrink-0">

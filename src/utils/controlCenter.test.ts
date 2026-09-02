@@ -186,6 +186,35 @@ describe('control center widgets', () => {
     expect(ids).toContain('documentos');
   });
 
+  it('never shows amanhã and confirmar at the same time', () => {
+    const view = deriveControlCenter(input(at('2026-09-02T18:40:00'), {
+      appointments: [
+        appt({ id: 1, start_time: '2026-09-02T09:00:00', end_time: '2026-09-02T09:40:00', status: 'FINISHED' }),
+        appt({ id: 2, patient_name: 'Lia', start_time: '2026-09-03T08:30:00', end_time: '2026-09-03T09:00:00', status: 'SCHEDULED' }),
+        appt({ id: 3, patient_name: 'Rui', start_time: '2026-09-03T10:00:00', end_time: '2026-09-03T10:40:00', status: 'SCHEDULED' }),
+      ],
+    }));
+
+    const ids = view.widgets.map(widget => widget.id);
+    expect(ids).toContain('confirmar');
+    expect(ids).not.toContain('amanha');
+    expect(ids.filter(id => id === 'confirmar' || id === 'amanha')).toHaveLength(1);
+    expect(view.widgets.find(widget => widget.id === 'confirmar')?.tab).toBe('dashboard');
+  });
+
+  it('keeps amanhã when tomorrow is already confirmed', () => {
+    const view = deriveControlCenter(input(at('2026-09-02T18:40:00'), {
+      appointments: [
+        appt({ id: 1, start_time: '2026-09-02T09:00:00', end_time: '2026-09-02T09:40:00', status: 'FINISHED' }),
+        appt({ id: 2, patient_name: 'Lia', start_time: '2026-09-03T08:30:00', end_time: '2026-09-03T09:00:00', status: 'CONFIRMED' }),
+      ],
+    }));
+
+    const ids = view.widgets.map(widget => widget.id);
+    expect(ids).toContain('amanha');
+    expect(ids).not.toContain('confirmar');
+  });
+
   it('does not invent a caixa widget without money', () => {
     const view = deriveControlCenter(input(at('2026-09-02T12:00:00'), {
       appointments: [
