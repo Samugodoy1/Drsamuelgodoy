@@ -3087,6 +3087,13 @@ export default function App() {
               profile={profile}
               isAdmin={user?.role?.toUpperCase() === 'ADMIN'}
               onLogout={handleLogout}
+              appointments={appointments}
+              transactions={transactions}
+              installments={installments}
+              patientsCount={patients.length}
+              portalPendingCount={portalPendingCount}
+              onOpenPatient={openPatientRecord}
+              onNewAppointment={openAppointmentModal}
             />
             <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col">
               <ClinicalPageRoute 
@@ -3348,6 +3355,13 @@ export default function App() {
         profile={profile}
         isAdmin={user?.role?.toUpperCase() === 'ADMIN'}
         onLogout={handleLogout}
+        appointments={appointments}
+        transactions={transactions}
+        installments={installments}
+        patientsCount={patients.length}
+        portalPendingCount={portalPendingCount}
+        onOpenPatient={openPatientRecord}
+        onNewAppointment={openAppointmentModal}
       />
 
       {/* Main Content */}

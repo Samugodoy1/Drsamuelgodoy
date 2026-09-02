@@ -355,6 +355,25 @@
   .clinic-cc-jiggle:nth-child(2n) { animation-duration: 0.28s; }
   .clinic-cc-jiggle:nth-child(3n) { animation-duration: 0.22s; animation-delay: -0.08s; }
 
+  .clinic-cc-progress {
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+  }
+  .clinic-cc-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: #fff;
+  }
+  .clinic-cc-progress-light {
+    background: rgba(0, 0, 0, 0.08);
+  }
+  .clinic-cc-progress-light > span {
+    background: #1d1d1f;
+  }
+
   @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
     .liquid-glass-tabbar,
     .ios-glass {
