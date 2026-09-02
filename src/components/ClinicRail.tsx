@@ -11,9 +11,11 @@ import {
   MessageCircle,
   Plus,
   Settings,
+  Stethoscope,
   UserCircle,
   UserCog,
   Users,
+  WalletCards,
   X,
 } from '../icons';
 import {
@@ -63,6 +65,11 @@ const WIDGET_ICONS: Record<string, typeof Home> = {
   ritmo: Calendar,
   encaixe: CalendarPlus,
   agenda: Calendar,
+  sala: Stethoscope,
+  pausa: Clock,
+  fila: Users,
+  receber: WalletCards,
+  semana: Calendar,
   pacientes: Users,
   documentos: FileText,
   configuracoes: Settings,
@@ -142,13 +149,9 @@ function toneDotClass(tone: WidgetTone) {
 }
 
 function sizeSpan(size: WidgetSize) {
-  if (size === 'l') {
-    return 'col-span-2 min-h-[132px] p-4 tablet-l:col-span-1 tablet-l:min-h-[52px] tablet-l:p-2 desktop:col-span-2 desktop:min-h-[132px] desktop:p-4';
-  }
-  if (size === 'm') {
-    return 'col-span-2 min-h-[88px] p-3.5 tablet-l:col-span-1 tablet-l:min-h-[52px] tablet-l:p-2 desktop:col-span-2 desktop:min-h-[88px] desktop:p-3.5';
-  }
-  return 'col-span-1 min-h-[96px] p-3.5 tablet-l:min-h-[52px] tablet-l:p-2 desktop:min-h-[96px] desktop:p-3.5';
+  if (size === 'l') return 'col-span-2 min-h-[132px]';
+  if (size === 'm') return 'col-span-2 min-h-[88px]';
+  return 'col-span-1 min-h-[96px]';
 }
 
 export interface ClinicRailSnapshot {
@@ -181,6 +184,7 @@ interface ClinicRailProps {
   onLogout: () => void;
   snapshot?: ClinicRailSnapshot;
   onOpenPortalInbox?: () => void;
+  onOpenPatient?: (id: number) => void;
 }
 
 export function ClinicRail({
@@ -195,6 +199,7 @@ export function ClinicRail({
   onLogout,
   snapshot,
   onOpenPortalInbox,
+  onOpenPatient,
 }: ClinicRailProps) {
   const [editing, setEditing] = useState(false);
   const [pins, setPins] = useState<RailTab[]>(() => loadPins(user?.id, isAdmin));
@@ -308,14 +313,16 @@ export function ClinicRail({
   };
 
   const activateWidget = (widget: ControlWidget) => {
-    if (editing) {
-      hideWidget(widget.id);
-      return;
-    }
+    if (editing) return;
+    setFocusedWidget(widget.id);
     if (widget.id === 'portal' && onOpenPortalInbox) {
-      setFocusedWidget(widget.id);
       onOpenPortalInbox();
       setIsSidebarOpen(false);
+      return;
+    }
+    if (widget.patientId && onOpenPatient) {
+      setIsSidebarOpen(false);
+      onOpenPatient(widget.patientId);
       return;
     }
     go(widget.tab, widget.id);
@@ -337,7 +344,7 @@ export function ClinicRail({
 
   const widthClass = isSidebarOpen
     ? 'translate-x-0 w-[19rem]'
-    : '-translate-x-full w-[19rem] tablet-l:w-[5.25rem] desktop:w-[19rem]';
+    : '-translate-x-full w-[19rem] tablet-l:translate-x-0 tablet-l:w-[19rem]';
 
   const tileClass = (on: boolean, extra = '') =>
     `relative flex flex-col text-left rounded-[26px] transition-colors duration-200 text-[#1d1d1f] ${extra} ${
@@ -353,8 +360,8 @@ export function ClinicRail({
         ${widthClass}
       `}
     >
-      <div className="flex items-start justify-between px-4 pt-6 pb-3 desktop:px-5">
-        <div className="min-w-0 tablet-l:hidden desktop:block">
+      <div className="flex items-start justify-between px-4 pt-6 pb-3">
+        <div className="min-w-0">
           <p className="text-[12px] text-[#86868b] tracking-[-0.011em]">
             {view.voice.greeting}
           </p>
@@ -380,117 +387,135 @@ export function ClinicRail({
 
       <div className="flex-1 overflow-y-auto px-3 desktop:px-4 pb-3 no-scrollbar">
         {editing && (
-          <p className="tablet-l:hidden desktop:block text-[12px] text-[#86868b] px-1 mb-3 leading-relaxed">
-            Arraste para reordenar. O canto altera o tamanho — 1×1, 2×1 ou 2×2.
+          <p className="text-[12px] text-[#86868b] px-1 mb-3 leading-relaxed">
+            O botão vermelho remove. O canto muda o tamanho: 1×1, 2×1 ou 2×2.
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={() => (editing ? undefined : go('dashboard', 'dashboard'))}
-          className={tileClass(
-            featuredOn,
-            `${layout.featuredSize === 'm' ? 'min-h-[88px] p-3.5 desktop:min-h-[88px]' : 'min-h-[108px] p-4 desktop:min-h-[108px]'} w-full tablet-l:min-h-[52px] tablet-l:items-center tablet-l:justify-center tablet-l:p-2 desktop:items-stretch desktop:p-4`,
-          )}
-        >
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => (editing ? undefined : go('dashboard', 'dashboard'))}
+            className={tileClass(
+              featuredOn,
+              `${layout.featuredSize === 'm' ? 'min-h-[88px] p-3.5' : 'min-h-[108px] p-4'} w-full items-stretch`,
+            )}
+          >
+            <div className="flex w-full items-center justify-between">
+              <span className="relative">
+                <FeaturedIcon size={22} className="text-[#1d1d1f]" />
+                {view.featured.attending && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#30d158] clinic-cc-live-dot" />
+                )}
+              </span>
+              <span className="text-[22px] font-semibold tracking-[-0.025em] tabular-nums text-[#1d1d1f]">
+                {view.featured.clock}
+              </span>
+            </div>
+            <div className="mt-auto">
+              <p className="text-[15px] font-semibold tracking-[-0.016em]">{view.featured.label}</p>
+              <p className="text-[12px] mt-0.5 truncate text-[#86868b]">
+                {view.featured.hint}
+              </p>
+              {view.featured.total > 0 && (
+                <p className="text-[11px] mt-1 tabular-nums text-[#86868b]">
+                  {view.featured.done} de {view.featured.total} concluídos
+                </p>
+              )}
+            </div>
+          </button>
           {editing && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
+              onMouseDown={event => event.stopPropagation()}
               onClick={event => {
+                event.preventDefault();
                 event.stopPropagation();
                 resizeFeatured();
               }}
-              className="clinic-cc-resize tablet-l:hidden desktop:flex"
+              className="clinic-cc-resize"
               title={`Tamanho ${SIZE_LABEL[layout.featuredSize]}`}
             >
               {SIZE_LABEL[layout.featuredSize]}
-            </span>
+            </button>
           )}
-          <div className="flex w-full items-center justify-between tablet-l:justify-center desktop:justify-between">
-            <span className="relative">
-              <FeaturedIcon size={22} className="text-[#1d1d1f]" />
-              {view.featured.attending && (
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#30d158] clinic-cc-live-dot" />
-              )}
-            </span>
-            <span className="tablet-l:hidden desktop:block text-[22px] font-semibold tracking-[-0.025em] tabular-nums text-[#1d1d1f]">
-              {view.featured.clock}
-            </span>
-          </div>
-          <div className="tablet-l:hidden desktop:block mt-auto">
-            <p className="text-[15px] font-semibold tracking-[-0.016em]">{view.featured.label}</p>
-            <p className="text-[12px] mt-0.5 truncate text-[#86868b]">
-              {view.featured.hint}
-            </p>
-            {view.featured.total > 0 && (
-              <p className="text-[11px] mt-1 tabular-nums text-[#86868b]">
-                {view.featured.done} de {view.featured.total} concluídos
-              </p>
-            )}
-          </div>
-        </button>
+        </div>
 
-        <div className="grid grid-cols-2 tablet-l:grid-cols-1 desktop:grid-cols-2 gap-2.5 mt-2.5">
+        <div className="grid grid-cols-2 gap-2.5 mt-2.5">
           {view.widgets.map(widget => {
             const on = focusedWidget === widget.id;
             const Icon = WIDGET_ICONS[widget.icon] || WIDGET_ICONS[widget.tab] || Calendar;
             const showDot = widget.live && (widget.tone === 'urgent' || widget.tone === 'warn' || widget.tone === 'live');
             return (
-              <button
+              <div
                 key={widget.id}
-                type="button"
+                className={`relative ${sizeSpan(widget.size)}`}
                 draggable={editing}
                 onDragStart={() => setDragging(widget.id)}
                 onDragOver={e => e.preventDefault()}
                 onDrop={() => onDrop(widget.id)}
-                onClick={() => activateWidget(widget)}
-                title={`${widget.title}${widget.value ? ` · ${widget.value}` : ''} · ${widget.hint}`}
-                className={tileClass(on, `${sizeSpan(widget.size)} items-start justify-between tablet-l:items-center tablet-l:justify-center desktop:items-start`)}
               >
-                {editing && (
-                  <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#ff3b30] text-white flex items-center justify-center z-10">
-                    <X size={11} />
+                <button
+                  type="button"
+                  onClick={() => activateWidget(widget)}
+                  title={`${widget.title}${widget.value ? ` · ${widget.value}` : ''} · ${widget.hint}`}
+                  className={tileClass(on, 'w-full h-full min-h-inherit p-3.5 items-start justify-between')}
+                >
+                  {showDot && !editing && (
+                    <span className={`absolute top-3 right-3 w-2 h-2 rounded-full ${toneDotClass(widget.tone)} ${widget.tone === 'live' ? 'clinic-cc-live-dot' : ''}`} />
+                  )}
+                  <Icon size={22} className="text-[#1d1d1f]" />
+                  <span className="flex flex-col mt-3 w-full min-w-0 pr-8">
+                    <span className="text-[13px] font-semibold tracking-[-0.016em] leading-tight">
+                      {widget.title}
+                    </span>
+                    {widget.value ? (
+                      <span className={`text-[17px] font-semibold tracking-[-0.022em] tabular-nums mt-1 leading-none ${toneValueClass(widget.tone)}`}>
+                        {widget.value}
+                      </span>
+                    ) : null}
+                    <span className="text-[11px] mt-1 leading-snug truncate text-[#86868b]">
+                      {widget.hint}
+                    </span>
                   </span>
+                </button>
+                {editing && (
+                  <button
+                    type="button"
+                    onMouseDown={event => event.stopPropagation()}
+                    onClick={event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      hideWidget(widget.id);
+                    }}
+                    className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#ff3b30] text-white flex items-center justify-center z-10"
+                    aria-label={`Remover ${widget.title}`}
+                  >
+                    <X size={11} />
+                  </button>
                 )}
                 {editing && (
-                  <span
-                    role="button"
-                    tabIndex={0}
+                  <button
+                    type="button"
+                    onMouseDown={event => event.stopPropagation()}
                     onClick={event => {
+                      event.preventDefault();
                       event.stopPropagation();
                       resizeWidget(widget.id, widget.size);
                     }}
-                    className="clinic-cc-resize tablet-l:hidden desktop:flex"
+                    className="clinic-cc-resize"
                     title={`Tamanho ${SIZE_LABEL[widget.size]}`}
                   >
                     {SIZE_LABEL[widget.size]}
-                  </span>
+                  </button>
                 )}
-                {showDot && !editing && (
-                  <span className={`absolute top-3 right-3 tablet-l:top-1.5 tablet-l:right-1.5 desktop:top-3 desktop:right-3 w-2 h-2 rounded-full ${toneDotClass(widget.tone)} ${widget.tone === 'live' ? 'clinic-cc-live-dot' : ''}`} />
-                )}
-                <Icon size={22} className="text-[#1d1d1f]" />
-                <span className="tablet-l:hidden desktop:flex flex-col mt-3 w-full min-w-0 pr-8">
-                  <span className="text-[13px] font-semibold tracking-[-0.016em] leading-tight">
-                    {widget.title}
-                  </span>
-                  {widget.value ? (
-                    <span className={`text-[17px] font-semibold tracking-[-0.022em] tabular-nums mt-1 leading-none ${toneValueClass(widget.tone)}`}>
-                      {widget.value}
-                    </span>
-                  ) : null}
-                  <span className="text-[11px] mt-1 leading-snug truncate text-[#86868b]">
-                    {widget.hint}
-                  </span>
-                </span>
-              </button>
+              </div>
             );
           })}
         </div>
 
         {editing && (
-          <div className="mt-7 tablet-l:hidden desktop:block space-y-6">
+          <div className="mt-7 space-y-6">
             <div>
               <p className="text-[12px] font-semibold text-[#1d1d1f] px-1 mb-1">Adicionar controles</p>
               <p className="text-[12px] text-[#86868b] px-1 mb-2.5 leading-relaxed">
@@ -549,10 +574,10 @@ export function ClinicRail({
             if (editing) persistPins(pins);
             setEditing(v => !v);
           }}
-          className={`w-full text-left ${
+          className={`w-full rounded-full text-center ${
             editing
-              ? 'h-11 rounded-full bg-[#e8e8ed] text-[#1d1d1f] text-[15px] font-semibold text-center'
-              : 'text-[13px] text-[#0071e3] px-1 py-2 tablet-l:text-center desktop:text-left'
+              ? 'h-12 bg-[#0071e3] text-white text-[16px] font-semibold'
+              : 'h-11 bg-white text-[#0071e3] text-[15px] font-semibold'
           }`}
         >
           {editing ? 'Concluído' : 'Personalizar'}
@@ -572,7 +597,7 @@ export function ClinicRail({
               <UserCircle size={24} />
             )}
           </div>
-          <div className="min-w-0 tablet-l:hidden desktop:block">
+          <div className="min-w-0">
             <p className="text-[13px] font-semibold text-[#1d1d1f] truncate">{profile?.name || user?.name}</p>
             <p className="text-[11px] text-[#86868b] truncate">{profile?.clinic_name || profile?.specialty || profile?.cro || 'Conta'}</p>
           </div>
@@ -584,7 +609,7 @@ export function ClinicRail({
           className="w-full flex items-center gap-3 px-2 py-2 text-[#86868b] hover:text-[#ff3b30] rounded-[18px]"
         >
           <LogOut size={18} className="shrink-0" />
-          <span className="text-[13px] tablet-l:hidden desktop:block">Sair</span>
+          <span className="text-[13px]">Sair</span>
         </button>
       </div>
     </aside>

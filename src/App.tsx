@@ -3102,6 +3102,7 @@ export default function App() {
               onLogout={handleLogout}
               snapshot={controlCenterSnapshot}
               onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
+              onOpenPatient={openPatientRecord}
             />
             <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col">
               <ClinicalPageRoute 
@@ -3365,6 +3366,7 @@ export default function App() {
         onLogout={handleLogout}
         snapshot={controlCenterSnapshot}
         onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
+        onOpenPatient={openPatientRecord}
       />
 
       {/* Main Content */}
