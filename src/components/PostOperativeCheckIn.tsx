@@ -187,10 +187,10 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+          className="w-full max-w-md bg-white rounded-[28px] overflow-hidden"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#FF9500]/20 to-[#FF6347]/10 px-6 py-6 border-b border-[#FF9500]/20">
+          <div className="bg-[#f5f5f7] px-6 py-6">
             <div className="flex items-center justify-between mb-4">
               {stage !== 'feeling' && (
                 <button
@@ -200,7 +200,7 @@ export const PostOperativeCheckIn: React.FC<PostOperativeCheckInProps> = ({
                   <ChevronLeft size={20} className="text-[#1d1d1f]" />
                 </button>
               )}
-              <h2 className="text-[#FF9500] text-[13px] font-bold uppercase tracking-wider flex-1">
+              <h2 className="text-[#86868b] text-[13px] font-normal flex-1">
                 Como você está?
               </h2>
               {stage !== 'feeling' && <div className="w-6" />}

@@ -34,7 +34,6 @@ import {
   Building2,
   Shield,
   Home,
-  Sparkles,
   Activity,
   UserCog,
   UserCircle,
@@ -516,68 +515,68 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
     <AnimatePresence>
       {data?.open && (
         <motion.div
-          className="fixed inset-0 z-[9999] bg-slate-950/35 backdrop-blur-md sm:flex sm:items-center sm:justify-center sm:px-4"
+          className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-md sm:flex sm:items-center sm:justify-center sm:px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            initial={{ opacity: 0, y: 42, scale: 1 }}
+            initial={{ opacity: 0, y: 24, scale: 1 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 42, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 1 }}
             transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             className="
               fixed bottom-0 left-0 right-0
               max-h-[92dvh] overflow-hidden
-              rounded-t-[30px] bg-white shadow-[0_-20px_70px_rgba(15,23,42,0.22)]
+              rounded-t-[28px] bg-white
               sm:relative sm:bottom-auto sm:left-auto sm:right-auto
-              sm:w-full sm:max-w-[460px] sm:rounded-[34px]
+              sm:w-full sm:max-w-[460px] sm:rounded-[28px]
               sm:max-h-[90vh]
             "
           >
-            <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-slate-200 sm:hidden" />
+            <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-[#d2d2d7] sm:hidden" />
 
             <button
               onClick={onClose}
-              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100/90 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#f5f5f7] text-[#86868b] transition hover:text-[#1d1d1f]"
               aria-label="Fechar"
             >
               <X size={18} />
             </button>
 
             <div className="max-h-[92dvh] overflow-y-auto px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pb-7 sm:pt-8">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[20px] bg-slate-950 text-white shadow-lg shadow-slate-950/15 sm:h-16 sm:w-16 sm:rounded-[22px]">
-                <Sparkles size={25} />
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[20px] bg-[#f5f5f7] text-[#1d1d1f] sm:h-16 sm:w-16">
+                <Users size={25} />
               </div>
 
               <div className="text-center">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400 sm:text-[11px]">
-                  OdontoHub Free
+                <p className="mb-2 text-[13px] font-normal text-[#86868b]">
+                  Plano Free
                 </p>
 
-                <h2 className="mx-auto max-w-[330px] text-[25px] font-bold leading-[1.06] tracking-[-0.055em] text-slate-950 sm:max-w-[360px] sm:text-[28px]">
-                  Seu OdontoHub está crescendo.
+                <h2 className="apple-display-ink mx-auto max-w-[330px] text-[28px] sm:max-w-[360px] sm:text-[32px]">
+                  Limite de pacientes.
                 </h2>
 
-                <p className="mx-auto mt-3 max-w-[330px] text-[14px] leading-6 text-slate-500 sm:mt-4 sm:max-w-[360px] sm:text-[15px]">
-                  Você já organizou {currentUsage} pacientes. Para continuar cadastrando sem perder o controle, mude para o Pro.
+                <p className="apple-subhead mx-auto mt-3 max-w-[330px] text-[15px] sm:mt-4 sm:max-w-[360px]">
+                  Você já cadastrou {currentUsage} pacientes. Para continuar, mude para o Pro.
                 </p>
               </div>
 
-              <div className="mt-6 rounded-[22px] border border-slate-100 bg-slate-50/80 p-4 sm:rounded-[24px]">
+              <div className="mt-6 rounded-[22px] bg-[#f5f5f7] p-4 sm:rounded-[24px]">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-700">
+                  <span className="text-[15px] text-[#1d1d1f]">
                     Pacientes no Free
                   </span>
 
-                  <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-slate-950 shadow-sm ring-1 ring-slate-100">
+                  <span className="rounded-full bg-white px-3 py-1 text-[15px] text-[#1d1d1f]">
                     {currentUsage}/{limit}
                   </span>
                 </div>
 
-                <div className="h-2.5 overflow-hidden rounded-full bg-slate-200/70">
+                <div className="h-1.5 overflow-hidden rounded-full bg-[#d2d2d7]">
                   <motion.div
-                    className="h-full rounded-full bg-slate-950"
+                    className="h-full rounded-full bg-[#0071e3]"
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.45, ease: "easeOut" }}
@@ -593,9 +592,9 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
                 ].map((item) => (
                   <div
                     key={item}
-                    className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 text-[13px] text-slate-600 ring-1 ring-slate-100 sm:text-sm"
+                    className="flex items-center gap-3 rounded-[18px] bg-white px-3 py-2.5 text-[15px] text-[#1d1d1f]"
                   >
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0071e3]">
                       <CheckCircle2 size={15} />
                     </div>
                     <span>{item}</span>
@@ -603,17 +602,17 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
                 ))}
               </div>
 
-              <div className="sticky bottom-0 mt-6 space-y-2 bg-white/95 pt-3 backdrop-blur-md">
+              <div className="sticky bottom-0 mt-6 space-y-2 bg-white pt-3">
                 <button
                   onClick={onUpgrade}
-                  className="h-12 w-full rounded-full bg-slate-950 text-[15px] font-bold text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition active:scale-[0.99] sm:hover:-translate-y-0.5 sm:hover:bg-slate-800"
+                  className="w-full apple-btn"
                 >
                   Mudar para o Pro
                 </button>
 
                 <button
                   onClick={onClose}
-                  className="h-11 w-full rounded-full text-[14px] font-semibold text-slate-500 transition active:scale-[0.99] sm:hover:bg-slate-100 sm:hover:text-slate-700"
+                  className="w-full apple-btn-light"
                 >
                   Continuar no Free
                 </button>
@@ -3723,7 +3722,7 @@ export default function App() {
                               <Calendar className="text-violet-400" size={28} />
                             </div>
                             <div className="space-y-2">
-                              <p className="text-lg font-bold text-slate-800">Sua agenda começa com um paciente</p>
+                              <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Sua agenda começa com um paciente</p>
                               <p className="text-sm text-slate-500 leading-relaxed">Cadastre seu primeiro paciente e depois agende a consulta. O sistema envia lembretes automáticos por WhatsApp.</p>
                             </div>
                             <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-100 text-left">
@@ -3755,7 +3754,7 @@ export default function App() {
                               <Calendar className="text-slate-300" size={28} />
                             </div>
                             <div className="space-y-2">
-                              <p className="text-lg font-bold text-slate-800">Agenda livre neste dia</p>
+                              <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Agenda livre neste dia</p>
                               <p className="text-sm text-slate-500">Sua agenda está livre. Que tal encaixar um paciente?</p>
                             </div>
                             <button 
@@ -3819,7 +3818,7 @@ export default function App() {
                                     if (patient) openPatientRecord(patient.id);
                                     navigate(`/prontuario/${app.patient_id}`);
                                   }}
-                                  className="flex-1 sm:flex-none bg-primary text-white px-4 py-2.5 rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95"
+                                  className="flex-1 sm:flex-none apple-btn text-[15px] py-2 px-4 gap-2"
                                 >
                                   <Activity size={16} />
                                   <span className="hidden sm:inline">{app.status === 'FINISHED' ? 'Ver Prontuário' : 'Iniciar Atendimento'}</span>
@@ -3859,7 +3858,7 @@ export default function App() {
                             }}
                           >
                             <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                              <Sparkles size={12} className="text-amber-500" />
+                              <Clock size={12} className="text-[#86868b]" />
                               {slot.start} – {slot.end} • {suggestion}
                             </span>
                           </div>
@@ -4050,9 +4049,9 @@ export default function App() {
                                             duration: bestSlot.duration,
                                             procedure: getSuggestion(bestSlot.duration)
                                           })}
-                                          className="text-xs font-bold text-primary flex items-center gap-1 mx-auto hover:underline"
+                                          className="text-[13px] text-[#0071e3] flex items-center gap-1 mx-auto hover:underline"
                                         >
-                                          <Sparkles size={12} className="inline text-amber-500 mr-1" />Ver horário disponível ({bestSlot.start}–{bestSlot.end})
+                                          <Clock size={12} className="inline text-[#86868b] mr-1" />Ver horário disponível ({bestSlot.start}–{bestSlot.end})
                                         </button>
                                       )}
                                     </div>
@@ -4062,8 +4061,8 @@ export default function App() {
                                 return (
                                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                                     {bestSlot && (
-                                      <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
-                                        <span className="text-xs text-amber-700 flex items-center gap-1"><Sparkles size={12} /> Horário livre: {bestSlot.start}–{bestSlot.end}</span>
+                                      <div className="px-4 py-2 bg-[#f5f5f7] border-b border-[#d2d2d7] flex items-center justify-between">
+                                        <span className="text-xs text-[#6e6e73] flex items-center gap-1"><Clock size={12} /> Horário livre: {bestSlot.start}–{bestSlot.end}</span>
                                         <button
                                           type="button"
                                           onClick={() => setWeekSuggestionSheet({
@@ -4157,11 +4156,11 @@ export default function App() {
                                                   procedure: getSuggestion(bestSlotSuggestion.duration)
                                                 });
                                               }}
-                                              className="absolute top-1 right-1 z-10 text-slate-400 bg-white/80 rounded-full p-0.5 hover:text-amber-500 transition-colors"
+                                              className="absolute top-1 right-1 z-10 text-[#86868b] bg-white/80 rounded-full p-0.5 hover:text-[#0071e3] transition-colors"
                                               title="Ver sugestão de encaixe"
                                               aria-label="Ver sugestão de encaixe"
                                             >
-                                              <Sparkles size={12} />
+                                              <Clock size={12} />
                                             </button>
                                           )}
                                         </div>
@@ -4408,13 +4407,13 @@ export default function App() {
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pb-32"
+                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-[28px] max-h-[90vh] overflow-y-auto pb-32"
                               >
                                 <div className="p-6 space-y-6">
                                   {/* Close button and header */}
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <h3 className="text-2xl font-bold text-slate-900">
+                                      <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">
                                         {new Date(weekSheetSelectedAppointment.start_time).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', weekday: 'long' })}
                                       </h3>
                                       <p className="text-sm text-slate-500 mt-1">Detalhes do Agendamento</p>
@@ -4498,7 +4497,7 @@ export default function App() {
                                             navigate(`/prontuario/${weekSheetSelectedAppointment.patient_id}`);
                                             setWeekSheetSelectedAppointment(null);
                                           }}
-                                          className="w-full bg-primary text-white px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all"
+                                          className="w-full apple-btn text-[15px] gap-2"
                                         >
                                           <Activity size={18} />
                                           Iniciar Atendimento
@@ -4509,7 +4508,7 @@ export default function App() {
                                             sendReminder(weekSheetSelectedAppointment);
                                             setWeekSheetSelectedAppointment(null);
                                           }}
-                                          className="w-full bg-slate-50 text-primary px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 transition-all border border-slate-200"
+                                          className="w-full apple-btn-light gap-2 border border-[#d2d2d7]"
                                         >
                                           <MessageCircle size={18} />
                                           Enviar Lembrete WhatsApp
@@ -4537,7 +4536,7 @@ export default function App() {
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pb-24"
+                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-[28px] max-h-[90vh] overflow-y-auto pb-24"
                               >
                                 {/* Grab handle */}
                                 <div className="flex justify-center pt-3 pb-1">
@@ -4574,7 +4573,7 @@ export default function App() {
                                       setWeekSuggestionSheet(null);
                                       setIsModalOpen(true);
                                     }}
-                                    className="w-full bg-primary text-white px-4 py-3 rounded-xl font-bold text-sm hover:opacity-90 transition-all"
+                                    className="w-full apple-btn text-[15px]"
                                   >
                                     Agendar
                                   </button>
@@ -4714,7 +4713,7 @@ export default function App() {
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pb-32"
+                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-[28px] max-h-[90vh] overflow-y-auto pb-32"
                               >
                                 {/* Grab handle */}
                                 <div className="flex justify-center pt-3 pb-1">
@@ -4724,7 +4723,7 @@ export default function App() {
                                   {/* Close button and header */}
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <h3 className="text-2xl font-bold text-slate-900">
+                                      <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">
                                         {monthSheetSelectedDay.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', weekday: 'long' })}
                                       </h3>
                                       <p className="text-sm text-slate-500 mt-1">
@@ -5382,7 +5381,7 @@ export default function App() {
                               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
                                 <UserPlus size={28} className="text-primary" />
                               </div>
-                              <p className="text-lg font-bold text-slate-800">Cadastre seu primeiro paciente</p>
+                              <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Cadastre seu primeiro paciente</p>
                               <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">Cada paciente ganha automaticamente: prontuário digital, odontograma, histórico de evolução e controle financeiro.</p>
                             </div>
                             <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-100 max-w-sm mx-auto">
@@ -5864,7 +5863,7 @@ export default function App() {
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Nome Completo</label>
                           <input required type="text" value={profileDraft.name}
                             onChange={(e) => updateProfileDraft({ name: e.target.value })}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base" />
+                            className="ios-input w-full" />
                         </div>
                         {user.role === 'DENTIST' && (
                           <>
@@ -5873,14 +5872,14 @@ export default function App() {
                                 <label className="text-[11px] text-slate-400 mb-1.5 block">CRO</label>
                                 <input type="text" value={profileDraft.cro || ''}
                                   onChange={(e) => updateProfileDraft({ cro: e.target.value })}
-                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                                  className="ios-input w-full"
                                   placeholder="12345-SP" />
                               </div>
                               <div>
                                 <label className="text-[11px] text-slate-400 mb-1.5 block">Especialidade</label>
                                 <input type="text" value={profileDraft.specialty || ''}
                                   onChange={(e) => updateProfileDraft({ specialty: e.target.value })}
-                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                                  className="ios-input w-full"
                                   placeholder="Ortodontia" />
                               </div>
                             </div>
@@ -5904,13 +5903,13 @@ export default function App() {
                           <label className="text-[11px] text-slate-400 mb-1.5 block">E-mail</label>
                           <input required type="email" value={profileDraft.email}
                             onChange={(e) => updateProfileDraft({ email: e.target.value })}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base" />
+                            className="ios-input w-full" />
                         </div>
                         <div>
                           <label className="text-[11px] text-slate-400 mb-1.5 block">Telefone</label>
                           <input type="tel" inputMode="tel" value={profileDraft.phone || ''}
                             onChange={(e) => updateProfileDraft({ phone: e.target.value })}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                            className="ios-input w-full"
                             placeholder="(00) 00000-0000" />
                         </div>
                       </div>
@@ -5925,14 +5924,14 @@ export default function App() {
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Nome da Clínica</label>
                             <input type="text" value={profileDraft.clinic_name || ''}
                               onChange={(e) => updateProfileDraft({ clinic_name: e.target.value })}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                              className="ios-input w-full"
                               placeholder="Clínica Sorriso Perfeito" />
                           </div>
                           <div>
                             <label className="text-[11px] text-slate-400 mb-1.5 block">Endereço</label>
                             <input type="text" value={profileDraft.clinic_address || ''}
                               onChange={(e) => updateProfileDraft({ clinic_address: e.target.value })}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                              className="ios-input w-full"
                               placeholder="Rua Exemplo, 123 - Centro" />
                           </div>
                         </div>
@@ -5946,7 +5945,7 @@ export default function App() {
                         <label className="text-[11px] text-slate-400 mb-1.5 block">Nova Senha</label>
                         <input type="password" value={profilePassword}
                           onChange={(e) => setProfilePassword(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                          className="ios-input w-full"
                           placeholder="Deixe em branco para manter a atual" />
                       </div>
                     </div>
@@ -5956,14 +5955,14 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => { setIsProfileEditing(false); setProfilePassword(''); setProfileDraft(null); fetchProfile(); }}
-                        className="px-6 py-3 rounded-2xl font-semibold text-sm text-slate-500 hover:bg-slate-100 transition-all"
+                        className="apple-btn-light"
                       >
                         Cancelar
                       </button>
                       <button
                         type="submit"
                         disabled={isSavingProfile}
-                        className="bg-primary text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                        className="apple-btn disabled:opacity-50"
                       >
                         {isSavingProfile ? 'Salvando...' : 'Salvar alterações'}
                       </button>
@@ -6051,10 +6050,10 @@ export default function App() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-white/85 backdrop-blur-2xl border border-white/30 w-full max-w-md rounded-[24px] shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-md rounded-[28px] overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100/70 flex justify-between items-center">
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f] flex items-center gap-2">
                   <Download className="text-primary" size={24} />
                   Exportar relatório
                 </h3>
@@ -6071,35 +6070,35 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
+                      <label className="text-[13px] text-[#86868b] mb-2 block">
                         {exportType === 'patients' ? 'Cadastrados desde' : 'Data Inicial'}
                       </label>
                       <input 
                         type="date" 
                         value={exportFilters.startDate}
                         onChange={(e) => setExportFilters({...exportFilters, startDate: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
+                      <label className="text-[13px] text-[#86868b] mb-2 block">
                         {exportType === 'patients' ? 'Cadastrados até' : 'Data Final'}
                       </label>
                       <input 
                         type="date" 
                         value={exportFilters.endDate}
                         onChange={(e) => setExportFilters({...exportFilters, endDate: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Paciente</label>
                     <select 
                       value={exportFilters.patientId}
                       onChange={(e) => setExportFilters({...exportFilters, patientId: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     >
                       <option value="all">Todos os Pacientes</option>
                       {patients.map(p => (
@@ -6110,11 +6109,11 @@ export default function App() {
 
                   {exportType === 'finance' && (
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Tipo de Transação</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Tipo de Transação</label>
                       <select 
                         value={exportFilters.category}
                         onChange={(e) => setExportFilters({...exportFilters, category: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       >
                         <option value="all">Receitas + Despesas</option>
                         <option value="income">Apenas Receitas</option>
@@ -6133,7 +6132,7 @@ export default function App() {
                   </button>
                   <button 
                     onClick={exportType === 'patients' ? exportPatients : exportFinance}
-                    className="flex-1 bg-primary text-white py-3 rounded-full font-bold  hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 apple-btn gap-2"
                   >
                     <Download size={20} />
                     Exportar
@@ -6194,7 +6193,7 @@ export default function App() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
-              className="relative bg-white/80 backdrop-blur-2xl w-full sm:max-w-sm rounded-t-[28px] sm:rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] sm:max-h-fit overflow-y-auto border border-white/20"
+              className="relative bg-white w-full sm:max-w-sm rounded-t-[28px] sm:rounded-[28px] overflow-hidden max-h-[90vh] sm:max-h-fit overflow-y-auto"
             >
               {/* Minimal Header */}
               <div className="px-5 pt-5 pb-3 border-b border-slate-100/50">
@@ -6277,7 +6276,7 @@ export default function App() {
                     placeholder="Procedimento..."
                     maxLength={60}
                     aria-label="Procedimento"
-                    className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                    className="ios-input w-full"
                   />
                 </div>
 
@@ -6295,8 +6294,8 @@ export default function App() {
                         setAppointmentFormError(null);
                         setNewAppointment({...newAppointment, patient_name: name, patient_id: ''});
                       }}
-                      className={`w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all ${
-                        newAppointment.patient_id ? 'border-primary/40 bg-primary/5' : 'border-slate-200/50'
+                      className={`ios-input w-full ${
+                        newAppointment.patient_id ? 'ring-1 ring-[#0071e3]/30 bg-white' : ''
                       }`}
                     />
                     {newAppointment.patient_id && (
@@ -6331,30 +6330,30 @@ export default function App() {
                 {/* SEÇÃO 3: Data, Hora, Duração */}
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[11px] text-slate-500 font-semibold mb-1 block uppercase tracking-wider">Data</label>
+                    <label className="text-[13px] text-[#86868b] mb-1.5 block">Data</label>
                     <input 
                       required
                       type="date" 
                       value={newAppointment.date}
                       onChange={(e) => { setAppointmentFormError(null); setAppointmentConflict(null); setNewAppointment({...newAppointment, date: e.target.value}); }}
                       aria-label="Data da consulta"
-                      className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div className="grid grid-cols-[1fr_100px] gap-3">
                     <div>
-                      <label className="text-[11px] text-slate-500 font-semibold mb-1 block uppercase tracking-wider">Horário</label>
+                      <label className="text-[13px] text-[#86868b] mb-1.5 block">Horário</label>
                       <input 
                         required
                         type="time" 
                         value={newAppointment.time}
                         onChange={(e) => { setAppointmentFormError(null); setAppointmentConflict(null); setNewAppointment({...newAppointment, time: e.target.value}); }}
                         aria-label="Horário da consulta"
-                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 transition-all"
+                        className="ios-input w-full"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-slate-500 font-semibold mb-1 block uppercase tracking-wider">Duração</label>
+                      <label className="text-[13px] text-[#86868b] mb-1.5 block">Duração</label>
                       <input 
                         required
                         type="number" 
@@ -6363,7 +6362,7 @@ export default function App() {
                         onChange={(e) => { setAppointmentFormError(null); setNewAppointment({...newAppointment, duration: e.target.value}); }}
                         placeholder="30 min"
                         aria-label="Duração em minutos"
-                        className="w-full px-3.5 py-2.5 bg-slate-50/50 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-base font-medium text-slate-900 placeholder:text-slate-400 transition-all"
+                        className="ios-input w-full"
                       />
                     </div>
                   </div>
@@ -6381,14 +6380,14 @@ export default function App() {
                       setAppointmentFormError(null);
                       setAppointmentConflict(null);
                     }}
-                    className="flex-1 py-2.5 px-4 border border-slate-200/50 text-slate-700 font-medium rounded-xl hover:bg-slate-50/50 active:bg-slate-100/50 transition-all text-sm backdrop-blur-sm min-h-[44px]"
+                    className="flex-1 apple-btn-light border border-[#d2d2d7]"
                   >
                     Cancelar
                   </button>
                   <button 
                     type="submit"
                     disabled={!newAppointment.patient_id || !newAppointment.date || !newAppointment.time}
-                    className="flex-1 py-2.5 px-4 bg-primary/90 hover:bg-primary text-white font-medium rounded-xl active:scale-95 transition-all text-sm shadow-lg shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm min-h-[44px]"
+                    className="flex-1 apple-btn disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {appointmentModalMode === 'reschedule' ? 'Confirmar reagendamento' : 'Agendar'}
                   </button>
@@ -6413,11 +6412,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white/85 backdrop-blur-2xl border border-white/30 w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+              className="relative bg-white w-full max-w-sm rounded-[28px] overflow-hidden max-h-[90vh] overflow-y-auto"
             >
               <div className="p-6">
                 <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-lg font-bold text-slate-900">Novo paciente</h3>
+                  <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Novo paciente</h3>
                   <button onClick={() => setIsPatientModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={20} className="rotate-45" />
                   </button>
@@ -6432,7 +6431,7 @@ export default function App() {
                       placeholder="Nome completo"
                       value={newPatient.name}
                       onChange={(e) => setNewPatient({...newPatient, name: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                      className="ios-input w-full"
                     />
                   </div>
 
@@ -6444,7 +6443,7 @@ export default function App() {
                       placeholder="Telefone"
                       value={newPatient.phone}
                       onChange={(e) => setNewPatient({...newPatient, phone: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                      className="ios-input w-full"
                     />
                   </div>
 
@@ -6455,7 +6454,7 @@ export default function App() {
                       placeholder="E-mail (opcional)"
                       value={newPatient.email}
                       onChange={(e) => setNewPatient({...newPatient, email: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                      className="ios-input w-full"
                     />
                   </div>
 
@@ -6471,7 +6470,7 @@ export default function App() {
                           placeholder="CPF (opcional)"
                           value={newPatient.cpf}
                           onChange={(e) => setNewPatient({...newPatient, cpf: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                          className="ios-input w-full"
                         />
                       </div>
                       <div>
@@ -6479,7 +6478,7 @@ export default function App() {
                           type="date" 
                           value={newPatient.birth_date}
                           onChange={(e) => setNewPatient({...newPatient, birth_date: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                          className="ios-input w-full"
                           title="Data de Nascimento"
                         />
                       </div>
@@ -6489,7 +6488,7 @@ export default function App() {
                           placeholder="Endereço (opcional)"
                           value={newPatient.address}
                           onChange={(e) => setNewPatient({...newPatient, address: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none text-base"
+                          className="ios-input w-full"
                         />
                       </div>
                     </div>
@@ -6499,13 +6498,13 @@ export default function App() {
                     <button 
                       type="button"
                       onClick={() => setIsPatientModalOpen(false)}
-                      className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 text-sm font-bold rounded-full hover:bg-slate-100/70 transition-all"
+                      className="flex-1 apple-btn-light border border-[#d2d2d7] text-[15px]"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-4 py-2.5 bg-primary text-white text-sm font-bold rounded-full  hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 apple-btn text-[15px]"
                     >
                       Salvar
                     </button>
@@ -6532,11 +6531,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white/85 backdrop-blur-2xl border border-white/30 w-full max-w-md rounded-[24px] shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-md rounded-[28px] overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-2xl font-bold text-slate-900">Editar Dentista</h3>
+                  <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Editar Dentista</h3>
                   <button onClick={() => setIsEditDentistModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={24} className="rotate-45" />
                   </button>
@@ -6544,36 +6543,36 @@ export default function App() {
 
                 <form onSubmit={handleUpdateDentist} className="space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Nome Completo</label>
                     <input 
                       required
                       type="text" 
                       value={editingDentist.name}
                       onChange={(e) => setEditingDentist({...editingDentist, name: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">E-mail</label>
                     <input 
                       required
                       type="email" 
                       value={editingDentist.email}
                       onChange={(e) => setEditingDentist({...editingDentist, email: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div className="flex gap-4 pt-4">
                     <button 
                       type="button"
                       onClick={() => setIsEditDentistModalOpen(false)}
-                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all"
+                      className="flex-1 apple-btn-light border border-[#d2d2d7]"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-xl  hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 apple-btn"
                     >
                       Salvar
                     </button>
@@ -6600,7 +6599,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-lg rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-lg rounded-2xl md:rounded-3xl overflow-hidden"
             >
               <div className="p-6 md:p-8">
                 <div className="flex justify-between items-center mb-6 md:mb-8">
@@ -6612,7 +6611,7 @@ export default function App() {
 
                 <form onSubmit={handleCreatePaymentPlan} className="space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Paciente</label>
                     {selectedPatient ? (
                       <input 
                         readOnly
@@ -6625,7 +6624,7 @@ export default function App() {
                         required
                         value={newPaymentPlan.patient_id}
                         onChange={(e) => setNewPaymentPlan({...newPaymentPlan, patient_id: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       >
                         <option value="">Selecione um paciente</option>
                         {patients.map(p => (
@@ -6636,20 +6635,20 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Procedimento / Tratamento</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Procedimento / Tratamento</label>
                     <input 
                       required
                       type="text" 
                       placeholder="Ex: Tratamento de Canal, Implante..."
                       value={newPaymentPlan.procedure}
                       onChange={(e) => setNewPaymentPlan({...newPaymentPlan, procedure: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Valor Total (R$)</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Valor Total (R$)</label>
                       <input 
                         required
                         type="number" 
@@ -6657,16 +6656,16 @@ export default function App() {
                         placeholder="0,00"
                         value={newPaymentPlan.total_amount}
                         onChange={(e) => setNewPaymentPlan({...newPaymentPlan, total_amount: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nº de Parcelas</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Nº de Parcelas</label>
                       <select 
                         required
                         value={newPaymentPlan.installments_count}
                         onChange={(e) => setNewPaymentPlan({...newPaymentPlan, installments_count: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       >
                         {[1, 2, 3, 4, 5, 6, 10, 12, 18, 24].map(n => (
                           <option key={n} value={n}>{n}x</option>
@@ -6676,13 +6675,13 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Data do Primeiro Vencimento</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Data do Primeiro Vencimento</label>
                     <input 
                       required
                       type="date" 
                       value={newPaymentPlan.first_due_date}
                       onChange={(e) => setNewPaymentPlan({...newPaymentPlan, first_due_date: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
 
@@ -6690,13 +6689,13 @@ export default function App() {
                     <button 
                       type="button"
                       onClick={() => setIsPaymentPlanModalOpen(false)}
-                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-full hover:bg-slate-100/70 transition-all"
+                      className="flex-1 apple-btn-light border border-[#d2d2d7]"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-full  hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 apple-btn"
                     >
                       Criar Plano
                     </button>
@@ -6723,7 +6722,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-2xl rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto receipt-content"
+              className="relative bg-white w-full max-w-2xl rounded-2xl md:rounded-3xl overflow-hidden max-h-[90vh] overflow-y-auto receipt-content"
             >
               <div className="p-8 md:p-12 bg-white text-slate-800 font-serif">
                 <div className="flex justify-between items-start mb-12 no-print">
@@ -6799,11 +6798,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white/85 backdrop-blur-2xl border border-white/30 w-full max-w-md rounded-[24px] shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-md rounded-[28px] overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-2xl font-bold text-slate-900">Novo dentista</h3>
+                  <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Novo dentista</h3>
                   <button onClick={() => setIsDentistModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={24} className="rotate-45" />
                   </button>
@@ -6811,46 +6810,46 @@ export default function App() {
 
                 <form onSubmit={handleCreateDentist} className="space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nome Completo</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Nome Completo</label>
                     <input 
                       required
                       type="text" 
                       value={newDentist.name}
                       onChange={(e) => setNewDentist({...newDentist, name: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">E-mail</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">E-mail</label>
                     <input 
                       required
                       type="email" 
                       value={newDentist.email}
                       onChange={(e) => setNewDentist({...newDentist, email: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Senha</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Senha</label>
                     <input 
                       required
                       type="password" 
                       value={newDentist.password}
                       onChange={(e) => setNewDentist({...newDentist, password: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div className="flex gap-4 pt-4">
                     <button 
                       type="button"
                       onClick={() => setIsDentistModalOpen(false)}
-                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-full hover:bg-slate-100/70 transition-all"
+                      className="flex-1 apple-btn-light border border-[#d2d2d7]"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-full  hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 apple-btn"
                     >
                       Salvar dentista
                     </button>
@@ -6877,11 +6876,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-md rounded-3xl overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-2xl font-bold text-slate-900">Adicionar imagem</h3>
+                  <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Adicionar imagem</h3>
                   <button onClick={() => setIsImageModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                     <Plus size={24} className="rotate-45" />
                   </button>
@@ -6889,7 +6888,7 @@ export default function App() {
 
                 <form onSubmit={handleUploadImage} className="space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Arquivo de Imagem</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Arquivo de Imagem</label>
                     <div className="relative group">
                       <input 
                         required={!newImage.url}
@@ -6921,27 +6920,27 @@ export default function App() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrição</label>
+                    <label className="text-[13px] text-[#86868b] mb-2 block">Descrição</label>
                     <input 
                       required
                       type="text" 
                       placeholder="Ex: RX Panorâmico"
                       value={newImage.description}
                       onChange={(e) => setNewImage({...newImage, description: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                      className="ios-input w-full"
                     />
                   </div>
                   <div className="flex gap-4 pt-4">
                     <button 
                       type="button"
                       onClick={() => setIsImageModalOpen(false)}
-                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all"
+                      className="flex-1 apple-btn-light border border-[#d2d2d7]"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-6 py-3 bg-primary text-white font-bold rounded-xl  hover:opacity-90 transition-all active:scale-95"
+                      className="flex-1 apple-btn"
                     >
                       Salvar
                     </button>
@@ -6968,12 +6967,12 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white/85 backdrop-blur-2xl border border-white/30 w-full max-w-lg rounded-[24px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="relative bg-white w-full max-w-lg rounded-[28px] overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-8 overflow-y-auto">
                 <div className="flex justify-between items-center mb-8">
                   <div>
-                    <h3 className="text-2xl font-bold text-slate-900">
+                    <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">
                       {transactionType === 'INCOME' ? 'Registrar entrada' : 'Registrar saída'}
                     </h3>
                     <p className="text-sm text-slate-500">Preencha os campos abaixo</p>
@@ -6986,22 +6985,22 @@ export default function App() {
                 <form onSubmit={handleSaveTransaction} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Descrição</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Descrição</label>
                       <input 
                         required
                         type="text" 
                         placeholder={transactionType === 'INCOME' ? 'Ex: Limpeza - João Silva' : 'Ex: Aluguel'}
                         value={newTransaction.description}
                         onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Categoria</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Categoria</label>
                       <select 
                         value={newTransaction.category}
                         onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       >
                         {transactionType === 'INCOME' ? (
                           <>
@@ -7023,7 +7022,7 @@ export default function App() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Valor (R$)</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Valor (R$)</label>
                       <input 
                         required
                         type="number" 
@@ -7035,21 +7034,21 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Data</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Data</label>
                       <input 
                         required
                         type="date" 
                         value={newTransaction.date}
                         onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Forma de Pagamento</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Forma de Pagamento</label>
                       <select 
                         value={newTransaction.payment_method}
                         onChange={(e) => setNewTransaction({...newTransaction, payment_method: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="ios-input w-full"
                       >
                         <option value="Dinheiro">Dinheiro</option>
                         <option value="PIX">PIX</option>
@@ -7062,11 +7061,11 @@ export default function App() {
                     {transactionType === 'INCOME' && (
                       <>
                         <div className="col-span-2">
-                          <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Paciente (Opcional)</label>
+                          <label className="text-[13px] text-[#86868b] mb-2 block">Paciente (Opcional)</label>
                           <select 
                             value={newTransaction.patient_id}
                             onChange={(e) => setNewTransaction({...newTransaction, patient_id: e.target.value})}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                            className="ios-input w-full"
                           >
                             <option value="">Selecione um paciente</option>
                             {patients.map(p => (
@@ -7075,24 +7074,24 @@ export default function App() {
                           </select>
                         </div>
                         <div className="col-span-2">
-                          <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Procedimento (Opcional)</label>
+                          <label className="text-[13px] text-[#86868b] mb-2 block">Procedimento (Opcional)</label>
                           <input 
                             type="text" 
                             placeholder="Ex: Limpeza, Canal..."
                             value={newTransaction.procedure}
                             onChange={(e) => setNewTransaction({...newTransaction, procedure: e.target.value})}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-full focus:ring-2 focus:ring-primary/20 outline-none"
+                            className="ios-input w-full"
                           />
                         </div>
                       </>
                     )}
                     <div className="col-span-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Observações</label>
+                      <label className="text-[13px] text-[#86868b] mb-2 block">Observações</label>
                       <textarea 
                         rows={2}
                         value={newTransaction.notes || ''}
                         onChange={(e) => setNewTransaction({...newTransaction, notes: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                        className="ios-input w-full resize-none"
                       />
                     </div>
                   </div>
@@ -7100,16 +7099,16 @@ export default function App() {
                     <button 
                       type="button"
                       onClick={() => setIsTransactionModalOpen(false)}
-                      className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-full hover:bg-slate-100/70 transition-all"
+                      className="flex-1 apple-btn-light border border-[#d2d2d7]"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className={`flex-1 px-6 py-3 text-white font-bold rounded-full shadow-lg transition-all active:scale-95 ${
-                        transactionType === 'INCOME' 
-                          ? 'bg-primary shadow-primary/10 hover:opacity-90' 
-                          : 'bg-rose-600 shadow-rose-100 hover:bg-rose-700'
+                      className={`flex-1 apple-btn ${
+                        transactionType === 'INCOME'
+                          ? ''
+                          : '!bg-[#ff3b30] hover:!bg-[#ff453a]'
                       }`}
                     >
                       Salvar {transactionType === 'INCOME' ? 'entrada' : 'saída'}
@@ -7130,7 +7129,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white/85 backdrop-blur-2xl border border-white/30 rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white rounded-[28px] w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -7138,7 +7137,7 @@ export default function App() {
                     <DollarSign size={20} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800">Registrar recebimento</h3>
+                    <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Registrar recebimento</h3>
                     <p className="text-xs text-slate-500">Confirme o recebimento do pagamento</p>
                   </div>
                 </div>
@@ -7173,7 +7172,7 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Forma de Pagamento</label>
+                  <label className="text-[13px] text-[#86868b] mb-2 block">Forma de Pagamento</label>
                   <div className="grid grid-cols-2 gap-2">
                     {['Dinheiro', 'Pix', 'Cartão de Crédito', 'Cartão de Débito'].map((method) => (
                       <button
@@ -7194,13 +7193,13 @@ export default function App() {
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsReceiveInstallmentModalOpen(false)}
-                    className="flex-1 py-3 px-4 text-slate-600 font-bold hover:bg-slate-100/70 rounded-full transition-colors border border-slate-200"
+                    className="flex-1 apple-btn-light border border-[#d2d2d7]"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={() => handlePayInstallment(selectedInstallment.id, paymentMethod)}
-                    className="flex-1 py-3 px-4 bg-primary text-white font-bold rounded-full hover:opacity-90 transition-all  active:scale-95"
+                    className="flex-1 apple-btn"
                   >
                     Confirmar
                   </button>
@@ -7219,7 +7218,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white/85 backdrop-blur-2xl border border-white/30 rounded-[24px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white rounded-[28px] w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -7227,7 +7226,7 @@ export default function App() {
                     <List size={20} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800">Parcelas</h3>
+                    <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Parcelas</h3>
                     <p className="text-xs text-slate-500">{selectedPlan.procedure} - {selectedPatient?.name || selectedPlan.patient_name}</p>
                   </div>
                 </div>
@@ -7323,7 +7322,7 @@ export default function App() {
             className={`fixed z-[100] flex items-center gap-3 border ${
               notification.celebration
                 ? 'bottom-12 left-1/2 -translate-x-1/2 px-8 py-5 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] bg-white border-primary/20'
-                : 'bottom-8 right-8 px-6 py-4 rounded-2xl shadow-2xl'
+                : 'bottom-8 right-8 px-6 py-4 rounded-2xl'
             } ${
               !notification.celebration && notification.type === 'success' 
                 ? 'bg-primary border-primary/20 text-white' 
@@ -7345,7 +7344,7 @@ export default function App() {
                       setNotification(null);
                       if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
                     }}
-                    className="shrink-0 ml-1 px-4 py-2 bg-primary text-white text-[13px] font-bold rounded-xl hover:opacity-90 transition-all"
+                    className="shrink-0 ml-1 apple-btn text-[13px] py-1.5 px-4"
                   >
                     {notification.actionLabel}
                   </button>
@@ -7381,19 +7380,19 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white/85 backdrop-blur-2xl border border-white/30 rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-white rounded-[28px] w-full max-w-md overflow-hidden"
             >
               <div className="p-6 text-center">
                 <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <AlertTriangle size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmar</h3>
+                <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f] mb-2">Confirmar</h3>
                 <p className="text-slate-600">{confirmation.message}</p>
               </div>
               <div className="p-6 bg-slate-50 flex gap-3">
                 <button 
                   onClick={() => setConfirmation(null)}
-                  className="flex-1 px-6 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-full hover:bg-slate-100 transition-all"
+                  className="flex-1 apple-btn-light border border-[#d2d2d7]"
                 >
                   Cancelar
                 </button>
@@ -7402,7 +7401,7 @@ export default function App() {
                     confirmation.onConfirm();
                     setConfirmation(null);
                   }}
-                  className="flex-1 px-6 py-3 bg-rose-600 text-white font-bold rounded-full hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all"
+                  className="flex-1 rounded-full bg-[#ff3b30] text-white py-3 px-6 text-[17px] font-normal hover:opacity-90"
                 >
                   Confirmar
                 </button>
@@ -7420,11 +7419,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+              className="bg-white rounded-3xl max-w-md w-full overflow-hidden"
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">Portal do Paciente</h3>
+                  <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Portal do Paciente</h3>
                   <button onClick={() => setPortalLinkData(null)} className="text-slate-400 hover:text-slate-600">
                     <X size={20} />
                   </button>
@@ -7565,11 +7564,11 @@ function ForgotPassword() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <h1 className="text-[26px] font-semibold text-[#1d1d1f] tracking-[-0.4px] leading-[1.2] mb-2.5">
-            Redefinir sua senha
+          <h1 className="apple-display-ink text-[40px] mb-3">
+            Redefinir senha.
           </h1>
-          <p className="text-[15px] text-[#86868b] leading-relaxed">
-            Informe seu e-mail para receber as instruções de acesso.
+          <p className="apple-subhead text-[17px]">
+            Informe seu e-mail.
           </p>
         </motion.div>
 
@@ -7615,7 +7614,7 @@ function ForgotPassword() {
               whileHover={{ scale: loading ? 1 : 1.005 }}
               whileTap={{ scale: loading ? 1 : 0.98 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
-              className="w-full h-[48px] bg-[#1d1d1f] hover:bg-[#1d1d1f] disabled:hover:bg-[#1d1d1f] text-white text-[15px] font-medium rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_8px_rgba(0,0,0,0.14),0_1px_2px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] duration-[160ms] ease-in-out"
+              className="w-full apple-btn disabled:opacity-50"
               style={{ willChange: 'transform' }}
             >
               {loading ? 'Enviando...' : 'Enviar instruções'}
@@ -7685,12 +7684,11 @@ function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-md">
-          <AlertTriangle className="mx-auto text-rose-500 mb-4" size={48} />
-          <h1 className="text-2xl font-bold mb-2">Link Inválido</h1>
-          <p className="text-slate-500 mb-6">Este link de recuperação de senha é inválido ou expirou.</p>
-          <Link to="/" className="bg-primary text-white px-6 py-3 rounded-xl font-bold inline-block">
+      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <h1 className="apple-display-ink text-[32px] mb-3">Link inválido.</h1>
+          <p className="apple-subhead text-[17px] mb-8">Este link expirou.</p>
+          <Link to="/" className="apple-btn inline-block">
             Voltar para o login
           </Link>
         </div>
@@ -7699,52 +7697,39 @@ function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 font-sans">
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+        className="w-full max-w-[400px]"
       >
-        <div className="p-8 md:p-12">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary/20">
-              <Lock size={32} strokeWidth={3} />
-            </div>
-          </div>
-          <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Nova Senha</h1>
-            <p className="text-slate-500">Crie uma nova senha segura para sua conta</p>
-          </div>
+        <div>
+          <h1 className="apple-display-ink text-[40px] mb-3">Nova senha.</h1>
+          <p className="apple-subhead text-[17px] mb-10">Escolha uma senha.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nova Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
+              <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Nova senha</label>
+              <input 
                   type="password" 
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="ios-input w-full h-[48px] text-[17px]"
                 />
-              </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Confirmar Nova Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
+              <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Confirmar senha</label>
+              <input 
                   type="password" 
                   required
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="ios-input w-full h-[48px] text-[17px]"
                 />
-              </div>
             </div>
 
             {error && (
@@ -7764,9 +7749,9 @@ function ResetPassword() {
             <button 
               type="submit"
               disabled={loading || success}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold  hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full apple-btn disabled:opacity-50"
             >
-              {loading ? 'Processando...' : 'Redefinir Senha'}
+              {loading ? 'Processando' : 'Redefinir senha'}
             </button>
           </form>
 
@@ -7838,7 +7823,7 @@ function PrintAgenda({ date, appointments, profile }: { date: Date, appointments
             </p>
           </div>
           <div className="text-right">
-            <p className="text-lg font-bold text-slate-900">
+            <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">
               Total: {dayAppointments.length} consultas
             </p>
           </div>
@@ -8028,11 +8013,11 @@ function PrintReport({ profile, transactions, patients, appointments }: any) {
         <div className="mt-24 pt-12 border-t border-slate-100 flex justify-between items-end">
           <div>
             <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Clínica</p>
-            <p className="text-lg font-bold text-slate-900">{profile?.clinic_name || 'OdontoHub'}</p>
+            <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">{profile?.clinic_name || 'OdontoHub'}</p>
           </div>
           <div className="text-right">
             <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Responsável</p>
-            <p className="text-lg font-bold text-slate-900">{profile?.name}</p>
+            <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">{profile?.name}</p>
           </div>
         </div>
       </div>

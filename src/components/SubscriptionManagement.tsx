@@ -199,16 +199,15 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
   return (
     <div className="space-y-4">
       {/* Subscription Card */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        {/* Header gradient */}
-        <div className={`px-6 py-4 ${isProActive ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent' : isPending ? 'bg-gradient-to-r from-amber-50/80 to-transparent' : 'bg-gradient-to-r from-slate-50 to-transparent'}`}>
+      <div className="bg-white rounded-[28px] overflow-hidden">
+        <div className="px-6 py-4 bg-[#f5f5f7]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isProActive ? 'bg-primary/15 text-primary' : isPending ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
                 <CreditCard size={20} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Minha Assinatura</h3>
+                <h3 className="text-[17px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Minha assinatura</h3>
                 <p className="text-[11px] text-slate-400">
                   {product === 'academy' ? 'Academy' : 'OdontoHub'} — {isProActive ? subscription?.plan_name || 'Pro' : 'Plano Free'}
                 </p>
@@ -228,11 +227,11 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Valor</p>
+                  <p className="text-[11px] text-[#86868b] mb-0.5">Valor</p>
                   <p className="text-sm font-bold text-slate-800">{formatCurrency(subscription.amount)}/mês</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Status</p>
+                  <p className="text-[11px] text-[#86868b] mb-0.5">Status</p>
                   <p className={`text-sm font-bold ${statusInfo?.color}`}>{statusInfo?.label}</p>
                 </div>
               </div>
@@ -275,11 +274,11 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Plano</p>
+                  <p className="text-[11px] text-[#86868b] mb-0.5">Plano</p>
                   <p className="text-sm font-bold text-slate-800">{subscription.plan_name}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Valor</p>
+                  <p className="text-[11px] text-[#86868b] mb-0.5">Valor</p>
                   <p className="text-sm font-bold text-slate-800">{formatCurrency(subscription.amount)}/mês</p>
                 </div>
               </div>
@@ -294,7 +293,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
               <button
                 onClick={handleResumeSubscription}
                 disabled={createLoading}
-                className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+                className="w-full apple-btn disabled:opacity-50"
               >
                 {createLoading ? 'Processando...' : 'Continuar assinatura'}
               </button>
@@ -325,7 +324,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
                 <button
                   onClick={() => handleCreateSubscription(paidPlan.id)}
                   disabled={createLoading}
-                  className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+                  className="w-full apple-btn disabled:opacity-50"
                 >
                   {createLoading ? 'Processando...' : subscribeCtaLabel}
                 </button>
@@ -354,7 +353,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
               <button
                 onClick={() => handleCreateSubscription(paidPlan.id)}
                 disabled={createLoading}
-                className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
+                className="w-full apple-btn disabled:opacity-50"
               >
                 {createLoading ? 'Processando...' : 'Assinar novamente'}
               </button>
@@ -364,7 +363,7 @@ export function SubscriptionManagement({ apiFetch, product, currentPlan }: Subsc
           {/* Recent payments */}
           {payments.length > 0 && (
             <div className="border-t border-slate-100 pt-4">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Pagamentos recentes</h4>
+              <h4 className="text-[13px] text-[#86868b] mb-3">Pagamentos recentes</h4>
               <div className="space-y-2">
                 {payments.slice(0, 3).map((payment) => (
                   <div key={payment.id} className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg">

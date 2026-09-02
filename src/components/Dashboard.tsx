@@ -959,7 +959,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setOnboardingDismissed(true);
               onDismissOnboarding();
             }}
-            className="w-full flex items-center justify-center gap-2.5 bg-primary text-white py-4 rounded-[20px] text-[16px] font-bold shadow-[0_8px_28px_rgba(0,0,0,0.12)] hover:opacity-90 transition-all"
+            className="w-full apple-btn gap-2.5"
           >
             Começar minha rotina
             <ArrowRight size={17} />
@@ -1074,7 +1074,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2.5 bg-violet-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(109,40,217,0.15)] hover:bg-violet-700 transition-all"
+                className="flex items-center gap-2.5 apple-btn text-[15px]"
               >
                 Agendar primeira consulta
                 <ArrowRight size={15} />
@@ -1106,7 +1106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={() => openPatientRecord(firstPatient.id)}
-                className="flex items-center gap-2.5 bg-sky-600 text-white px-6 py-3.5 rounded-[18px] text-[14px] font-bold shadow-[0_8px_24px_rgba(2,132,199,0.2)] hover:bg-sky-700 transition-all"
+                className="flex items-center gap-2.5 apple-btn text-[15px]"
               >
                 Abrir prontuário
                 <ArrowRight size={15} />
@@ -1138,7 +1138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            className="rounded-[24px] border border-sky-200 bg-gradient-to-br from-sky-50 to-white p-5 space-y-4 shadow-[0_4px_24px_rgba(2,132,199,0.08)]"
+            className="rounded-[28px] bg-white p-5 space-y-4"
           >
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-sky-100 rounded-[14px] flex items-center justify-center shrink-0">
@@ -1394,7 +1394,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-[11px] rounded-[12px] bg-violet-100 text-violet-700 text-[12px] font-bold transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-[11px] rounded-full bg-[#f5f5f7] text-[#1d1d1f] text-[13px] font-normal transition-all"
           >
             <CalendarPlus size={13} strokeWidth={2.5} />
             Consulta
@@ -1403,7 +1403,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* 3. RETORNOS VENCIDOS — prioridade máxima nas primeiras semanas */}
       {intelligence && intelligence.overdueReturns.length > 0 && (
-        <section className="-mx-5 px-5 py-6 bg-gradient-to-b from-rose-50/90 to-rose-50/20 rounded-[20px] space-y-4">
+        <section className="-mx-5 px-5 py-6 bg-[#f5f5f7] rounded-[20px] space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
@@ -1517,7 +1517,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </motion.div>
           </section>
         ) : (
-        <section className="-mx-5 px-5 py-6 bg-gradient-to-b from-rose-50/80 to-rose-50/20 rounded-[20px] space-y-4">
+        <section className="-mx-5 px-5 py-6 bg-[#f5f5f7] rounded-[20px] space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
@@ -1594,7 +1594,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <motion.button
                             whileTap={{ scale: 0.98 }}
                             onClick={() => sendReminder(appointment)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[18px] bg-primary text-white text-[13px] font-bold shadow-[0_8px_24px_rgba(0,0,0,0.1)]"
+                            className="w-full sm:w-auto apple-btn text-[15px] py-2 px-4 gap-2"
                           >
                             <MessageCircle size={15} />
                             Enviar confirmação
