@@ -725,3 +725,71 @@ export function listHideableLiveWidgets(input: ControlCenterInput, hiddenLive: s
   const hidden = new Set(hiddenLive);
   return buildLiveWidgets(facts).filter(widget => hidden.has(widget.id) && widget.score >= 30);
 }
+
+export type MobileGlanceChip = {
+  id: LiveWidgetId;
+  label: string;
+  detail: string;
+  tone: WidgetTone;
+  tab: ControlTab;
+  patientId?: number;
+};
+
+const MOBILE_GLANCE_ORDER: LiveWidgetId[] = ['sala', 'proximo', 'confirmar', 'recuperar', 'portal'];
+const MOBILE_NEXT_WINDOW_MIN = 45;
+const MOBILE_GLANCE_LIMIT = 2;
+
+function glanceCopy(widget: ControlWidget): Pick<MobileGlanceChip, 'label' | 'detail'> {
+  if (widget.id === 'sala') return { label: widget.value, detail: 'na cadeira' };
+  if (widget.id === 'proximo') return { label: widget.hint, detail: widget.value };
+  if (widget.id === 'confirmar') {
+    return {
+      label: widget.value === '1' ? 'Confirmar' : `${widget.value} confirmar`,
+      detail: widget.value === '1' ? 'amanhã' : '',
+    };
+  }
+  if (widget.id === 'recuperar') {
+    return {
+      label: widget.value === '1' ? 'Recuperar' : `${widget.value} recuperar`,
+      detail: '',
+    };
+  }
+  if (widget.id === 'portal') {
+    return {
+      label: widget.value === '1' ? 'Portal' : `${widget.value} no portal`,
+      detail: '',
+    };
+  }
+  return { label: widget.title, detail: widget.value };
+}
+
+export function pickMobileGlance(input: ControlCenterInput, currentTab?: string): MobileGlanceChip[] {
+  const facts = deriveClinicFacts(input);
+  const live = buildLiveWidgets(facts);
+  const byId = new Map(live.map(widget => [widget.id, widget]));
+  const chips: MobileGlanceChip[] = [];
+
+  for (const id of MOBILE_GLANCE_ORDER) {
+    if (chips.length >= MOBILE_GLANCE_LIMIT) break;
+    const widget = byId.get(id);
+    if (!widget) continue;
+
+    if (id === 'proximo') {
+      const mins = facts.gapMinutes;
+      if (!facts.attending && (mins == null || mins > MOBILE_NEXT_WINDOW_MIN)) continue;
+    }
+    if (currentTab === 'agenda' && id === 'confirmar') continue;
+    if (currentTab === 'dashboard' && id === 'recuperar') continue;
+    if (currentTab === 'pacientes' && id === 'portal') continue;
+
+    chips.push({
+      id,
+      ...glanceCopy(widget),
+      tone: widget.tone,
+      tab: widget.tab,
+      patientId: widget.patientId,
+    });
+  }
+
+  return chips;
+}

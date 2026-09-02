@@ -50,7 +50,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
 import { ClinicRail } from './components/ClinicRail';
+import { ClinicControlMobile } from './components/ClinicControlMobile';
 import { ControlCenterPreview } from './components/ControlCenterPreview';
+import { pickMobileGlance } from './utils/controlCenter';
 import { PatientClinical } from './components/PatientClinical';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
@@ -3370,7 +3372,11 @@ export default function App() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
+      <main className={`flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 md:pb-8 ${
+        pickMobileGlance({ now, ...controlCenterSnapshot }, activeTab).length > 0
+          ? 'pb-[calc(8.25rem+env(safe-area-inset-bottom))]'
+          : 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]'
+      }`}>
         {/* ── Floating Guide Banner ── */}
         {(() => {
           const guide = getGuideStep();
@@ -7250,6 +7256,14 @@ export default function App() {
       {/* Primary Action & Mobile Bottom Navigation */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 tablet-l:hidden no-print">
         <div className="px-3 pt-2 pb-[max(10px,env(safe-area-inset-bottom))]">
+          <ClinicControlMobile
+            snapshot={{ now, ...controlCenterSnapshot }}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            navigate={navigate}
+            onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
+            onOpenPatient={openPatientRecord}
+          />
           <nav className="liquid-glass-tabbar pointer-events-auto mx-auto flex max-w-[430px] items-stretch px-1.5 py-1">
             <BottomNavItem id="dashboard" label="Início" icon={Home} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
             <BottomNavItem id="agenda" label="Agenda" icon={Calendar} activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
