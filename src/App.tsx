@@ -50,6 +50,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Odontogram } from './components/Odontogram';
 import { Documents } from './components/Documents';
 import { ClinicRail } from './components/ClinicRail';
+import { ControlCenterPreview } from './components/ControlCenterPreview';
 import { PatientClinical } from './components/PatientClinical';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
@@ -3068,6 +3069,7 @@ export default function App() {
   return (
     <>
     <Routes>
+      {import.meta.env.DEV && <Route path="/dev/central" element={<ControlCenterPreview />} />}
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/portal/:token" element={<PatientPortal />} />

@@ -396,6 +396,7 @@ function toneDotClass(tone: WidgetTone) {
 }
 
 export interface ClinicRailSnapshot {
+  now?: Date;
   appointments?: ControlCenterInput['appointments'];
   todayRevenue?: number;
   weekRevenue?: number;
@@ -477,7 +478,7 @@ export function ClinicRail({
   );
 
   const input: ControlCenterInput = useMemo(() => ({
-    now,
+    now: snapshot?.now ?? now,
     appointments: snapshot?.appointments || [],
     todayRevenue: snapshot?.todayRevenue || 0,
     weekRevenue: snapshot?.weekRevenue || 0,
