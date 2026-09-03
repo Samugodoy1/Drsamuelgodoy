@@ -9,7 +9,8 @@
     "start": "vite preview",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

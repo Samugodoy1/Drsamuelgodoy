@@ -15,6 +15,10 @@ interface OnboardingFlowProps {
   markComplete: () => Promise<void> | void;
   /** Send the user to their (now real) home and close the flow. */
   goToDashboard: () => void;
+  /** Local Clareza Viva snapshot used when the API seed route is missing. */
+  applyLocalDemo: () => void;
+  /** Drop the local snapshot before loading the dentist's real data. */
+  clearLocalDemo: () => void;
 }
 
 type Step = 'welcome' | 'home' | 'form' | 'portal' | 'done';
@@ -35,6 +39,8 @@ export function OnboardingFlow({
   refreshAppData,
   markComplete,
   goToDashboard,
+  applyLocalDemo,
+  clearLocalDemo,
 }: OnboardingFlowProps) {
   const [step, setStep] = useState<Step>('welcome');
   const [busy, setBusy] = useState(false);
@@ -62,11 +68,23 @@ export function OnboardingFlow({
         product: 'odontohub',
         body: JSON.stringify({}),
       });
-      if (!res.ok) throw new Error('seed failed');
-      await refreshAppData();
+      if (res.ok) {
+        clearLocalDemo();
+        await refreshAppData();
+        setStep('home');
+        return;
+      }
+      // Production API currently has no /api/onboarding/demo-seed route (404).
+      // Keep the flow alive with a local snapshot that matches the home.
+      if (res.status === 401) {
+        setError('Sessão expirada. Entre novamente para ver a demonstração.');
+        return;
+      }
+      applyLocalDemo();
       setStep('home');
-    } catch (e) {
-      setError('Não consegui montar a demonstração agora. Tente novamente.');
+    } catch {
+      applyLocalDemo();
+      setStep('home');
     } finally {
       setBusy(false);
     }
@@ -105,6 +123,7 @@ export function OnboardingFlow({
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || 'create failed');
       }
+      clearLocalDemo();
       await refreshAppData();
       // Persist completion now (not only on the final button): the real patient
       // already exists and the backend has retired the demo, so a refresh/close
