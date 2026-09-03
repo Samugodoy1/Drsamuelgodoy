@@ -58,6 +58,7 @@ import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
 import { Dashboard } from './components/Dashboard';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { buildOnboardingDemo, isOnboardingDemoId, type OnboardingDemoSnapshot } from './components/onboarding/demoSeed';
 import { Finance } from './components/Finance';
 import FillAgendaModal, { computeTodayFreeSlotTimes } from './components/FillAgendaModal';
 import { PreAtendimento } from './components/PreAtendimento';
@@ -917,9 +918,31 @@ export default function App() {
   // guaranteeing a refresh/close after creating the real patient won't restart
   // the flow (and never re-seeds demo onto an account that now has real data).
   const [onboardingFlowOpen, setOnboardingFlowOpen] = useState(false);
+  const [onboardingDemo, setOnboardingDemo] = useState<OnboardingDemoSnapshot | null>(null);
+  const onboardingDemoActiveRef = useRef(false);
   useEffect(() => {
     if (needsClarezaVivaOnboarding) setOnboardingFlowOpen(true);
   }, [needsClarezaVivaOnboarding]);
+
+  const applyOnboardingDemo = useCallback(() => {
+    const demo = buildOnboardingDemo();
+    onboardingDemoActiveRef.current = true;
+    setOnboardingDemo(demo);
+    setPatients(demo.patients as Patient[]);
+    setAppointments(demo.appointments as Appointment[]);
+    setTransactions(demo.transactions as Transaction[]);
+    setFinancialSummary(demo.financialSummary);
+    setPatientIntelligence(demo.patientIntelligence);
+    setPatientIntelLoaded(true);
+    setActiveTab('dashboard');
+    navigate('/');
+  }, [navigate]);
+
+  const clearOnboardingDemo = useCallback(() => {
+    if (!onboardingDemoActiveRef.current && !onboardingDemo) return;
+    onboardingDemoActiveRef.current = false;
+    setOnboardingDemo(null);
+  }, [onboardingDemo]);
 
   // ─── Agenda date navigation helper ───────────────────────────────────
   const navigateDate = useCallback((direction: 'prev' | 'next' | 'today') => {
@@ -1054,6 +1077,7 @@ export default function App() {
   const setMilestone = (key: string) => localStorage.setItem(milestoneKey(key), '1');
 
   const getGuideStep = (): { message: string; action: string; tab?: string; onClick?: () => void } | null => {
+    if (onboardingFlowOpen || onboardingDemoActiveRef.current) return null;
     if (guideDismissedUntil === activeTab) return null;
     if (!user || loading) return null;
     if (patients.length === 0) {
@@ -1299,6 +1323,10 @@ export default function App() {
 
   const fetchData = async (explicitToken?: string) => {
     if (!userRef.current && !explicitToken) return;
+    if (onboardingDemoActiveRef.current) {
+      setLoading(false);
+      return;
+    }
     try {
       const [pRes, aRes, fRes, sRes, plRes, iRes] = await Promise.all([
         apiFetch('/api/patients', { explicitToken }),
@@ -1315,6 +1343,11 @@ export default function App() {
       const sData = await sRes.json();
       const plData = await plRes.json();
       const iData = await iRes.json();
+
+      if (onboardingDemoActiveRef.current) {
+        setLoading(false);
+        return;
+      }
       
       if (Array.isArray(pData)) setPatients(pData);
       if (Array.isArray(aData)) setAppointments(aData);
@@ -1326,7 +1359,10 @@ export default function App() {
       // Fetch patient intelligence (non-blocking)
       apiFetch('/api/intelligence/patients', { explicitToken })
         .then(r => r.json())
-        .then(data => { if (Array.isArray(data)) { setPatientIntelligence(data); setPatientIntelLoaded(true); } })
+        .then(data => {
+          if (onboardingDemoActiveRef.current) return;
+          if (Array.isArray(data)) { setPatientIntelligence(data); setPatientIntelLoaded(true); }
+        })
         .catch(() => {});
 
       // Fetch portal pending counts (non-blocking)
@@ -2803,6 +2839,10 @@ export default function App() {
 
   const openPatientRecord = async (id: number) => {
     if (!user) return;
+    if (isOnboardingDemoId(id)) {
+      showNotification('Esta é a demonstração. Crie seu primeiro paciente para usar o prontuário de verdade.');
+      return;
+    }
     const wasFirstRecord = !(user.record_opened || hasMilestone('recordOpened'));
     try {
       const res = await apiFetch(`/api/patients/${id}`);
@@ -3520,6 +3560,8 @@ export default function App() {
                 onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
                 dataRefreshKey={dataRefreshKey}
                 suppressOnboarding={onboardingFlowOpen}
+                demoIntelligence={onboardingDemo?.dashboardIntelligence ?? null}
+                demoSchedulingSuggestions={onboardingDemo?.schedulingSuggestions}
               />
             )}
 
@@ -7461,7 +7503,9 @@ export default function App() {
           apiFetch={apiFetch}
           refreshAppData={refreshAppData}
           markComplete={() => updateUserOnboarding('onboarding_done')}
-          goToDashboard={() => { setOnboardingFlowOpen(false); setActiveTab('dashboard'); navigate('/'); }}
+          goToDashboard={() => { clearOnboardingDemo(); setOnboardingFlowOpen(false); setActiveTab('dashboard'); navigate('/'); }}
+          applyLocalDemo={applyOnboardingDemo}
+          clearLocalDemo={clearOnboardingDemo}
         />
       )}
     </div>

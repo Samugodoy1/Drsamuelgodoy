@@ -121,6 +121,9 @@ interface DashboardProps {
   /** While the "Clareza Viva" onboarding flow is active, the legacy in-dashboard
    *  guided onboarding is suppressed so the two don't overlap. */
   suppressOnboarding?: boolean;
+  /** Client-side demonstration used when the API seed route is unavailable. */
+  demoIntelligence?: DashboardIntelligence | null;
+  demoSchedulingSuggestions?: SchedulingSuggestion[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -229,6 +232,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenPortalInbox,
   dataRefreshKey = 0,
   suppressOnboarding = false,
+  demoIntelligence = null,
+  demoSchedulingSuggestions,
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
@@ -246,6 +251,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, []);
 
   const fetchIntelligence = useCallback(async () => {
+    if (demoIntelligence) {
+      setIntelligence({
+        ...demoIntelligence,
+        overdueReturns: Array.isArray(demoIntelligence.overdueReturns) ? demoIntelligence.overdueReturns : [],
+      });
+      if (Array.isArray(demoSchedulingSuggestions)) {
+        setSchedulingSuggestions(demoSchedulingSuggestions);
+      }
+      setLoading(false);
+      return;
+    }
     if (intelligenceFetchingRef.current) return;
     intelligenceFetchingRef.current = true;
     try {
@@ -286,7 +302,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setLoading(false);
       intelligenceFetchingRef.current = false;
     }
-  }, [product]);
+  }, [product, demoIntelligence, demoSchedulingSuggestions]);
 
   useEffect(() => {
     void fetchIntelligence();
