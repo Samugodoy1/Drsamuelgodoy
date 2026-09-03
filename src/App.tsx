@@ -1077,6 +1077,7 @@ export default function App() {
   const setMilestone = (key: string) => localStorage.setItem(milestoneKey(key), '1');
 
   const getGuideStep = (): { message: string; action: string; tab?: string; onClick?: () => void } | null => {
+    if (onboardingFlowOpen || onboardingDemoActiveRef.current) return null;
     if (guideDismissedUntil === activeTab) return null;
     if (!user || loading) return null;
     if (patients.length === 0) {
