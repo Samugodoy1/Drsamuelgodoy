@@ -52,13 +52,16 @@ import { Documents } from './components/Documents';
 import { ClinicRail } from './components/ClinicRail';
 import { ClinicControlMobile } from './components/ClinicControlMobile';
 import { ControlCenterPreview } from './components/ControlCenterPreview';
+import { UiPolishPreview } from './components/UiPolishPreview';
 import { pickMobileGlance } from './utils/controlCenter';
 import { PatientClinical } from './components/PatientClinical';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { NovaEvolucao } from './components/NovaEvolucao';
 import { Dashboard } from './components/Dashboard';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
-import { buildOnboardingDemo, isOnboardingDemoId, type OnboardingDemoSnapshot } from './components/onboarding/demoSeed';
+import { buildOnboardingDemo, getOnboardingDemoPatient, isOnboardingDemoId, type OnboardingDemoSnapshot } from './components/onboarding/demoSeed';
+import { AppToast } from './components/AppToast';
+import { PortalLinkSheet } from './components/PortalLinkSheet';
 import { Finance } from './components/Finance';
 import FillAgendaModal, { computeTodayFreeSlotTimes } from './components/FillAgendaModal';
 import { PreAtendimento } from './components/PreAtendimento';
@@ -435,6 +438,16 @@ const ClinicalPageRoute = ({ transactions, appointments, onUpdatePatient, onUpda
 
     if (showLoading) {
       setLoading(true);
+    }
+
+    const numericId = Number(id);
+    if (isOnboardingDemoId(numericId)) {
+      const demoPatient = getOnboardingDemoPatient(numericId);
+      if (demoPatient) {
+        setPatient(demoPatient);
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -1934,6 +1947,25 @@ export default function App() {
   const maxWeeklyRevenue = Math.max(...weeklyRevenueData.map(d => d.amount), 1);
 
   const apiFetch = useCallback(async (url: string, options: any = {}) => {
+    const demoPatientMatch = String(url).match(/\/api\/patients\/(\d+)/);
+    const demoAppointmentMatch = String(url).match(/\/api\/appointments\/(\d+)/);
+    const demoPatientId = demoPatientMatch ? Number(demoPatientMatch[1]) : null;
+    const demoAppointmentId = demoAppointmentMatch ? Number(demoAppointmentMatch[1]) : null;
+    if ((demoPatientId && isOnboardingDemoId(demoPatientId)) || (demoAppointmentId && isOnboardingDemoId(demoAppointmentId))) {
+      const method = String(options.method || 'GET').toUpperCase();
+      if (method === 'GET' && demoPatientId) {
+        const patient = getOnboardingDemoPatient(demoPatientId);
+        return new Response(JSON.stringify(patient || {}), {
+          status: patient ? 200 : 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const token = options.explicitToken || localStorage.getItem('token');
     const product = options.product || getCurrentProductRef.current();
     const headers: any = {
@@ -2172,9 +2204,19 @@ export default function App() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  const [portalLinkData, setPortalLinkData] = useState<{ url: string; preUrl: string | null; patientName: string } | null>(null);
+  const [portalLinkData, setPortalLinkData] = useState<{ url: string; preUrl: string | null; patientName: string; phone?: string } | null>(null);
 
   const generatePatientPortalLink = async (patient: Patient) => {
+    if (isOnboardingDemoId(patient.id)) {
+      const origin = window.location.origin;
+      setPortalLinkData({
+        url: `${origin}/portal/demonstracao`,
+        preUrl: `${origin}/pre-atendimento/demonstracao`,
+        patientName: patient.name,
+        phone: patient.phone,
+      });
+      return;
+    }
     try {
       const res = await apiFetch('/api/portal/generate-link', {
         method: 'POST',
@@ -2198,7 +2240,8 @@ export default function App() {
       setPortalLinkData({
         url: portalUrl,
         preUrl: hasFinished ? null : preAtendimentoUrl,
-        patientName: patient.name
+        patientName: patient.name,
+        phone: patient.phone,
       });
     } catch {
       showNotification('Erro de conexão ao gerar link do portal', 'error');
@@ -2840,7 +2883,12 @@ export default function App() {
   const openPatientRecord = async (id: number) => {
     if (!user) return;
     if (isOnboardingDemoId(id)) {
-      showNotification('Esta é a demonstração. Crie seu primeiro paciente para usar o prontuário de verdade.');
+      const demoPatient = getOnboardingDemoPatient(id);
+      if (demoPatient) {
+        setSelectedPatient(demoPatient as Patient);
+        setActiveTab('prontuario');
+        navigate(`/prontuario/${id}`);
+      }
       return;
     }
     const wasFirstRecord = !(user.record_opened || hasMilestone('recordOpened'));
@@ -3112,6 +3160,7 @@ export default function App() {
     <>
     <Routes>
       {import.meta.env.DEV && <Route path="/dev/central" element={<ControlCenterPreview />} />}
+      {import.meta.env.DEV && <Route path="/dev/ui" element={<UiPolishPreview />} />}
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/portal/:token" element={<PatientPortal />} />
@@ -3146,7 +3195,7 @@ export default function App() {
               onOpenPortalInbox={() => { setActiveTab('pacientes'); setPatientsSubView('portal'); }}
               onOpenPatient={openPatientRecord}
             />
-            <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col">
+            <main className={`flex-1 min-w-0 overflow-x-hidden flex flex-col ${onboardingFlowOpen ? 'pt-14' : ''}`}>
               <ClinicalPageRoute 
                 transactions={transactions}
                 appointments={appointments}
@@ -3412,7 +3461,9 @@ export default function App() {
       />
 
       {/* Main Content */}
-      <main className={`flex-1 p-4 md:p-6 lg:p-8 w-full max-w-full print:p-0 md:pb-8 ${
+      <main className={`flex-1 px-4 md:px-6 lg:px-8 w-full max-w-full print:p-0 md:pb-8 ${
+        onboardingFlowOpen ? 'pt-[4.75rem] md:pt-20' : 'pt-4 md:pt-6 lg:pt-8'
+      } ${
         pickMobileGlance({ now, ...controlCenterSnapshot }, activeTab).length > 0
           ? 'pb-[calc(8.25rem+env(safe-area-inset-bottom))]'
           : 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]'
@@ -7316,66 +7367,6 @@ export default function App() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {notification && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: notification.celebration ? 0.9 : 1 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50 }}
-            transition={notification.celebration ? { type: 'spring', stiffness: 300, damping: 20 } : undefined}
-            className={`fixed z-[100] flex items-center gap-3 border ${
-              notification.celebration
-                ? 'bottom-12 left-1/2 -translate-x-1/2 px-8 py-5 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] bg-white border-primary/20'
-                : 'bottom-8 right-8 px-6 py-4 rounded-2xl'
-            } ${
-              !notification.celebration && notification.type === 'success' 
-                ? 'bg-primary border-primary/20 text-white' 
-                : !notification.celebration 
-                  ? 'bg-rose-600 border-rose-500 text-white'
-                  : ''
-            }`}
-          >
-            {notification.celebration ? (
-              <>
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                  <CheckCircle size={22} className="text-primary" />
-                </div>
-                <span className="font-bold text-[15px] text-slate-800">{notification.message}</span>
-                {notification.onAction && notification.actionLabel && (
-                  <button
-                    onClick={() => {
-                      notification.onAction?.();
-                      setNotification(null);
-                      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-                    }}
-                    className="shrink-0 ml-1 apple-btn text-[13px] py-1.5 px-4"
-                  >
-                    {notification.actionLabel}
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-                <span className="font-bold text-sm">{notification.message}</span>
-                {notification.onUndo && (
-                  <button
-                    onClick={() => {
-                      notification.onUndo?.();
-                      setNotification(null);
-                      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-                    }}
-                    className="ml-1 px-3 py-1 text-sm font-bold rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
-                  >
-                    Desfazer
-                  </button>
-                )}
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Confirmation Modal */}
       <AnimatePresence>
         {confirmation && (
@@ -7414,104 +7405,30 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Portal Link Modal */}
-      <AnimatePresence>
-        {portalLinkData && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300] flex items-center justify-center px-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl max-w-md w-full overflow-hidden"
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Portal do Paciente</h3>
-                  <button onClick={() => setPortalLinkData(null)} className="text-slate-400 hover:text-slate-600">
-                    <X size={20} />
-                  </button>
-                </div>
-                <p className="text-sm text-slate-500 mb-5">
-                  Links gerados para <span className="font-semibold text-slate-700">{portalLinkData.patientName}</span>.
-                </p>
-
-                <div className="space-y-3">
-                  {/* Pre-atendimento link — only for first visit */}
-                  {portalLinkData.preUrl && (
-                  <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ClipboardList size={16} className="text-emerald-600" />
-                      <span className="text-sm font-bold text-emerald-800">Pré-Atendimento</span>
-                    </div>
-                    <p className="text-xs text-emerald-600 mb-3">Ficha online, termos e envio de documentos</p>
-                    <div className="flex gap-2">
-                      <input
-                        readOnly
-                        value={portalLinkData.preUrl}
-                        className="flex-1 text-xs bg-white border border-emerald-200 rounded-lg px-3 py-2 text-slate-600 truncate"
-                      />
-                      <button
-                        onClick={() => { navigator.clipboard.writeText(portalLinkData.preUrl!); }}
-                        className="px-3 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-[#0077ed] transition-colors whitespace-nowrap"
-                      >
-                        Copiar
-                      </button>
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Portal link */}
-                  <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Home size={16} className="text-blue-600" />
-                      <span className="text-sm font-bold text-blue-800">Portal Completo</span>
-                    </div>
-                    <p className="text-xs text-blue-600 mb-3">Histórico, exames, orçamentos, agendamento</p>
-                    <div className="flex gap-2">
-                      <input
-                        readOnly
-                        value={portalLinkData.url}
-                        className="flex-1 text-xs bg-white border border-blue-200 rounded-lg px-3 py-2 text-slate-600 truncate"
-                      />
-                      <button
-                        onClick={() => { navigator.clipboard.writeText(portalLinkData.url); }}
-                        className="px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
-                      >
-                        Copiar
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 p-3 bg-slate-50 rounded-xl">
-                  <p className="text-xs text-slate-500 text-center">
-                    💡 Envie o link de pré-atendimento <strong>antes</strong> da consulta para zero papel e atendimento mais rápido!
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Onboarding "Clareza Viva" — overlays the real home (banner + CTA in
-          Etapa 1, full-screen in Etapas 0/2/3). Runs once per user. */}
-      {onboardingFlowOpen && (
-        <OnboardingFlow
-          userName={user?.name || ''}
-          apiFetch={apiFetch}
-          refreshAppData={refreshAppData}
-          markComplete={() => updateUserOnboarding('onboarding_done')}
-          goToDashboard={() => { clearOnboardingDemo(); setOnboardingFlowOpen(false); setActiveTab('dashboard'); navigate('/'); }}
-          applyLocalDemo={applyOnboardingDemo}
-          clearLocalDemo={clearOnboardingDemo}
-        />
-      )}
     </div>
         )
       } />
     </Routes>
+    <AppToast
+      notification={notification}
+      offsetTop={onboardingFlowOpen}
+      onDismiss={() => {
+        setNotification(null);
+        if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+      }}
+    />
+    <PortalLinkSheet data={portalLinkData} onClose={() => setPortalLinkData(null)} />
+    {onboardingFlowOpen && (
+      <OnboardingFlow
+        userName={user?.name || ''}
+        apiFetch={apiFetch}
+        refreshAppData={refreshAppData}
+        markComplete={() => updateUserOnboarding('onboarding_done')}
+        goToDashboard={() => { clearOnboardingDemo(); setOnboardingFlowOpen(false); setActiveTab('dashboard'); navigate('/'); }}
+        applyLocalDemo={applyOnboardingDemo}
+        clearLocalDemo={clearOnboardingDemo}
+      />
+    )}
         <UpgradeLimitModal
       data={upgradeLimitModal}
       onClose={() => setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 })}

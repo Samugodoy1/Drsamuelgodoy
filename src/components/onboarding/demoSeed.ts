@@ -16,6 +16,10 @@ const addMinutes = (base: Date, minutes: number) => new Date(base.getTime() + mi
 
 const dateKey = (d: Date) => d.toLocaleDateString('en-CA');
 
+const daysAgoKey = (now: Date, days: number) => dateKey(addMinutes(now, -days * 24 * 60));
+
+let lastDemoSnapshot: ReturnType<typeof buildOnboardingDemo> | null = null;
+
 export function buildOnboardingDemo(now = new Date()) {
   const today = new Date(now);
   const tomorrow = new Date(now);
@@ -37,6 +41,44 @@ export function buildOnboardingDemo(now = new Date()) {
       phone: '11988880001',
       email: 'mariana.alves@demo.odontohub',
       is_demo: true,
+      birth_date: '1992-03-14',
+      anamnesis: {
+        medical_history: 'Nega doenças sistêmicas.',
+        allergies: 'Nega alergias.',
+        medications: 'Nenhuma contínua.',
+        chief_complaint: 'Dor no molar superior direito, piora à noite.',
+      },
+      odontogram: {
+        16: { status: 'root_canal_needed', notes: 'Canal iniciado — retorno atrasado' },
+      },
+      evolution: [
+        {
+          id: ONBOARDING_DEMO_ID_BASE + 30,
+          date: daysAgoKey(now, 14),
+          notes: 'Início de tratamento endodôntico no 16. Orientada a retornar em 7 dias.',
+          procedure_performed: 'Canal no 16',
+        },
+      ],
+      treatmentPlan: [
+        {
+          id: ONBOARDING_DEMO_ID_BASE + 40,
+          tooth_number: 16,
+          procedure: 'Tratamento de canal',
+          value: 850,
+          status: 'APROVADO' as const,
+          created_at: daysAgoKey(now, 14),
+        },
+      ],
+      journey: {
+        cadastro: 'CONCLUIDO' as const,
+        anamnese: 'CONCLUIDO' as const,
+        odontograma: 'CONCLUIDO' as const,
+        plano: 'CONCLUIDO' as const,
+        aceite: 'CONCLUIDO' as const,
+        consultas: 'CONCLUIDO' as const,
+        evolucao: 'CONCLUIDO' as const,
+        pagamento: 'PENDENTE' as const,
+      },
     },
     {
       id: ONBOARDING_DEMO_ID_BASE + 1,
@@ -45,6 +87,24 @@ export function buildOnboardingDemo(now = new Date()) {
       phone: '11988880002',
       email: 'joao.almeida@demo.odontohub',
       is_demo: true,
+      birth_date: '1988-07-22',
+      anamnesis: {
+        medical_history: 'Nega.',
+        allergies: 'Nega alergias.',
+        medications: 'Nenhuma.',
+        chief_complaint: 'Limpeza e revisão de rotina.',
+      },
+      odontogram: {
+        26: { status: 'filling', notes: 'Restauração em resina' },
+      },
+      evolution: [
+        {
+          id: ONBOARDING_DEMO_ID_BASE + 31,
+          date: daysAgoKey(now, 180),
+          notes: 'Profilaxia e aplicação de flúor. Retorno em 6 meses.',
+          procedure_performed: 'Limpeza',
+        },
+      ],
     },
     {
       id: ONBOARDING_DEMO_ID_BASE + 2,
@@ -53,6 +113,16 @@ export function buildOnboardingDemo(now = new Date()) {
       phone: '11988880003',
       email: 'ana.souza@demo.odontohub',
       is_demo: true,
+      birth_date: '1995-11-03',
+      anamnesis: {
+        medical_history: 'Nega.',
+        allergies: 'Nega.',
+        medications: 'Nenhuma.',
+        chief_complaint: 'Restauração no 36.',
+      },
+      odontogram: {
+        36: { status: 'decay', notes: 'Cárie oclusal' },
+      },
     },
     {
       id: ONBOARDING_DEMO_ID_BASE + 3,
@@ -69,6 +139,12 @@ export function buildOnboardingDemo(now = new Date()) {
       phone: '11988880005',
       email: 'beatriz.lima@demo.odontohub',
       is_demo: true,
+      anamnesis: {
+        medical_history: 'Nega.',
+        allergies: 'Nega.',
+        medications: 'Nenhuma.',
+        chief_complaint: 'Acompanhamento de clareamento.',
+      },
     },
     {
       id: ONBOARDING_DEMO_ID_BASE + 5,
@@ -77,6 +153,16 @@ export function buildOnboardingDemo(now = new Date()) {
       phone: '11988880006',
       email: 'carlos.santos@demo.odontohub',
       is_demo: true,
+      birth_date: '1979-01-09',
+      anamnesis: {
+        medical_history: 'Hipertensão controlada.',
+        allergies: 'Nega.',
+        medications: 'Losartana 50mg.',
+        chief_complaint: 'Tratamento interrompido no 36.',
+      },
+      odontogram: {
+        36: { status: 'decay', notes: 'Tratamento iniciado e interrompido' },
+      },
     },
   ];
 
@@ -184,9 +270,11 @@ export function buildOnboardingDemo(now = new Date()) {
   ];
 
   const dashboardIntelligence = {
-    needsActionToday: [patientIntelligence[0]],
+    // One story per patient — the home should feel like a calm clinic day,
+    // not a stack of the same alert repeated in three sections.
+    needsActionToday: [] as typeof patientIntelligence,
     abandonmentRisk: [patientIntelligence[1]],
-    attentionNeeded: [patientIntelligence[0]],
+    attentionNeeded: [] as typeof patientIntelligence,
     overdueReturns: [
       {
         patient_id: patients[0].id,
@@ -242,7 +330,7 @@ export function buildOnboardingDemo(now = new Date()) {
     },
   ];
 
-  return {
+  const snapshot = {
     patients,
     appointments,
     transactions,
@@ -251,6 +339,14 @@ export function buildOnboardingDemo(now = new Date()) {
     dashboardIntelligence,
     schedulingSuggestions,
   };
+
+  lastDemoSnapshot = snapshot;
+  return snapshot;
+}
+
+export function getOnboardingDemoPatient(id: number) {
+  const snapshot = lastDemoSnapshot ?? buildOnboardingDemo();
+  return snapshot.patients.find((patient) => patient.id === id) ?? null;
 }
 
 export type OnboardingDemoSnapshot = ReturnType<typeof buildOnboardingDemo>;

@@ -557,7 +557,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return null;
   };
 
-  const insightCard = !loading ? getInsightCard() : null;
+  const insightCard = !loading && !demoIntelligence ? getInsightCard() : null;
 
   const portalRecentCount = (portalActivity?.recentConfirmations?.length || 0)
     + (portalActivity?.requests?.filter(r => r.status === 'PENDING').length || 0);

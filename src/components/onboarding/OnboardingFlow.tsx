@@ -142,47 +142,36 @@ export function OnboardingFlow({
     goToDashboard();
   };
 
-  // ─── Etapa 1: non-blocking chrome over the REAL home ───────────────────────
+  // ─── Etapa 1: a single island over the real home — tab bar stays free ──────
   if (step === 'home') {
     return (
-      <>
-        {/* Faixa fixa, discreta, NÃO bloqueante */}
-        <motion.div
-          initial={{ y: -48, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, ease: easing }}
-          className="fixed top-0 inset-x-0 z-[120] flex justify-center px-3 pt-3 pointer-events-none"
+      <motion.div
+        initial={{ y: -24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: easing }}
+        className="pointer-events-none fixed inset-x-0 top-0 z-[120] flex justify-center px-3 pt-[max(10px,env(safe-area-inset-top))]"
+      >
+        <div
+          className="pointer-events-auto flex w-full max-w-[400px] items-center gap-3 rounded-full border border-white/70 px-3.5 py-2 shadow-[0_10px_32px_rgba(0,0,0,0.08)]"
+          style={{
+            background: 'rgba(255, 255, 255, 0.82)',
+            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+            backdropFilter: 'blur(40px) saturate(180%)',
+          }}
         >
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#000000] text-white/90 px-4 py-2.5 max-w-[640px] w-full">
-            <p className="text-[13px] font-normal leading-snug">
-              Esta é uma demonstração. É assim que o OdontoHub vai funcionar com seus pacientes reais.
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Rodapé fixo: "Gostou? Agora é a sua vez." */}
-        <motion.div
-          initial={{ y: 64, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, ease: easing, delay: 0.15 }}
-          className="fixed bottom-0 inset-x-0 z-[120] flex justify-center px-3 pb-4 pointer-events-none"
-        >
-          <div className="pointer-events-auto flex flex-col sm:flex-row sm:items-center gap-3 rounded-[28px] bg-white px-5 py-4 max-w-[640px] w-full">
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-semibold tracking-[-0.016em] text-[#1d1d1f]">Agora é a sua vez.</p>
-              <p className="text-[13px] text-[#86868b] mt-0.5">
-                Criar seu primeiro paciente remove a demonstração e deixa a home sua.
-              </p>
-            </div>
-            <button
-              onClick={() => setStep('form')}
-              className="shrink-0 apple-btn"
-            >
-              Criar meu primeiro paciente
-            </button>
-          </div>
-        </motion.div>
-      </>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#30d158]" />
+          <p className="min-w-0 flex-1 truncate text-[13px] font-normal tracking-[-0.011em] text-[#1d1d1f]">
+            Demonstração
+          </p>
+          <button
+            type="button"
+            onClick={() => setStep('form')}
+            className="shrink-0 px-1 text-[13px] font-normal tracking-[-0.011em] text-[#0071e3]"
+          >
+            Começar de verdade
+          </button>
+        </div>
+      </motion.div>
     );
   }
 
