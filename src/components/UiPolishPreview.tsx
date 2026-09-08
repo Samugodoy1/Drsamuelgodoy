@@ -3,6 +3,13 @@ import { Calendar, DollarSign, Home, Settings, Users } from '../icons';
 import { AppToast, type AppToastNotification } from './AppToast';
 import { PortalLinkSheet } from './PortalLinkSheet';
 
+const PREVIEW_PORTAL = {
+  url: 'https://odontohub.app/portal/mariana',
+  preUrl: 'https://odontohub.app/pre-atendimento/mariana',
+  patientName: 'Mariana Alves',
+  phone: '11988880001',
+};
+
 /**
  * Visual QA for the three surfaces remodeled in this pass.
  * Dev-only: /dev/ui
@@ -80,16 +87,7 @@ export function UiPolishPreview() {
 
       <AppToast notification={toast} offsetTop={showIsland} onDismiss={() => setToast(null)} />
       <PortalLinkSheet
-        data={
-          sheetOpen
-            ? {
-                url: 'https://odontohub.app/portal/mariana',
-                preUrl: 'https://odontohub.app/pre-atendimento/mariana',
-                patientName: 'Mariana Alves',
-                phone: '11988880001',
-              }
-            : null
-        }
+        data={sheetOpen ? PREVIEW_PORTAL : null}
         onClose={() => setSheetOpen(false)}
       />
     </div>

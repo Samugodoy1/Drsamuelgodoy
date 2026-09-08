@@ -47,11 +47,27 @@ export function PortalLinkSheet({ data, onClose }: PortalLinkSheetProps) {
   }, [copied]);
 
   const copy = async (value: string, which: 'pre' | 'portal') => {
+    setCopied(which);
     try {
-      await navigator.clipboard.writeText(value);
-      setCopied(which);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
     } catch {
-      setCopied(which);
+      // fall through to the execCommand fallback
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = value;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch {
+      // Feedback already shown
     }
   };
 
@@ -200,7 +216,9 @@ function LinkRow({
           <button
             type="button"
             onClick={onCopy}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3.5 py-1.5 text-[13px] font-normal tracking-[-0.016em] text-[#1d1d1f]"
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-normal tracking-[-0.016em] ${
+              copied ? 'bg-[#30d158]/12 text-[#1d1d1f]' : 'bg-[#f5f5f7] text-[#1d1d1f]'
+            }`}
           >
             {copied ? <Check size={13} className="text-[#30d158]" /> : <Copy size={13} />}
             {copied ? 'Copiado' : 'Copiar'}
