@@ -169,7 +169,7 @@ export function nextCycleAmount(sku: HubSku, cycle: HubCycle): number {
 
 export function migrationNotice(access: CanonicalHubAccess): string | null {
   if (access.migration === 'trial_from_free') {
-    return 'Seu OdontoHub inclui um mês. Depois, a renovação é automática a partir de R$ 190 por mês. Cancele quando quiser.';
+    return 'Você tem um mês para usar o OdontoHub. Nada é cobrado agora. Quando quiser, escolha um plano.';
   }
   if (access.migration === 'essencial_to_odontohub') {
     return 'Você continua no OdontoHub. O valor atual vale até o fim deste ciclo. Depois, R$ 190 por mês ou R$ 1.900 por ano.';

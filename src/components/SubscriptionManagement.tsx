@@ -383,7 +383,7 @@ export function SubscriptionManagement({
                 <h3 className="text-[17px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Minha assinatura</h3>
                 <p className="text-[11px] text-[#86868b]">
                   {hubDisplayName}
-                  {isProActive ? '' : access.onTrialFromFree ? ' · um mês incluso' : ''}
+                  {isProActive ? '' : access.onTrialFromFree ? ' · mês para usar, sem cobrança agora' : ''}
                 </p>
               </div>
             </div>

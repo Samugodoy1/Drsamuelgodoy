@@ -74,14 +74,14 @@ import AdminEngagement from './components/AdminEngagement';
 import { SubscriptionCallback } from './components/SubscriptionCallback';
 import {
   PLANS_DISMISSED_STORAGE_KEY,
+  clearShowPlansAfterSignup,
   clearStoredPlanQuery,
+  markShowPlansAfterSignup,
   parseHubPlanQuery,
   readStoredPlanQuery,
+  shouldShowPlansAfterSignup,
   startHubCheckout,
-  storeCheckoutIntent,
   storePlanQuery,
-  takeCheckoutIntent,
-  toPublicPlanQuery,
   type HubCycle,
   type HubSku,
 } from './data/hubPlans';
@@ -610,7 +610,6 @@ export default function App() {
   );
   const [hubCheckoutBusy, setHubCheckoutBusy] = useState<HubSku | null>(null);
   const [hubCheckoutError, setHubCheckoutError] = useState<string | null>(null);
-  const [authScreen, setAuthScreen] = useState<'plans' | 'auth'>('plans');
 
   const exportPatients = () => {
     let filteredP = patients;
@@ -916,20 +915,14 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    let dismissed = false;
-    try {
-      dismissed = sessionStorage.getItem(PLANS_DISMISSED_STORAGE_KEY) === '1';
-    } catch {
-      dismissed = false;
-    }
-    if (urlPlanRaw) {
-      setPlansOpen(true);
+    if (hubAccess.subscribed) {
+      clearShowPlansAfterSignup();
       return;
     }
-    if (!hubAccess.subscribed && !dismissed) {
+    if (shouldShowPlansAfterSignup()) {
       setPlansOpen(true);
     }
-  }, [user, urlPlanRaw, hubAccess.subscribed]);
+  }, [user, hubAccess.subscribed]);
 
   useEffect(() => {
     if (!isFillAgendaOpen || plusEnabled) return;
@@ -1690,6 +1683,8 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
+        if (isRegistering) markShowPlansAfterSignup();
+        else clearShowPlansAfterSignup();
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         dataFetchedRef.current = true;
@@ -1730,6 +1725,7 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
+        markShowPlansAfterSignup();
         // Auto-login após cadastro para reduzir fricção no onboarding
         const loginRes = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
@@ -3237,27 +3233,6 @@ export default function App() {
       } />
       <Route path="*" element={
         !user ? (
-          authScreen === 'plans' ? (
-            <HubPlansScreen
-              cycle={hubCycle}
-              selectedSku={hubSku ?? (planSelection.fromQuery ? planSelection.sku : undefined)}
-              notice={null}
-              continueLabel="Já tem conta? Entrar ›"
-              onCycleChange={setHubCycle}
-              onSubscribe={(sku, cycle) => {
-                setHubSku(sku);
-                setHubCycle(cycle);
-                storePlanQuery(toPublicPlanQuery(sku, cycle));
-                storeCheckoutIntent(sku, cycle);
-                setIsRegistering(true);
-                setAuthScreen('auth');
-              }}
-              onContinue={() => {
-                setIsRegistering(false);
-                setAuthScreen('auth');
-              }}
-            />
-          ) : (
           <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 font-sans antialiased">
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -3281,11 +3256,7 @@ export default function App() {
                   })()}
                 </h1>
                 <p className="apple-subhead text-[17px]">
-                  {isRegistering
-                    ? 'A partir de R$ 190 por mês.'
-                    : planSelection.fromQuery
-                      ? `${planSelection.sku === 'plus' ? 'OdontoHub+' : 'OdontoHub'} · ${planSelection.cycle === 'yearly' ? 'Anual' : 'Mensal'}.`
-                      : 'Entre na sua clínica.'}
+                  {isRegistering ? 'Leva um minuto.' : 'Entre na sua clínica.'}
                 </p>
               </motion.div>
 
@@ -3443,15 +3414,6 @@ export default function App() {
                   >
                     {isRegistering ? 'Já tem conta? Entrar ›' : 'Não tem conta? Cadastre-se ›'}
                   </motion.button>
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => setAuthScreen('plans')}
-                      className="text-[15px] text-[#86868b]"
-                    >
-                      Ver planos ›
-                    </button>
-                  </div>
                 </div>
 
                 <div className="flex justify-center items-center gap-3 text-[11px] text-[#86868b]">
@@ -3462,7 +3424,6 @@ export default function App() {
               </div>
             </motion.div>
           </div>
-          )
         ) : (
           <div className="min-h-screen bg-[#f5f5f7] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
@@ -3612,14 +3573,20 @@ export default function App() {
             )}
 
             {activeTab === 'dashboard' && !searchTerm && hubMigrationNotice && !plansOpen && (
-              <button
-                type="button"
-                onClick={() => setPlansOpen(true)}
-                className="w-full mb-4 rounded-[20px] bg-white px-5 py-4 text-left"
-              >
-                <p className="text-[15px] text-[#1d1d1f] leading-relaxed">{hubMigrationNotice}</p>
-                <p className="text-[13px] text-[#2997ff] mt-2">Assinar o OdontoHub ›</p>
-              </button>
+              hubAccess.onTrialFromFree ? (
+                <button
+                  type="button"
+                  onClick={() => setPlansOpen(true)}
+                  className="w-full mb-4 rounded-[20px] bg-white px-5 py-4 text-left"
+                >
+                  <p className="text-[15px] text-[#1d1d1f] leading-relaxed">{hubMigrationNotice}</p>
+                  <p className="text-[13px] text-[#2997ff] mt-2">Escolher um plano ›</p>
+                </button>
+              ) : (
+                <div className="w-full mb-4 rounded-[20px] bg-white px-5 py-4 text-left">
+                  <p className="text-[15px] text-[#1d1d1f] leading-relaxed">{hubMigrationNotice}</p>
+                </div>
+              )
             )}
             {activeTab === 'dashboard' && !searchTerm && (
               <Dashboard 
@@ -7505,7 +7472,8 @@ export default function App() {
           selectedSku={hubSku}
           busySku={hubCheckoutBusy}
           currentSku={hubAccess.subscribed ? hubAccess.sku : null}
-          notice={hubMigrationNotice}
+          notice={null}
+          continueLabel="Agora não ›"
           onCycleChange={setHubCycle}
           onSubscribe={async (sku, cycle) => {
             setHubSku(sku);
@@ -7524,6 +7492,7 @@ export default function App() {
             } catch {
               /* ignore */
             }
+            clearShowPlansAfterSignup();
             clearStoredPlanQuery();
             if (urlPlanRaw) {
               const params = new URLSearchParams(location.search);
