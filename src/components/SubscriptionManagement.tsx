@@ -491,7 +491,7 @@ export function SubscriptionManagement({
         </div>
       </div>
 
-      <div className="bg-white rounded-[28px] p-6 md:p-10">
+      <div className="bg-white rounded-[20px] md:rounded-[28px] p-4 md:p-10">
         <HubPlans
           cycle={cycle}
           selectedSku={selectedSku}
