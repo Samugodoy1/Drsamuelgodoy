@@ -69,8 +69,23 @@ import { PatientPortal } from './components/PatientPortal';
 import { PortalInbox } from './components/PortalInbox';
 import { MLInsights } from './components/MLInsights';
 import { SubscriptionManagement } from './components/SubscriptionManagement';
+import { HubPlansScreen } from './components/HubPlans';
 import AdminEngagement from './components/AdminEngagement';
 import { SubscriptionCallback } from './components/SubscriptionCallback';
+import {
+  PLANS_DISMISSED_STORAGE_KEY,
+  clearStoredPlanQuery,
+  parseHubPlanQuery,
+  readStoredPlanQuery,
+  startHubCheckout,
+  storeCheckoutIntent,
+  storePlanQuery,
+  takeCheckoutIntent,
+  toPublicPlanQuery,
+  type HubCycle,
+  type HubSku,
+} from './data/hubPlans';
+import { migrationNotice, resolveHubAccess } from './utils/hubEntitlements';
 import GoogleSignInButton from './components/GoogleSignInButton';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 import {
@@ -258,7 +273,7 @@ interface Transaction {
 }
 
 type Product = 'odontohub' | 'academy';
-type ProductPlan = 'free' | 'pro' | 'student';
+type ProductPlan = 'free' | 'pro' | 'student' | 'essencial' | 'odontohub' | 'plus';
 type ProductApprovalStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
 
 interface ProductAccess {
@@ -510,11 +525,7 @@ const LegacyClinicalRedirect = () => {
   const { id } = useParams();
   return <Navigate to={id ? `/prontuario/${id}` : '/'} replace />;
 };
-const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
-  const limit = data?.limit || 15;
-  const currentUsage = data?.currentUsage || limit;
-  const progress = Math.min(100, Math.round((currentUsage / limit) * 100));
-
+const SubscribeHubModal = ({ data, onClose, onSubscribe }: any) => {
   return (
     <AnimatePresence>
       {data?.open && (
@@ -548,77 +559,19 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
               <X size={18} />
             </button>
 
-            <div className="max-h-[92dvh] overflow-y-auto px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pb-7 sm:pt-8">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[20px] bg-[#f5f5f7] text-[#1d1d1f] sm:h-16 sm:w-16">
-                <Users size={25} />
-              </div>
-
-              <div className="text-center">
-                <p className="mb-2 text-[13px] font-normal text-[#86868b]">
-                  Plano Free
-                </p>
-
-                <h2 className="apple-display-ink mx-auto max-w-[330px] text-[28px] sm:max-w-[360px] sm:text-[32px]">
-                  Limite de pacientes.
-                </h2>
-
-                <p className="apple-subhead mx-auto mt-3 max-w-[330px] text-[15px] sm:mt-4 sm:max-w-[360px]">
-                  Você já cadastrou {currentUsage} pacientes. Para continuar, mude para o Pro.
-                </p>
-              </div>
-
-              <div className="mt-6 rounded-[22px] bg-[#f5f5f7] p-4 sm:rounded-[24px]">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[15px] text-[#1d1d1f]">
-                    Pacientes no Free
-                  </span>
-
-                  <span className="rounded-full bg-white px-3 py-1 text-[15px] text-[#1d1d1f]">
-                    {currentUsage}/{limit}
-                  </span>
-                </div>
-
-                <div className="h-1.5 overflow-hidden rounded-full bg-[#d2d2d7]">
-                  <motion.div
-                    className="h-full rounded-full bg-[#0071e3]"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.45, ease: "easeOut" }}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-2">
-                {[
-                  'Pacientes ilimitados',
-                  'Agenda e prontuário sem limite',
-                  'Lembretes inteligentes de retorno',
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-center gap-3 rounded-[18px] bg-white px-3 py-2.5 text-[15px] text-[#1d1d1f]"
-                  >
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0071e3]">
-                      <CheckCircle2 size={15} />
-                    </div>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="sticky bottom-0 mt-6 space-y-2 bg-white pt-3">
-                <button
-                  onClick={onUpgrade}
-                  className="w-full apple-btn"
-                >
-                  Mudar para o Pro
+            <div className="px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-10 sm:px-7 sm:pb-7 sm:pt-12 text-center">
+              <h2 className="apple-display-ink text-[28px] sm:text-[32px]">
+                Assine o OdontoHub.
+              </h2>
+              <p className="apple-subhead mt-3 text-[15px]">
+                A partir de R$ 190 por mês. Pacientes ilimitados.
+              </p>
+              <div className="sticky bottom-0 mt-8 space-y-2 bg-white pt-3">
+                <button onClick={onSubscribe} className="w-full apple-btn">
+                  Assinar OdontoHub
                 </button>
-
-                <button
-                  onClick={onClose}
-                  className="w-full apple-btn-light"
-                >
-                  Continuar no Free
+                <button onClick={onClose} className="w-full apple-btn-light">
+                  Agora não
                 </button>
               </div>
             </div>
@@ -630,6 +583,12 @@ const UpgradeLimitModal = ({ data, onClose, onUpgrade }: any) => {
 };
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const urlPlanRaw = new URLSearchParams(location.search).get('plan');
+  const planSelection = useMemo(
+    () => parseHubPlanQuery(urlPlanRaw || readStoredPlanQuery()),
+    [location.search, urlPlanRaw],
+  );
   const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia' | 'academy'>('dashboard');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -643,9 +602,15 @@ export default function App() {
   });
   const [upgradeLimitModal, setUpgradeLimitModal] = useState<any>({
   open: false,
-  limit: 15,
-  currentUsage: 0,
   });
+  const [plansOpen, setPlansOpen] = useState(false);
+  const [hubCycle, setHubCycle] = useState<HubCycle>(planSelection.cycle);
+  const [hubSku, setHubSku] = useState<HubSku | undefined>(
+    planSelection.fromQuery ? planSelection.sku : undefined,
+  );
+  const [hubCheckoutBusy, setHubCheckoutBusy] = useState<HubSku | null>(null);
+  const [hubCheckoutError, setHubCheckoutError] = useState<string | null>(null);
+  const [authScreen, setAuthScreen] = useState<'plans' | 'auth'>('plans');
 
   const exportPatients = () => {
     let filteredP = patients;
@@ -917,6 +882,12 @@ export default function App() {
   // Runs once per user. Source of truth is the persisted (backend) flag
   // user_product_access.onboarding_completed for the odontohub product.
   const odontohubAccess = getProductAccess(ODONTOHUB_PRODUCT);
+  const hubAccess = useMemo(
+    () => resolveHubAccess({ plan: odontohubAccess?.plan || 'free' }),
+    [odontohubAccess?.plan],
+  );
+  const plusEnabled = hubAccess.plusEnabled;
+  const hubMigrationNotice = migrationNotice(hubAccess);
   const needsClarezaVivaOnboarding = Boolean(
     user &&
     user.role?.toUpperCase() === 'DENTIST' &&
@@ -936,6 +907,37 @@ export default function App() {
   useEffect(() => {
     if (needsClarezaVivaOnboarding) setOnboardingFlowOpen(true);
   }, [needsClarezaVivaOnboarding]);
+
+  useEffect(() => {
+    if (urlPlanRaw) storePlanQuery(urlPlanRaw);
+    setHubCycle(planSelection.cycle);
+    setHubSku(planSelection.fromQuery ? planSelection.sku : undefined);
+  }, [urlPlanRaw, planSelection]);
+
+  useEffect(() => {
+    if (!user) return;
+    let dismissed = false;
+    try {
+      dismissed = sessionStorage.getItem(PLANS_DISMISSED_STORAGE_KEY) === '1';
+    } catch {
+      dismissed = false;
+    }
+    if (urlPlanRaw) {
+      setPlansOpen(true);
+      return;
+    }
+    if (!hubAccess.subscribed && !dismissed) {
+      setPlansOpen(true);
+    }
+  }, [user, urlPlanRaw, hubAccess.subscribed]);
+
+  useEffect(() => {
+    if (!isFillAgendaOpen || plusEnabled) return;
+    setIsFillAgendaOpen(false);
+    setHubSku('plus');
+    setHubCycle('yearly');
+    setPlansOpen(true);
+  }, [isFillAgendaOpen, plusEnabled]);
 
   const applyOnboardingDemo = useCallback(() => {
     const demo = buildOnboardingDemo();
@@ -1927,7 +1929,8 @@ export default function App() {
     portalPendingCount,
     noShowRescheduleCount: noShowsNeedingReschedule.length,
     patientCount: patients.length,
-    freeSlotCount: todayFreeSlotsCount,
+    freeSlotCount: plusEnabled ? todayFreeSlotsCount : 0,
+    plusEnabled,
   };
 
   // Weekly Revenue Data for the Chart
@@ -2742,11 +2745,7 @@ export default function App() {
         const data = await res.json();
       
         if (data.upgrade_required) {
-          setUpgradeLimitModal({
-            open: true,
-            limit: data.limit,
-            currentUsage: data.current_usage,
-          });
+          setUpgradeLimitModal({ open: true });
           return;
         }
       
@@ -3238,6 +3237,27 @@ export default function App() {
       } />
       <Route path="*" element={
         !user ? (
+          authScreen === 'plans' ? (
+            <HubPlansScreen
+              cycle={hubCycle}
+              selectedSku={hubSku ?? (planSelection.fromQuery ? planSelection.sku : undefined)}
+              notice={null}
+              continueLabel="Já tem conta? Entrar ›"
+              onCycleChange={setHubCycle}
+              onSubscribe={(sku, cycle) => {
+                setHubSku(sku);
+                setHubCycle(cycle);
+                storePlanQuery(toPublicPlanQuery(sku, cycle));
+                storeCheckoutIntent(sku, cycle);
+                setIsRegistering(true);
+                setAuthScreen('auth');
+              }}
+              onContinue={() => {
+                setIsRegistering(false);
+                setAuthScreen('auth');
+              }}
+            />
+          ) : (
           <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 font-sans antialiased">
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -3261,7 +3281,11 @@ export default function App() {
                   })()}
                 </h1>
                 <p className="apple-subhead text-[17px]">
-                  {isRegistering ? 'Leva um minuto.' : 'Entre na sua clínica.'}
+                  {isRegistering
+                    ? 'A partir de R$ 190 por mês.'
+                    : planSelection.fromQuery
+                      ? `${planSelection.sku === 'plus' ? 'OdontoHub+' : 'OdontoHub'} · ${planSelection.cycle === 'yearly' ? 'Anual' : 'Mensal'}.`
+                      : 'Entre na sua clínica.'}
                 </p>
               </motion.div>
 
@@ -3419,6 +3443,15 @@ export default function App() {
                   >
                     {isRegistering ? 'Já tem conta? Entrar ›' : 'Não tem conta? Cadastre-se ›'}
                   </motion.button>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setAuthScreen('plans')}
+                      className="text-[15px] text-[#86868b]"
+                    >
+                      Ver planos ›
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex justify-center items-center gap-3 text-[11px] text-[#86868b]">
@@ -3429,6 +3462,7 @@ export default function App() {
               </div>
             </motion.div>
           </div>
+          )
         ) : (
           <div className="min-h-screen bg-[#f5f5f7] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
@@ -3577,6 +3611,16 @@ export default function App() {
               </div>
             )}
 
+            {activeTab === 'dashboard' && !searchTerm && hubMigrationNotice && !plansOpen && (
+              <button
+                type="button"
+                onClick={() => setPlansOpen(true)}
+                className="w-full mb-4 rounded-[20px] bg-white px-5 py-4 text-left"
+              >
+                <p className="text-[15px] text-[#1d1d1f] leading-relaxed">{hubMigrationNotice}</p>
+                <p className="text-[13px] text-[#2997ff] mt-2">Assinar o OdontoHub ›</p>
+              </button>
+            )}
             {activeTab === 'dashboard' && !searchTerm && (
               <Dashboard 
                 user={user}
@@ -3613,6 +3657,7 @@ export default function App() {
                 suppressOnboarding={onboardingFlowOpen}
                 demoIntelligence={onboardingDemo?.dashboardIntelligence ?? null}
                 demoSchedulingSuggestions={onboardingDemo?.schedulingSuggestions}
+                plusEnabled={plusEnabled || Boolean(onboardingDemo)}
               />
             )}
 
@@ -5508,6 +5553,7 @@ export default function App() {
                 setActiveTab={setActiveTab}
                 onFillAgenda={() => setIsFillAgendaOpen(true)}
                 profile={profile}
+                plusEnabled={plusEnabled}
               />
             )}
 
@@ -5751,7 +5797,18 @@ export default function App() {
             )}
 
             {activeTab === 'inteligencia' && (
-              <MLInsights openPatientRecord={openPatientRecord} product={getCurrentProduct()} />
+              plusEnabled ? (
+                <MLInsights openPatientRecord={openPatientRecord} product={getCurrentProduct()} />
+              ) : (
+                <div className="max-w-lg mx-auto py-16 px-6 text-center">
+                  <p className="text-[13px] text-[#86868b] mb-2">OdontoHub+</p>
+                  <h2 className="apple-display-ink text-[28px]">Inteligência. O dia, resolvido.</h2>
+                  <p className="apple-subhead mt-3 mb-8">A inteligência que antecipa, encaixes e previsão de caixa.</p>
+                  <button type="button" onClick={() => { setHubSku('plus'); setHubCycle('yearly'); setPlansOpen(true); }} className="apple-btn">
+                    Assinar OdontoHub+
+                  </button>
+                </div>
+              )
             )}
 
             {activeTab === 'configuracoes' && user && !profile && (
@@ -6021,6 +6078,8 @@ export default function App() {
                   apiFetch={apiFetch}
                   product="odontohub"
                   currentPlan={getProductAccess('odontohub')?.plan || 'free'}
+                  initialSku={hubSku}
+                  initialCycle={hubCycle}
                 />
 
                 {/* ── LEGAL (minimal) ── */}
@@ -6469,7 +6528,7 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleCreatePatient} className="space-y-3">
-                  {/* Essencial: Nome */}
+                  {/* Nome */}
                   <div>
                     <input 
                       required
@@ -6481,7 +6540,7 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Essencial: Telefone */}
+                  {/* Telefone */}
                   <div>
                     <input 
                       required
@@ -7429,15 +7488,59 @@ export default function App() {
         clearLocalDemo={clearOnboardingDemo}
       />
     )}
-        <UpgradeLimitModal
+        <SubscribeHubModal
       data={upgradeLimitModal}
-      onClose={() => setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 })}
-      onUpgrade={() => {
-        setUpgradeLimitModal({ open: false, limit: 0, currentUsage: 0 });
-        setActiveTab('configuracoes');
-        navigate('/');
+      onClose={() => setUpgradeLimitModal({ open: false })}
+      onSubscribe={() => {
+        setUpgradeLimitModal({ open: false });
+        setHubSku('odontohub');
+        setHubCycle('yearly');
+        setPlansOpen(true);
       }}
     />
+    {user && plansOpen && !onboardingFlowOpen && (
+      <div className="fixed inset-0 z-[120] overflow-y-auto bg-white">
+        <HubPlansScreen
+          cycle={hubCycle}
+          selectedSku={hubSku}
+          busySku={hubCheckoutBusy}
+          currentSku={hubAccess.subscribed ? hubAccess.sku : null}
+          notice={hubMigrationNotice}
+          onCycleChange={setHubCycle}
+          onSubscribe={async (sku, cycle) => {
+            setHubSku(sku);
+            setHubCycle(cycle);
+            setHubCheckoutBusy(sku);
+            setHubCheckoutError(null);
+            const result = await startHubCheckout(apiFetch, sku, cycle);
+            if (result.error) {
+              setHubCheckoutError(result.error);
+              setHubCheckoutBusy(null);
+            }
+          }}
+          onContinue={() => {
+            try {
+              sessionStorage.setItem(PLANS_DISMISSED_STORAGE_KEY, '1');
+            } catch {
+              /* ignore */
+            }
+            clearStoredPlanQuery();
+            if (urlPlanRaw) {
+              const params = new URLSearchParams(location.search);
+              params.delete('plan');
+              const next = params.toString();
+              navigate({ pathname: location.pathname, search: next ? `?${next}` : '' }, { replace: true });
+            }
+            setPlansOpen(false);
+          }}
+        />
+        {hubCheckoutError && (
+          <p className="fixed bottom-6 left-1/2 -translate-x-1/2 text-[13px] text-[#ff3b30] bg-white px-4 py-2 rounded-full shadow">
+            {hubCheckoutError}
+          </p>
+        )}
+      </div>
+    )}
   </>
   );
 }

@@ -61,7 +61,7 @@ export const SubscriptionCallback: React.FC<SubscriptionCallbackProps> = ({
             </div>
             <h2 className="text-lg font-bold text-slate-800 mb-2">Assinatura ativada!</h2>
             <p className="text-sm text-slate-500 mb-6">
-              Seu plano foi atualizado com sucesso. Aproveite todos os recursos premium!
+              Sua assinatura está ativa.
             </p>
             <button
               onClick={onNavigate}
