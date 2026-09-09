@@ -228,6 +228,7 @@ interface FinanceProps {
   onFillAgenda: () => void;
   todayFreeSlots?: number;
   profile?: { name?: string; cro?: string; clinic_name?: string; clinic_address?: string; phone?: string; email?: string } | null;
+  plusEnabled?: boolean;
 }
 
 const currency = (value: number) =>
@@ -258,6 +259,7 @@ export function Finance({
   onFillAgenda,
   todayFreeSlots,
   profile,
+  plusEnabled = false,
 }: FinanceProps) {
   void financialSummary;
   void patients;
@@ -695,9 +697,11 @@ export function Finance({
       headlineColor = 'text-primary';
       subtitle = monthRevenue > 0
         ? `${currency(monthRevenue)} registrado${totalIncomeCount === 1 ? '' : 's'} — comparativos aparecem com mais histórico`
-        : 'Com poucos dados, mostramos só o essencial: o que entrou hoje e o que está pendente';
-      ctaLabel = freeSlots > 0 ? 'Agendar consulta' : 'Registrar primeira receita';
-      ctaAction = freeSlots > 0 ? 'schedule' : 'income';
+        : 'Com poucos dados, mostramos o que entrou hoje e o que está pendente';
+      if (!plusEnabled && ctaAction === 'schedule') {
+        ctaAction = 'agenda';
+        ctaLabel = 'Ver agenda';
+      }
       return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction, isEarlyStage };
     }
 
@@ -796,8 +800,18 @@ export function Finance({
       }
     }
 
+    if (!plusEnabled) {
+      if (ctaAction === 'schedule') {
+        ctaAction = 'agenda';
+        if (/encaixe|preencher|horários livres/i.test(ctaLabel)) ctaLabel = 'Ver agenda';
+      }
+      if (/projeção/i.test(subtitle)) {
+        subtitle = `${currency(monthRevenue)} neste mês`;
+      }
+    }
+
     return { headline, headlineIcon, headlineColor, subtitle, ctaLabel, ctaAction, isEarlyStage: false };
-  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount, todayFreeSlots, transactions]);
+  }, [monthRevenue, monthExpenses, netProfit, prevMonthRevenue, currentMonth, currentYear, now, todayAppointmentsCount, todayFreeSlots, transactions, plusEnabled]);
 
   const pendingItems = useMemo(() => insights?.pendingInstallments || [], [insights]);
 

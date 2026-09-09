@@ -473,8 +473,7 @@ export function OnboardingFlow({
                 transition={{ delay: 0.26, duration: 0.5, ease: easing }}
                 className="mt-4 text-[16px] text-white/75 leading-relaxed"
               >
-                A partir de agora, o OdontoHub vai te avisar quando um paciente precisar de você,
-                sugerir encaixes e cuidar do que costuma escapar.
+                A partir de agora, o OdontoHub cuida da agenda e do que costuma escapar.
               </motion.p>
               <motion.button
                 initial={{ opacity: 0, y: 12 }}

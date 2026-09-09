@@ -37,6 +37,7 @@ function input(now: Date, extra: Partial<ControlCenterInput> = {}): ControlCente
     noShowRescheduleCount: extra.noShowRescheduleCount ?? 0,
     patientCount: extra.patientCount ?? 12,
     freeSlotCount: extra.freeSlotCount ?? 0,
+    plusEnabled: extra.plusEnabled,
   };
 }
 
@@ -250,6 +251,25 @@ describe('control center widgets', () => {
       ],
     }));
     expect(view.widgets.some(widget => widget.id === 'caixa')).toBe(false);
+  });
+
+  it('hides encaixe when plus is off', () => {
+    const withPlus = deriveControlCenter(input(at('2026-09-02T11:00:00'), {
+      freeSlotCount: 4,
+      plusEnabled: true,
+      appointments: [
+        appt({ id: 1, start_time: '2026-09-02T14:00:00', end_time: '2026-09-02T14:40:00' }),
+      ],
+    }));
+    const withoutPlus = deriveControlCenter(input(at('2026-09-02T11:00:00'), {
+      freeSlotCount: 4,
+      plusEnabled: false,
+      appointments: [
+        appt({ id: 1, start_time: '2026-09-02T14:00:00', end_time: '2026-09-02T14:40:00' }),
+      ],
+    }));
+    expect(withPlus.widgets.some(widget => widget.id === 'encaixe')).toBe(true);
+    expect(withoutPlus.widgets.some(widget => widget.id === 'encaixe')).toBe(false);
   });
 });
 

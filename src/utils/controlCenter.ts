@@ -61,6 +61,7 @@ export interface ControlCenterInput {
   noShowRescheduleCount?: number;
   patientCount?: number;
   freeSlotCount?: number;
+  plusEnabled?: boolean;
 }
 
 export interface ControlVoice {
@@ -250,7 +251,8 @@ export function deriveClinicFacts(input: ControlCenterInput) {
     portalPendingCount: input.portalPendingCount || 0,
     noShowRescheduleCount: input.noShowRescheduleCount || 0,
     patientCount: input.patientCount || 0,
-    freeSlotCount: input.freeSlotCount || 0,
+    freeSlotCount: input.plusEnabled === false ? 0 : input.freeSlotCount || 0,
+    plusEnabled: input.plusEnabled !== false,
   };
 }
 
@@ -565,7 +567,7 @@ function buildLiveWidgets(facts: ClinicFacts): ControlWidget[] {
     });
   }
 
-  if (facts.freeSlotCount > 0 && facts.remaining.length <= 4 && facts.phase !== 'night') {
+  if (facts.plusEnabled && facts.freeSlotCount > 0 && facts.remaining.length <= 4 && facts.phase !== 'night') {
     widgets.push({
       id: 'encaixe',
       tab: 'agenda',

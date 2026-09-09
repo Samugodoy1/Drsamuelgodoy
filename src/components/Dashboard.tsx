@@ -124,6 +124,7 @@ interface DashboardProps {
   /** Client-side demonstration used when the API seed route is unavailable. */
   demoIntelligence?: DashboardIntelligence | null;
   demoSchedulingSuggestions?: SchedulingSuggestion[];
+  plusEnabled?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -234,6 +235,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   suppressOnboarding = false,
   demoIntelligence = null,
   demoSchedulingSuggestions,
+  plusEnabled = false,
 }) => {
   const [intelligence, setIntelligence] = useState<DashboardIntelligence | null>(null);
   const [schedulingSuggestions, setSchedulingSuggestions] = useState<SchedulingSuggestion[]>([]);
@@ -271,11 +273,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         headers['Authorization'] = `Bearer ${token}`;
         headers['x-auth-token'] = token;
       }
-      const [dashRes, schedRes, operationalRes, portalRes] = await Promise.all([
+      const portalRes = await fetch(`${API_URL}/api/portal/activity`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const });
+      if (portalRes.ok) {
+        const data = await portalRes.json();
+        if (data && typeof data === 'object') setPortalActivity(data);
+      }
+      if (!plusEnabled) {
+        setIntelligence(null);
+        setSchedulingSuggestions([]);
+        setOperationalInsight(null);
+        return;
+      }
+      const [dashRes, schedRes, operationalRes] = await Promise.all([
         fetch(`${API_URL}/api/intelligence/dashboard`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
         fetch(`${API_URL}/api/intelligence/scheduling`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
         fetch(`${API_URL}/api/intelligence/operational`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
-        fetch(`${API_URL}/api/portal/activity`, { headers, credentials: API_URL ? 'include' as const : 'same-origin' as const }),
       ]);
       if (dashRes.ok) {
         const data = await dashRes.json();
@@ -292,17 +304,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const data = await operationalRes.json();
         if (data?.text) setOperationalInsight(data);
       }
-      if (portalRes.ok) {
-        const data = await portalRes.json();
-        if (data && typeof data === 'object') setPortalActivity(data);
-      }
     } catch (e) {
       console.error('Dashboard intelligence fetch failed:', e);
     } finally {
       setLoading(false);
       intelligenceFetchingRef.current = false;
     }
-  }, [product, demoIntelligence, demoSchedulingSuggestions]);
+  }, [product, demoIntelligence, demoSchedulingSuggestions, plusEnabled]);
 
   useEffect(() => {
     void fetchIntelligence();
@@ -1362,9 +1370,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-1.5">
             <p className="text-[22px] font-semibold tracking-[-0.025em] text-[#1d1d1f]">Agenda livre</p>
             <p className="text-[15px] text-[#86868b]">
-              {availableSchedulingSuggestions.length > 0
-                ? `${availableSchedulingSuggestions.length} paciente${availableSchedulingSuggestions.length === 1 ? '' : 's'} aguardando encaixe`
-                : 'Nenhuma consulta por agora'}
+              Nenhuma consulta por agora
             </p>
           </div>
           <div className="flex w-full justify-center">
