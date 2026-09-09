@@ -1,9 +1,12 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ChevronRight } from '../icons';
 import { Link } from 'react-router-dom';
+import { HUB_NO_REFUND_LINE, HUB_PLANS, HUB_TRIAL_DAYS } from '../data/hubPlans';
 
 export const TermsPage = () => {
+  const hub = HUB_PLANS[0];
+  const plus = HUB_PLANS[1];
+
   return (
     <div className="min-h-screen bg-[#F7F8FA] py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 rounded-[32px] shadow-sm border border-black/5">
@@ -43,11 +46,31 @@ export const TermsPage = () => {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-bold text-[#0F172A]">6. Alterações nos Termos</h2>
+            <h2 className="text-xl font-bold text-[#0F172A]">6. Assinatura e cobrança</h2>
+            <p>
+              O OdontoHub é oferecido em dois planos: {hub.name} (R$ {hub.monthly.toLocaleString('pt-BR')} por mês ou R$ {hub.yearly.toLocaleString('pt-BR')} por ano) e {plus.name} (R$ {plus.monthly.toLocaleString('pt-BR')} por mês ou R$ {plus.yearly.toLocaleString('pt-BR')} por ano). O {plus.name} inclui tudo o que está no {hub.name}.
+            </p>
+            <p>
+              A primeira assinatura inclui {HUB_TRIAL_DAYS} dias sem cobrança. Nada é cobrado nesse período. Depois do mês incluso, a cobrança segue o ciclo escolhido (mensal ou anual). Você pode cancelar a qualquer momento; o cancelamento interrompe a renovação e o acesso permanece até o fim do período já coberto.
+            </p>
+            <p>
+              A cobrança só começa depois que você escolhe um plano. Quem já assina continua no plano vigente até o fim do ciclo pago.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold text-[#0F172A]">7. Reembolso</h2>
+            <p>
+              {HUB_NO_REFUND_LINE} Isso vale para cancelamento antecipado, uso parcial do período, desistência após a contratação ou qualquer outro motivo. Ao assinar, você declara estar ciente desta política.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold text-[#0F172A]">8. Alterações nos Termos</h2>
             <p>Reservamo-nos o direito de alterar estes termos a qualquer momento. O uso continuado da plataforma após alterações constitui aceitação dos novos termos.</p>
           </section>
 
-          <p className="pt-8 text-sm text-[#94A3B8] italic">Última atualização: 14 de Março de 2026</p>
+          <p className="pt-8 text-sm text-[#94A3B8] italic">Última atualização: 9 de setembro de 2026</p>
         </div>
       </div>
     </div>

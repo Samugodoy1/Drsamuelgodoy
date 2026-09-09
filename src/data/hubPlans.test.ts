@@ -1,16 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_HUB_SELECTION,
+  HUB_FROM_LINE,
+  HUB_HEADLINE,
   HUB_LEGAL_FOOTER,
+  HUB_NO_REFUND_LINE,
   HUB_PLANS,
   findMatchingHubApiPlan,
+  hubChargeAfterTrialLine,
   hubCheckoutPayload,
   hubYearlyPerMonth,
   hubYearlyPerMonthLine,
+  markShowPlansAfterSignup,
   parseHubPlanQuery,
+  shouldShowPlansAfterSignup,
   storeCheckoutIntent,
   takeCheckoutIntent,
   toPublicPlanQuery,
+  clearShowPlansAfterSignup,
 } from './hubPlans';
 
 describe('Hub catalog', () => {
@@ -47,6 +54,23 @@ describe('Hub catalog', () => {
     expect(blob).not.toMatch(/grátis para sempre/i);
     expect(blob).not.toMatch(/sem cartão/i);
     expect(blob.toLowerCase()).not.toContain('academy');
+    expect(HUB_HEADLINE).toBe('Escolha o seu plano.');
+    expect(HUB_FROM_LINE).toMatch(/primeiro mês/i);
+    expect(HUB_FROM_LINE).toMatch(/Nada é cobrado agora/);
+    expect(HUB_LEGAL_FOOTER).toMatch(/primeiro mês/i);
+    expect(HUB_LEGAL_FOOTER).toMatch(/Nada é cobrado/);
+    expect(HUB_LEGAL_FOOTER).toMatch(/Não trabalhamos com reembolso/);
+    expect(HUB_NO_REFUND_LINE).toMatch(/Não trabalhamos com reembolso/);
+    expect(HUB_LEGAL_FOOTER).not.toMatch(/renovação é automática/);
+  });
+
+  it('explains the included month before any charge', () => {
+    expect(hubChargeAfterTrialLine(HUB_PLANS[0], 'monthly')).toBe(
+      'Primeiro mês incluso. Depois, R$ 190/mês.',
+    );
+    expect(hubChargeAfterTrialLine(HUB_PLANS[0], 'yearly')).toBe(
+      'Primeiro mês incluso. Depois, R$ 158/mês, cobrado anualmente.',
+    );
   });
 });
 
@@ -67,7 +91,7 @@ describe('Landing query string', () => {
     expect(toPublicPlanQuery('plus', 'yearly')).toBe('plus-anual');
   });
 
-  it('defaults to the plans screen with yearly selected', () => {
+  it('defaults to yearly OdontoHub when no query is present', () => {
     expect(parseHubPlanQuery(null)).toEqual(DEFAULT_HUB_SELECTION);
     expect(parseHubPlanQuery('')).toEqual(DEFAULT_HUB_SELECTION);
     expect(parseHubPlanQuery('unknown')).toEqual(DEFAULT_HUB_SELECTION);
@@ -145,5 +169,22 @@ describe('Checkout intent', () => {
     storeCheckoutIntent('plus', 'yearly');
     expect(takeCheckoutIntent()).toEqual({ sku: 'plus', cycle: 'yearly' });
     expect(takeCheckoutIntent()).toBeNull();
+  });
+
+  it('remembers to show plans only after a new account', () => {
+    const memory = new Map<string, string>();
+    (globalThis as unknown as { sessionStorage: Storage }).sessionStorage = {
+      getItem: (k: string) => memory.get(k) ?? null,
+      setItem: (k: string, v: string) => { memory.set(k, v); },
+      removeItem: (k: string) => { memory.delete(k); },
+      clear: () => memory.clear(),
+      key: () => null,
+      length: 0,
+    };
+    expect(shouldShowPlansAfterSignup()).toBe(false);
+    markShowPlansAfterSignup();
+    expect(shouldShowPlansAfterSignup()).toBe(true);
+    clearShowPlansAfterSignup();
+    expect(shouldShowPlansAfterSignup()).toBe(false);
   });
 });

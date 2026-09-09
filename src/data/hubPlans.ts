@@ -54,10 +54,14 @@ export const HUB_PLANS: HubPlan[] = [
 
 export const HUB_FROM_MONTHLY = HUB_PLANS[0].monthly;
 
-export const HUB_HEADLINE = 'Assine o OdontoHub.';
-export const HUB_FROM_LINE = `A partir de R$ ${HUB_FROM_MONTHLY} por mês.`;
+export const HUB_HEADLINE = 'Escolha o seu plano.';
+export const HUB_FROM_LINE = 'O primeiro mês está incluso. Nada é cobrado agora.';
+export const HUB_NO_REFUND_LINE =
+  'Não trabalhamos com reembolso. Valores pagos não são devolvidos.';
 export const HUB_LEGAL_FOOTER =
-  'Um mês incluso na primeira assinatura. A renovação é automática. Cancele quando quiser. OdontoHub+ inclui tudo o que está no OdontoHub.';
+  'O primeiro mês entra na primeira assinatura. Nada é cobrado nesse período. Depois, segue o valor do plano escolhido. Cancele quando quiser. Não trabalhamos com reembolso. OdontoHub+ inclui tudo o que está no OdontoHub.';
+export const HUB_LEGAL_FOOTER_SUBSCRIBED =
+  'Cancele quando quiser. Não trabalhamos com reembolso. OdontoHub+ inclui tudo o que está no OdontoHub.';
 
 export const HUB_TRIAL_DAYS = 30;
 export const HUB_CURRENCY = 'BRL';
@@ -81,7 +85,7 @@ const PLAN_QUERY_ALIASES: Record<string, { sku: HubSku; cycle: HubCycle }> = {
 export type HubPlanSelection = {
   sku: HubSku;
   cycle: HubCycle;
-  /** True when the URL named a SKU (including aliases). False = plans screen, yearly default. */
+  /** True when the URL named a SKU (including aliases). False = catalog default (yearly). */
   fromQuery: boolean;
 };
 
@@ -114,6 +118,13 @@ export function hubYearlyPerMonth(plan: HubPlan): number {
 
 export function hubYearlyPerMonthLine(plan: HubPlan): string {
   return `R$ ${brl(hubYearlyPerMonth(plan))}/mês, cobrado anualmente.`;
+}
+
+export function hubChargeAfterTrialLine(plan: HubPlan, cycle: HubCycle): string {
+  if (cycle === 'yearly') {
+    return `Primeiro mês incluso. Depois, ${hubYearlyPerMonthLine(plan)}`;
+  }
+  return `Primeiro mês incluso. Depois, R$ ${brl(plan.monthly)}/mês.`;
 }
 
 export function toPublicPlanQuery(sku: HubSku, cycle: HubCycle): string {
@@ -255,6 +266,34 @@ export function takeCheckoutIntent(): { sku: HubSku; cycle: HubCycle } | null {
   }
 }
 export const PLANS_DISMISSED_STORAGE_KEY = 'odontohub.plansDismissed';
+export const SHOW_PLANS_AFTER_SIGNUP_KEY = 'odontohub.showPlansAfterSignup';
+
+export function markShowPlansAfterSignup(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(SHOW_PLANS_AFTER_SIGNUP_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearShowPlansAfterSignup(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.removeItem(SHOW_PLANS_AFTER_SIGNUP_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function shouldShowPlansAfterSignup(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(SHOW_PLANS_AFTER_SIGNUP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export function readStoredPlanQuery(): string | null {
   if (typeof sessionStorage === 'undefined') return null;

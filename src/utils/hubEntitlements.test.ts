@@ -64,6 +64,9 @@ describe('Hub entitlements', () => {
     expect(access.onTrialFromFree).toBe(true);
     expect(access.migration).toBe('trial_from_free');
     expect(migrationNotice(access)).toMatch(/um mês/i);
+    expect(migrationNotice(access)).toMatch(/Nada é cobrado agora/);
+    expect(migrationNotice(access)).not.toMatch(/renovação é automática/);
+    expect(migrationNotice(access)).not.toMatch(/R\$ 190/);
     expect(migrationNotice(access)).not.toMatch(/grátis para sempre/i);
     expect(migrationNotice(access)).not.toMatch(/Gratuito/);
   });
