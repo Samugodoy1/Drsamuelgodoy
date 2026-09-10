@@ -86,7 +86,7 @@ function CycleToggle({
 /** Product-in-use collage — same job as the Fitness+ photos: you already see yourself inside. */
 function DesireMosaic() {
   return (
-    <div className="grid grid-cols-2 gap-1.5 max-w-[420px] mx-auto">
+    <div className="grid grid-cols-2 gap-1.5 md:gap-2.5 max-w-[420px] md:max-w-[560px] mx-auto">
       <div className="rounded-[14px] overflow-hidden bg-[#1c2333] p-2.5 min-h-[78px] flex flex-col justify-between">
         <p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Agenda</p>
         <div>
