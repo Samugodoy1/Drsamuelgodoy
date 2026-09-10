@@ -31,7 +31,7 @@ import {
   X,
   Zap,
 } from '../icons';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { CLINICAL_PROCEDURES, getProcedureDefinition, resolveProcedureValue } from '../constants/clinicalProcedures';
 import { NovaEvolucao } from './NovaEvolucao';
 import { DentitionIndicator, DentitionRevealHint } from './DentitionIndicator';

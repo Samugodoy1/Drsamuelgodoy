@@ -254,7 +254,7 @@ interface ToothProps {
   buttonRef?: (el: HTMLButtonElement | null) => void;
 }
 
-const Tooth: React.FC<ToothProps> = ({
+const Tooth: React.FC<ToothProps> = React.memo(({
   number,
   status,
   selected,
@@ -322,7 +322,7 @@ const Tooth: React.FC<ToothProps> = ({
       )}
     </div>
   );
-};
+});
 
 interface ActionMenuProps {
   open: boolean;
@@ -543,7 +543,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   );
 };
 
-export const Odontogram: React.FC<OdontogramProps> = ({ 
+export const Odontogram: React.FC<OdontogramProps> = React.memo(({ 
   data = {}, 
   history = [], 
   onChange, 
@@ -1006,4 +1006,4 @@ export const Odontogram: React.FC<OdontogramProps> = ({
       )}
     </div>
   );
-};
+});

@@ -398,6 +398,11 @@
     100% { transform: rotate(-0.7deg) translateY(0); }
   }
 
+  .list-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 88px;
+  }
+
   .clinic-cc-jiggle {
     animation: clinic-cc-jiggle 0.24s ease-in-out infinite;
   }
@@ -467,10 +472,22 @@
   }
 }
 
+@media (max-width: 899px) {
+  .liquid-glass-tabbar,
+  .clinic-cc-mobile-chip,
+  .ios-glass,
+  .clinic-control-rail,
+  .clinic-cc-tile {
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

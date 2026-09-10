@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Calendar,
@@ -187,7 +187,7 @@ interface ClinicRailProps {
   onOpenPatient?: (id: number) => void;
 }
 
-export function ClinicRail({
+function ClinicRailComponent({
   activeTab,
   setActiveTab,
   setIsSidebarOpen,
@@ -615,3 +615,5 @@ export function ClinicRail({
     </aside>
   );
 }
+
+export const ClinicRail = React.memo(ClinicRailComponent);

@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from 'react';
 import { Routes, Route, useParams, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import { API_URL } from './config';
 import {
   Users,
@@ -46,32 +45,37 @@ import {
   Download,
   LinkIcon,
 } from './icons';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Odontogram } from './components/Odontogram';
-import { Documents } from './components/Documents';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { ClinicRail } from './components/ClinicRail';
 import { ClinicControlMobile } from './components/ClinicControlMobile';
-import { ControlCenterPreview } from './components/ControlCenterPreview';
-import { UiPolishPreview } from './components/UiPolishPreview';
 import { pickMobileGlance } from './utils/controlCenter';
-import { PatientClinical } from './components/PatientClinical';
-import { TermsPage, PrivacyPage } from './components/LegalPages';
-import { NovaEvolucao } from './components/NovaEvolucao';
 import { Dashboard } from './components/Dashboard';
-import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { buildOnboardingDemo, getOnboardingDemoPatient, isOnboardingDemoId, type OnboardingDemoSnapshot } from './components/onboarding/demoSeed';
 import { AppToast } from './components/AppToast';
-import { PortalLinkSheet } from './components/PortalLinkSheet';
-import { Finance } from './components/Finance';
-import FillAgendaModal, { computeTodayFreeSlotTimes } from './components/FillAgendaModal';
-import { PreAtendimento } from './components/PreAtendimento';
-import { PatientPortal } from './components/PatientPortal';
-import { PortalInbox } from './components/PortalInbox';
-import { MLInsights } from './components/MLInsights';
-import { SubscriptionManagement } from './components/SubscriptionManagement';
-import { HubPlansScreen } from './components/HubPlans';
-import AdminEngagement from './components/AdminEngagement';
-import { SubscriptionCallback } from './components/SubscriptionCallback';
+import { computeTodayFreeSlotTimes } from './utils/freeSlots';
+import { AppRouteFallback } from './components/AppRouteFallback';
+import { DebouncedSearchInput } from './components/DebouncedSearchInput';
+import { emptyList, indexByPatientId, PATIENT_LIST_PAGE_SIZE, replaceIfChanged, writeXlsxSheet } from './utils/perf';
+
+const Documents = lazy(() => import('./components/Documents').then((m) => ({ default: m.Documents })));
+const PatientClinical = lazy(() => import('./components/PatientClinical').then((m) => ({ default: m.PatientClinical })));
+const NovaEvolucao = lazy(() => import('./components/NovaEvolucao').then((m) => ({ default: m.NovaEvolucao })));
+const OnboardingFlow = lazy(() => import('./components/onboarding/OnboardingFlow').then((m) => ({ default: m.OnboardingFlow })));
+const PortalLinkSheet = lazy(() => import('./components/PortalLinkSheet').then((m) => ({ default: m.PortalLinkSheet })));
+const Finance = lazy(() => import('./components/Finance').then((m) => ({ default: m.Finance })));
+const FillAgendaModal = lazy(() => import('./components/FillAgendaModal'));
+const PreAtendimento = lazy(() => import('./components/PreAtendimento').then((m) => ({ default: m.PreAtendimento })));
+const PatientPortal = lazy(() => import('./components/PatientPortal').then((m) => ({ default: m.PatientPortal })));
+const PortalInbox = lazy(() => import('./components/PortalInbox').then((m) => ({ default: m.PortalInbox })));
+const MLInsights = lazy(() => import('./components/MLInsights').then((m) => ({ default: m.MLInsights })));
+const SubscriptionManagement = lazy(() => import('./components/SubscriptionManagement').then((m) => ({ default: m.SubscriptionManagement })));
+const HubPlansScreen = lazy(() => import('./components/HubPlans').then((m) => ({ default: m.HubPlansScreen })));
+const AdminEngagement = lazy(() => import('./components/AdminEngagement'));
+const SubscriptionCallback = lazy(() => import('./components/SubscriptionCallback').then((m) => ({ default: m.SubscriptionCallback })));
+const ControlCenterPreview = lazy(() => import('./components/ControlCenterPreview').then((m) => ({ default: m.ControlCenterPreview })));
+const UiPolishPreview = lazy(() => import('./components/UiPolishPreview').then((m) => ({ default: m.UiPolishPreview })));
+const TermsPage = lazy(() => import('./components/LegalPages').then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('./components/LegalPages').then((m) => ({ default: m.PrivacyPage })));
 import {
   PLANS_DISMISSED_STORAGE_KEY,
   clearShowPlansAfterSignup,
@@ -589,7 +593,10 @@ export default function App() {
     () => parseHubPlanQuery(urlPlanRaw || readStoredPlanQuery()),
     [location.search, urlPlanRaw],
   );
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia' | 'academy'>('dashboard');
+  const [activeTab, setActiveTabState] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia' | 'academy'>('dashboard');
+  const setActiveTab = useCallback((tab: typeof activeTab) => {
+    startTransition(() => setActiveTabState(tab));
+  }, []);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -636,10 +643,7 @@ export default function App() {
       'Dentista Responsável': profile?.name || user?.name
     }));
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pacientes");
-    XLSX.writeFile(wb, `Pacientes_${new Date().toLocaleDateString('en-CA')}.xlsx`);
+    void writeXlsxSheet(data, 'Pacientes', `Pacientes_${new Date().toLocaleDateString('en-CA')}.xlsx`);
     setIsExportModalOpen(false);
   };
 
@@ -710,10 +714,7 @@ export default function App() {
 
     const combinedData = [...transactionData, ...installmentData];
 
-    const ws = XLSX.utils.json_to_sheet(combinedData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Financeiro");
-    XLSX.writeFile(wb, `Financeiro_${new Date().toLocaleDateString('en-CA')}.xlsx`);
+    void writeXlsxSheet(combinedData, 'Financeiro', `Financeiro_${new Date().toLocaleDateString('en-CA')}.xlsx`);
     setIsExportModalOpen(false);
   };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -754,6 +755,7 @@ export default function App() {
   const [patientActionsToday, setPatientActionsToday] = useState<Set<number>>(new Set());
   const [patientsInlineFeedback, setPatientsInlineFeedback] = useState('');
   const [patientsSubView, setPatientsSubView] = useState<'list' | 'portal'>('list');
+  const [patientsVisibleCount, setPatientsVisibleCount] = useState(PATIENT_LIST_PAGE_SIZE);
   const [portalPendingCount, setPortalPendingCount] = useState(0);
   const [patientIntelligence, setPatientIntelligence] = useState<any[]>([]);
   const [patientIntelLoaded, setPatientIntelLoaded] = useState(false);
@@ -771,8 +773,11 @@ export default function App() {
   const weekDidDragRef = useRef(false);
 
   useEffect(() => {
-    if (activeTab !== 'dashboard' && activeTab !== 'agenda') return;
-    const timer = setInterval(() => setNow(new Date()), 60000);
+    if (activeTab !== 'dashboard' && activeTab !== 'agenda' && activeTab !== 'pacientes') return;
+    const tick = () => {
+      if (document.visibilityState === 'visible') setNow(new Date());
+    };
+    const timer = setInterval(tick, 60000);
     return () => clearInterval(timer);
   }, [activeTab]);
 
@@ -1335,45 +1340,92 @@ export default function App() {
       setLoading(false);
       return;
     }
+    let coreChanged = false;
     try {
-      const [pRes, aRes, fRes, sRes, plRes, iRes] = await Promise.all([
+      const [pRes, aRes] = await Promise.all([
         apiFetch('/api/patients', { explicitToken }),
         apiFetch('/api/appointments', { explicitToken }),
+      ]);
+
+      const pData = await pRes.json();
+      const aData = await aRes.json();
+
+      if (onboardingDemoActiveRef.current) {
+        setLoading(false);
+        return false;
+      }
+
+      if (Array.isArray(pData)) {
+        setPatients((prev) => {
+          const next = replaceIfChanged(prev, pData);
+          if (next !== prev) coreChanged = true;
+          return next;
+        });
+      }
+      if (Array.isArray(aData)) {
+        setAppointments((prev) => {
+          const next = replaceIfChanged(prev, aData);
+          if (next !== prev) coreChanged = true;
+          return next;
+        });
+      }
+
+      setLoading(false);
+
+      const [fRes, sRes, plRes, iRes] = await Promise.all([
         apiFetch('/api/finance', { explicitToken }),
         apiFetch('/api/finance/summary', { explicitToken }),
         apiFetch('/api/finance/payment-plans', { explicitToken }),
-        apiFetch('/api/finance/installments', { explicitToken })
+        apiFetch('/api/finance/installments', { explicitToken }),
       ]);
-      
-      const pData = await pRes.json();
-      const aData = await aRes.json();
+
       const fData = await fRes.json();
       const sData = await sRes.json();
       const plData = await plRes.json();
       const iData = await iRes.json();
 
-      if (onboardingDemoActiveRef.current) {
-        setLoading(false);
-        return;
-      }
-      
-      if (Array.isArray(pData)) setPatients(pData);
-      if (Array.isArray(aData)) setAppointments(aData);
-      if (Array.isArray(fData)) setTransactions(fData);
-      if (sData && !sData.error) setFinancialSummary(sData);
-      if (Array.isArray(plData)) setPaymentPlans(plData);
-      if (Array.isArray(iData)) setInstallments(iData);
+      if (onboardingDemoActiveRef.current) return coreChanged;
 
-      // Fetch patient intelligence (non-blocking)
+      if (Array.isArray(fData)) {
+        setTransactions((prev) => {
+          const next = replaceIfChanged(prev, fData);
+          if (next !== prev) coreChanged = true;
+          return next;
+        });
+      }
+      if (sData && !sData.error) {
+        setFinancialSummary((prev: any) => {
+          const next = replaceIfChanged(prev, sData);
+          if (next !== prev) coreChanged = true;
+          return next;
+        });
+      }
+      if (Array.isArray(plData)) {
+        setPaymentPlans((prev) => {
+          const next = replaceIfChanged(prev, plData);
+          if (next !== prev) coreChanged = true;
+          return next;
+        });
+      }
+      if (Array.isArray(iData)) {
+        setInstallments((prev) => {
+          const next = replaceIfChanged(prev, iData);
+          if (next !== prev) coreChanged = true;
+          return next;
+        });
+      }
+
       apiFetch('/api/intelligence/patients', { explicitToken })
         .then(r => r.json())
         .then(data => {
           if (onboardingDemoActiveRef.current) return;
-          if (Array.isArray(data)) { setPatientIntelligence(data); setPatientIntelLoaded(true); }
+          if (Array.isArray(data)) {
+            setPatientIntelligence((prev) => replaceIfChanged(prev, data));
+            setPatientIntelLoaded(true);
+          }
         })
         .catch(() => {});
 
-      // Fetch portal pending counts (non-blocking)
       apiFetch('/api/portal/appointment-requests', { explicitToken })
         .then(r => r.json())
         .then(data => {
@@ -1387,6 +1439,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+    return coreChanged;
   };
 
   const refreshAppData = async (explicitToken?: string) => {
@@ -1396,8 +1449,10 @@ export default function App() {
     }
     dataFetchingRef.current = true;
     try {
-      await fetchData(explicitToken);
-      setDataRefreshKey((key) => key + 1);
+      const changed = await fetchData(explicitToken);
+      if (changed) {
+        setDataRefreshKey((key) => key + 1);
+      }
       try {
         await refreshClinicalPatientRef.current?.();
       } catch (error) {
@@ -1418,7 +1473,7 @@ export default function App() {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible' || !userRef.current) return;
       const now = Date.now();
-      if (now - lastVisibilityRefreshRef.current < 5000) return;
+      if (now - lastVisibilityRefreshRef.current < 30000) return;
       lastVisibilityRefreshRef.current = now;
       void refreshAppDataRef.current();
     };
@@ -1796,128 +1851,135 @@ export default function App() {
     }
   };
 
-  // Dashboard Stats Calculations
-  const dashboardNow = new Date();
-  const dashboardMonth = dashboardNow.getMonth();
-  const dashboardYear = dashboardNow.getFullYear();
+  const appointmentsByPatientId = useMemo(
+    () => indexByPatientId(appointments),
+    [appointments],
+  );
 
-  const startOfWeek = new Date(dashboardNow);
-  startOfWeek.setDate(dashboardNow.getDate() - dashboardNow.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-  
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
+  const clinicStats = useMemo(() => {
+    const dashboardNow = now;
+    const todayKey = dashboardNow.toDateString();
+    const todayStr = dashboardNow.toLocaleDateString('en-CA');
 
-  const weeklyAppointmentsCount = appointments.filter(a => {
-    const d = new Date(a.start_time);
-    return d >= startOfWeek && d <= endOfWeek;
-  }).length;
+    const dailyRevenue = financialSummary?.todayRevenue !== undefined
+      ? financialSummary.todayRevenue
+      : transactions
+          .filter((t) => t.type === 'INCOME' && t.date?.split('T')[0] === todayStr)
+          .reduce((acc, t) => acc + Number(t.amount), 0);
 
-  const todayStr = new Date().toLocaleDateString('en-CA');
-  const dailyRevenue = financialSummary?.todayRevenue !== undefined 
-    ? financialSummary.todayRevenue 
-    : transactions
-        .filter(t => {
-          const tDate = t.date?.split('T')[0];
-          return t.type === 'INCOME' && tDate === todayStr;
-        })
-        .reduce((acc, t) => acc + Number(t.amount), 0);
+    const nextAppointments = appointments
+      .filter((a) =>
+        new Date(a.start_time).toDateString() === todayKey &&
+        new Date(a.start_time) >= dashboardNow &&
+        a.status !== 'FINISHED' &&
+        a.status !== 'CANCELLED' &&
+        a.status !== 'NO_SHOW'
+      )
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+      .slice(0, 5);
 
-  const todayIncome = transactions
-    .filter(t => t.type === 'INCOME' && t.date?.split('T')[0] === todayStr)
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-    
-  const todayExpense = transactions
-    .filter(t => t.type === 'EXPENSE' && t.date?.split('T')[0] === todayStr)
-    .reduce((acc, t) => acc + Number(t.amount), 0);
+    const todayAppointmentsTotalCount = appointments.filter(
+      (a) => new Date(a.start_time).toDateString() === todayKey,
+    ).length;
+    const todayFreeSlotsCount = computeTodayFreeSlotTimes(appointments, dashboardNow).length;
+    const todayAppointmentsRemainingCount = appointments.filter((a) =>
+      new Date(a.start_time).toDateString() === todayKey &&
+      a.status !== 'FINISHED' &&
+      a.status !== 'CANCELLED'
+    ).length;
 
-  const absencesToday = appointments.filter(a => 
-    new Date(a.start_time).toDateString() === dashboardNow.toDateString() && 
-    a.status === 'CANCELLED'
-  ).length;
+    const tomorrowStart = new Date(dashboardNow);
+    tomorrowStart.setDate(dashboardNow.getDate() + 1);
+    tomorrowStart.setHours(0, 0, 0, 0);
+    const tomorrowEnd = new Date(tomorrowStart);
+    tomorrowEnd.setHours(23, 59, 59, 999);
 
-  const proceduresToday = appointments.filter(a => 
-    new Date(a.start_time).toDateString() === dashboardNow.toDateString() && 
-    (a.status === 'FINISHED' || a.status === 'IN_PROGRESS')
-  ).length;
+    const tomorrowUnconfirmedAppointments = appointments
+      .filter((a) => {
+        const apptDate = new Date(a.start_time);
+        return apptDate >= tomorrowStart && apptDate <= tomorrowEnd && a.status !== 'CONFIRMED' && a.status !== 'CANCELLED';
+      })
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-  const nextAppointments = appointments
-    .filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString() && new Date(a.start_time) >= dashboardNow && a.status !== 'FINISHED' && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-    .slice(0, 5);
-
-  const todayAppointmentsTotalCount = appointments.filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString()).length;
-  const todayFreeSlotsCount = computeTodayFreeSlotTimes(appointments, dashboardNow).length;
-  const todayAppointmentsRemainingCount = appointments.filter(a => 
-    new Date(a.start_time).toDateString() === dashboardNow.toDateString() &&
-    a.status !== 'FINISHED' &&
-    a.status !== 'CANCELLED'
-  ).length;
-
-  const tomorrowStart = new Date(dashboardNow);
-  tomorrowStart.setDate(dashboardNow.getDate() + 1);
-  tomorrowStart.setHours(0, 0, 0, 0);
-  const tomorrowEnd = new Date(tomorrowStart);
-  tomorrowEnd.setHours(23, 59, 59, 999);
-
-  const tomorrowUnconfirmedAppointments = appointments.filter(a => {
-    const apptDate = new Date(a.start_time);
-    return apptDate >= tomorrowStart && apptDate <= tomorrowEnd && a.status !== 'CONFIRMED' && a.status !== 'CANCELLED';
-  }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  const tomorrowUnconfirmedCount = tomorrowUnconfirmedAppointments.length;
-
-  const tomorrowAppointments = appointments.filter(a => {
-    const apptDate = new Date(a.start_time);
-    return apptDate >= tomorrowStart && apptDate <= tomorrowEnd && a.status !== 'CANCELLED';
-  });
-  const tomorrowTotalCount = tomorrowAppointments.length;
-  const tomorrowConfirmedCount = tomorrowAppointments.filter(a => a.status === 'CONFIRMED').length;
-
-  const todayAppointmentsAll = appointments
-    .filter(a => new Date(a.start_time).toDateString() === dashboardNow.toDateString() && a.status !== 'CANCELLED')
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  const todayFirstAppointment = todayAppointmentsAll.find(a => a.status !== 'FINISHED' && a.status !== 'NO_SHOW')
-    ?? todayAppointmentsAll[0]
-    ?? null;
-
-  const noShowsNeedingReschedule = appointments
-    .filter(a => {
-      if (a.status !== 'NO_SHOW') return false;
+    const tomorrowAppointments = appointments.filter((a) => {
       const apptDate = new Date(a.start_time);
-      const cutoff = new Date(dashboardNow);
-      cutoff.setDate(cutoff.getDate() - 14);
-      if (apptDate < cutoff) return false;
-      const hasFuture = appointments.some(f =>
-        f.patient_id === a.patient_id &&
-        new Date(f.start_time) > dashboardNow &&
-        f.status !== 'CANCELLED' &&
-        f.status !== 'NO_SHOW'
-      );
-      return !hasFuture;
-    })
-    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+      return apptDate >= tomorrowStart && apptDate <= tomorrowEnd && a.status !== 'CANCELLED';
+    });
 
-  const weekStart = new Date(dashboardNow);
-  weekStart.setDate(dashboardNow.getDate() - 6);
-  weekStart.setHours(0, 0, 0, 0);
-  const weekRevenue = transactions
-    .filter(t => {
-      if (t.type !== 'INCOME') return false;
-      const tDate = t.date?.split('T')[0];
-      if (!tDate) return false;
-      const parsed = new Date(`${tDate}T12:00:00`);
-      return parsed >= weekStart && parsed <= dashboardNow;
-    })
-    .reduce((acc, t) => acc + Number(t.amount), 0);
+    const todayAppointmentsAll = appointments
+      .filter((a) => new Date(a.start_time).toDateString() === todayKey && a.status !== 'CANCELLED')
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-  const pendingReceivablesTotal = installments
-    .filter(i => i.status === 'PENDING' || i.status === 'OVERDUE')
-    .reduce((acc, i) => acc + Number(i.amount), 0);
+    const todayFirstAppointment = todayAppointmentsAll.find((a) => a.status !== 'FINISHED' && a.status !== 'NO_SHOW')
+      ?? todayAppointmentsAll[0]
+      ?? null;
 
-  const controlCenterSnapshot = {
+    const cutoff = new Date(dashboardNow);
+    cutoff.setDate(cutoff.getDate() - 14);
+    const noShowsNeedingReschedule = appointments
+      .filter((a) => {
+        if (a.status !== 'NO_SHOW') return false;
+        if (new Date(a.start_time) < cutoff) return false;
+        const siblings = appointmentsByPatientId.get(a.patient_id) || (emptyList() as Appointment[]);
+        return !siblings.some((f) =>
+          new Date(f.start_time) > dashboardNow &&
+          f.status !== 'CANCELLED' &&
+          f.status !== 'NO_SHOW'
+        );
+      })
+      .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+
+    const weekStart = new Date(dashboardNow);
+    weekStart.setDate(dashboardNow.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekRevenue = transactions
+      .filter((t) => {
+        if (t.type !== 'INCOME') return false;
+        const tDate = t.date?.split('T')[0];
+        if (!tDate) return false;
+        const parsed = new Date(`${tDate}T12:00:00`);
+        return parsed >= weekStart && parsed <= dashboardNow;
+      })
+      .reduce((acc, t) => acc + Number(t.amount), 0);
+
+    const pendingReceivablesTotal = installments
+      .filter((i) => i.status === 'PENDING' || i.status === 'OVERDUE')
+      .reduce((acc, i) => acc + Number(i.amount), 0);
+
+    return {
+      dailyRevenue,
+      nextAppointments,
+      todayAppointmentsTotalCount,
+      todayFreeSlotsCount,
+      todayAppointmentsRemainingCount,
+      tomorrowUnconfirmedAppointments,
+      tomorrowUnconfirmedCount: tomorrowUnconfirmedAppointments.length,
+      tomorrowTotalCount: tomorrowAppointments.length,
+      tomorrowConfirmedCount: tomorrowAppointments.filter((a) => a.status === 'CONFIRMED').length,
+      todayFirstAppointment,
+      noShowsNeedingReschedule,
+      weekRevenue,
+      pendingReceivablesTotal,
+    };
+  }, [appointments, appointmentsByPatientId, financialSummary, installments, now, transactions]);
+
+  const {
+    dailyRevenue,
+    nextAppointments,
+    todayAppointmentsTotalCount,
+    todayFreeSlotsCount,
+    todayAppointmentsRemainingCount,
+    tomorrowUnconfirmedAppointments,
+    tomorrowUnconfirmedCount,
+    tomorrowTotalCount,
+    tomorrowConfirmedCount,
+    todayFirstAppointment,
+    noShowsNeedingReschedule,
+    weekRevenue,
+    pendingReceivablesTotal,
+  } = clinicStats;
+
+  const controlCenterSnapshot = useMemo(() => ({
     appointments,
     todayRevenue: dailyRevenue,
     weekRevenue,
@@ -1927,23 +1989,22 @@ export default function App() {
     patientCount: patients.length,
     freeSlotCount: plusEnabled ? todayFreeSlotsCount : 0,
     plusEnabled,
-  };
+  }), [
+    appointments,
+    dailyRevenue,
+    noShowsNeedingReschedule.length,
+    patients.length,
+    pendingReceivablesTotal,
+    plusEnabled,
+    portalPendingCount,
+    todayFreeSlotsCount,
+    weekRevenue,
+  ]);
 
-  // Weekly Revenue Data for the Chart
-  const weeklyRevenueData = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dStr = d.toLocaleDateString('en-CA');
-    const amount = transactions
-      .filter(t => t.type === 'INCOME' && t.date?.split('T')[0] === dStr)
-      .reduce((acc, t) => acc + Number(t.amount), 0);
-    return {
-      day: d.toLocaleDateString('pt-BR', { weekday: 'short' }).charAt(0).toUpperCase(),
-      amount
-    };
-  });
-
-  const maxWeeklyRevenue = Math.max(...weeklyRevenueData.map(d => d.amount), 1);
+  const mobileGlanceCount = useMemo(
+    () => pickMobileGlance({ now, ...controlCenterSnapshot }, activeTab).length,
+    [activeTab, controlCenterSnapshot, now],
+  );
 
   const apiFetch = useCallback(async (url: string, options: any = {}) => {
     const demoPatientMatch = String(url).match(/\/api\/patients\/(\d+)/);
@@ -2247,9 +2308,9 @@ export default function App() {
     }
   };
 
-  const getPatientLastVisitDate = (patient: Patient) => {
-    const finishedAppointments = appointments
-      .filter(app => app.patient_id === patient.id && app.status === 'FINISHED')
+  const getPatientLastVisitDate = (patient: Patient, patientAppointments?: Appointment[]) => {
+    const finishedAppointments = (patientAppointments || appointmentsByPatientId.get(patient.id) || (emptyList() as Appointment[]))
+      .filter(app => app.status === 'FINISHED')
       .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
 
     if (finishedAppointments.length > 0) {
@@ -2331,25 +2392,22 @@ export default function App() {
   };
 
   const getPatientCardMeta = (patient: Patient) => {
-    const lastVisitDate = getPatientLastVisitDate(patient);
+    const patientAppointments = appointmentsByPatientId.get(patient.id) || (emptyList() as Appointment[]);
+    const lastVisitDate = getPatientLastVisitDate(patient, patientAppointments);
 
     // ── Derive clinical fields from real data ──────────────────────────────
 
     // hasActiveTreatment: treatment plan with open items OR a future scheduled/confirmed appointment
     const hasActiveTreatment =
       (patient.treatmentPlan?.some(plan => plan.status === 'PLANEJADO' || plan.status === 'APROVADO') ?? false) ||
-      appointments.some(app =>
-        app.patient_id === patient.id &&
+      patientAppointments.some(app =>
         new Date(app.start_time) > now &&
         app.status !== 'CANCELLED' && app.status !== 'FINISHED'
       );
 
     // nextVisitDate: nearest upcoming SCHEDULED/CONFIRMED appointment.
-    const scheduledAppointments = appointments
-      .filter(app =>
-        app.patient_id === patient.id &&
-        (app.status === 'SCHEDULED' || app.status === 'CONFIRMED')
-      )
+    const scheduledAppointments = patientAppointments
+      .filter(app => app.status === 'SCHEDULED' || app.status === 'CONFIRMED')
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     const nextVisitAppointment = scheduledAppointments.find(app => new Date(app.start_time) >= now) ?? null;
@@ -2434,6 +2492,23 @@ export default function App() {
     };
   };
 
+  const patientMetaById = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof getPatientCardMeta>>();
+    for (const patient of patients) {
+      map.set(patient.id, getPatientCardMeta(patient));
+    }
+    return map;
+  }, [appointmentsByPatientId, now, patients]);
+
+  const getCachedPatientMeta = useCallback(
+    (patient: { id: number }) => patientMetaById.get(patient.id) || getPatientCardMeta(patient as Patient),
+    [getPatientCardMeta, patientMetaById],
+  );
+
+  useEffect(() => {
+    setPatientsVisibleCount(PATIENT_LIST_PAGE_SIZE);
+  }, [patientListFilter, searchTerm]);
+
   // Auto-select most urgent filter when opening pacientes tab
   const patientsFilterAutoAppliedRef = useRef(false);
   useEffect(() => {
@@ -2443,7 +2518,7 @@ export default function App() {
     }
     if (loading || patientsFilterAutoAppliedRef.current || !patientIntelLoaded) return;
 
-    const counts = computePatientFilterCounts(patients, getPatientCardMeta, patientIntelligence, now);
+    const counts = computePatientFilterCounts(patients, getCachedPatientMeta, patientIntelligence, now);
     setPatientListFilter(PATIENT_FILTER_URGENCY.find(key => counts[key] > 0) ?? 'all');
     patientsFilterAutoAppliedRef.current = true;
   }, [activeTab, loading, patientIntelLoaded, patients, patientIntelligence, appointments, now]);
@@ -3153,6 +3228,7 @@ export default function App() {
 
   return (
     <>
+    <Suspense fallback={<AppRouteFallback />}>
     <Routes>
       {import.meta.env.DEV && <Route path="/dev/central" element={<ControlCenterPreview />} />}
       {import.meta.env.DEV && <Route path="/dev/ui" element={<UiPolishPreview />} />}
@@ -3191,6 +3267,7 @@ export default function App() {
               onOpenPatient={openPatientRecord}
             />
             <main className={`flex-1 min-w-0 overflow-x-hidden flex flex-col ${onboardingFlowOpen ? 'pt-14' : ''}`}>
+              <Suspense fallback={<AppRouteFallback />}>
               <ClinicalPageRoute 
                 transactions={transactions}
                 appointments={appointments}
@@ -3205,6 +3282,7 @@ export default function App() {
                 registerClinicalRefresh={registerClinicalRefresh}
                 onDataMutated={() => void refreshAppData()}
               />
+              </Suspense>
             </main>
           </div>
         ) : <Navigate to="/" />
@@ -3425,6 +3503,7 @@ export default function App() {
             </motion.div>
           </div>
         ) : (
+          <MotionConfig reducedMotion="user" transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}>
           <div className="min-h-screen bg-[#f5f5f7] flex font-sans text-slate-900 relative overflow-x-hidden">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
@@ -3459,7 +3538,7 @@ export default function App() {
       <main className={`flex-1 px-4 md:px-6 lg:px-8 w-full max-w-full print:p-0 md:pb-8 ${
         onboardingFlowOpen ? 'pt-[4.75rem] md:pt-20' : 'pt-4 md:pt-6 lg:pt-8'
       } ${
-        pickMobileGlance({ now, ...controlCenterSnapshot }, activeTab).length > 0
+        mobileGlanceCount > 0
           ? 'pb-[calc(8.25rem+env(safe-area-inset-bottom))]'
           : 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]'
       }`}>
@@ -3504,15 +3583,11 @@ export default function App() {
             </motion.div>
           );
         })()}
-        <AnimatePresence mode="wait">
-          <motion.div
+        <div
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="w-full max-w-screen-xl mx-auto px-0 md:px-4"
+            className="w-full max-w-screen-xl mx-auto px-0 md:px-4 animate-fade-in-up"
           >
+          <Suspense fallback={<AppRouteFallback />}>
             {searchTerm && activeTab !== 'pacientes' && (
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
                 <div className="flex justify-between items-center mb-4">
@@ -5049,7 +5124,7 @@ export default function App() {
               <div className="space-y-4 pt-10">
                 {(() => {
                   // ---------- stats ----------
-                  const allMetas = patients.map(p => ({ patient: p, meta: getPatientCardMeta(p) }));
+                  const allMetas = patients.map(p => ({ patient: p, meta: getCachedPatientMeta(p) }));
                   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
                   const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
                   const totalOverdue = allMetas.filter(x => x.meta.attentionStatus.key === 'overdue').length;
@@ -5109,7 +5184,7 @@ export default function App() {
                       (p.cpf && p.cpf.includes(searchTerm)) ||
                       p.phone.includes(searchTerm)
                     )
-                    .map(patient => ({ patient, meta: getPatientCardMeta(patient), intel: intelMap.get(patient.id) || null }))
+                    .map(patient => ({ patient, meta: getCachedPatientMeta(patient), intel: intelMap.get(patient.id) || null }))
                     .filter(({ meta, intel }) => matchesPatientListFilter(patientListFilter, meta, intel, now))
                     .sort((a, b) => {
                       // Sort by intelligence priority first, then by days since last visit
@@ -5127,7 +5202,7 @@ export default function App() {
                       return dateA - dateB;
                     });
 
-                  const filterCounts = computePatientFilterCounts(patients, getPatientCardMeta, patientIntelligence, now);
+                  const filterCounts = computePatientFilterCounts(patients, getCachedPatientMeta, patientIntelligence, now);
                   const filterChips = buildPatientFilterChips(filterCounts);
                   const activeFilterHeader = getPatientFilterHeader(patientListFilter);
 
@@ -5200,16 +5275,11 @@ export default function App() {
 
                         {patientsSubView === 'list' && (
                         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-full">
-                          <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input
-                              type="text"
-                              placeholder="Buscar paciente..."
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full h-10 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-full focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 transition-all text-base"
-                            />
-                          </div>
+                          <DebouncedSearchInput
+                            value={searchTerm}
+                            onChange={setSearchTerm}
+                            placeholder="Buscar paciente..."
+                          />
                           <button
                             type="button"
                             onClick={() => setIsPatientModalOpen(true)}
@@ -5328,11 +5398,10 @@ export default function App() {
 
                       {/* ── Card grid ── */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {patientCards.map(({ patient, meta, intel }) => {
+                        {patientCards.slice(0, patientsVisibleCount).map(({ patient, meta, intel }) => {
                           const isActed = patientActionsToday.has(patient.id);
-                          const nextAppointment = appointments
+                          const nextAppointment = (appointmentsByPatientId.get(patient.id) || (emptyList() as Appointment[]))
                             .filter(app =>
-                              app.patient_id === patient.id &&
                               new Date(app.start_time) >= now &&
                               !['CANCELLED', 'FINISHED', 'NO_SHOW'].includes(String(app.status || '').toUpperCase())
                             )
@@ -5352,7 +5421,7 @@ export default function App() {
                           return (
                             <div
                               key={patient.id}
-                              className={`flex items-stretch bg-white rounded-2xl border border-slate-100 border-l-[3px] ${urgencyStyle.cardBorder} hover:border-slate-200 hover:shadow-sm transition-all`}
+                              className={`list-row flex items-stretch bg-white rounded-2xl border border-slate-100 border-l-[3px] ${urgencyStyle.cardBorder} hover:border-slate-200 hover:shadow-sm transition-all`}
                             >
                               <div className="flex items-center gap-3.5 flex-1 min-w-0 px-4 py-3.5">
                                 <button
@@ -5467,6 +5536,18 @@ export default function App() {
                               </button>
                               <p className="text-[11px] text-slate-400 mt-3">Só precisa de nome e telefone</p>
                             </div>
+                          </div>
+                        )}
+
+                        {patientCards.length > patientsVisibleCount && (
+                          <div className="col-span-full flex justify-center pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setPatientsVisibleCount((count) => count + PATIENT_LIST_PAGE_SIZE)}
+                              className="px-4 py-2 rounded-full bg-slate-100 text-slate-600 text-sm font-semibold hover:bg-slate-200 transition-colors"
+                            >
+                              Mostrar mais {Math.min(PATIENT_LIST_PAGE_SIZE, patientCards.length - patientsVisibleCount)} pacientes
+                            </button>
                           </div>
                         )}
 
@@ -6103,8 +6184,8 @@ export default function App() {
                 <div className="h-4" />
               </div>
             )}
-          </motion.div>
-        </AnimatePresence>
+          </Suspense>
+          </div>
       </main>
 
       {/* Modal de Exportação */}
@@ -6217,6 +6298,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Modal inteligente de preenchimento de agenda (CTA do Financeiro) */}
+      <Suspense fallback={null}>
       <FillAgendaModal
         isOpen={isFillAgendaOpen}
         onClose={() => setIsFillAgendaOpen(false)}
@@ -6246,6 +6328,7 @@ export default function App() {
           openAppointmentModal();
         }}
       />
+      </Suspense>
 
       {/* Modal de Novo Agendamento — iOS Premium Minimalista */}
       <AnimatePresence>
@@ -7432,9 +7515,11 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+          </MotionConfig>
         )
       } />
     </Routes>
+    </Suspense>
     <AppToast
       notification={notification}
       offsetTop={onboardingFlowOpen}
@@ -7443,6 +7528,7 @@ export default function App() {
         if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
       }}
     />
+    <Suspense fallback={null}>
     <PortalLinkSheet data={portalLinkData} onClose={() => setPortalLinkData(null)} />
     {onboardingFlowOpen && (
       <OnboardingFlow
@@ -7510,6 +7596,7 @@ export default function App() {
         )}
       </div>
     )}
+    </Suspense>
   </>
   );
 }
