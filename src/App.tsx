@@ -595,7 +595,10 @@ export default function App() {
   );
   const [activeTab, setActiveTabState] = useState<'dashboard' | 'agenda' | 'pacientes' | 'financeiro' | 'documentos' | 'prontuario' | 'configuracoes' | 'admin' | 'portal' | 'inteligencia' | 'academy'>('dashboard');
   const setActiveTab = useCallback((tab: typeof activeTab) => {
-    startTransition(() => setActiveTabState(tab));
+    startTransition(() => {
+      setSearchTerm('');
+      setActiveTabState(tab);
+    });
   }, []);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -1126,6 +1129,7 @@ export default function App() {
   // Reset guide dismiss when user navigates to a different tab
   useEffect(() => {
     setGuideDismissedUntil(null);
+    setSearchTerm('');
   }, [activeTab]);
 
   useEffect(() => {
