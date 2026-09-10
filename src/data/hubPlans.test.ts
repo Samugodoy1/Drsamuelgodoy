@@ -9,6 +9,7 @@ import {
   findMatchingHubApiPlan,
   hubChargeAfterTrialLine,
   hubCheckoutPayload,
+  hubHeroFootnote,
   hubYearlyPerMonth,
   hubYearlyPerMonthLine,
   markShowPlansAfterSignup,
@@ -27,15 +28,13 @@ describe('Hub catalog', () => {
       name: 'OdontoHub',
       monthly: 190,
       yearly: 1900,
-      line: 'O sistema para o consultório.',
-      cta: 'Assinar OdontoHub',
+      cta: 'Começar com OdontoHub',
     });
     expect(HUB_PLANS[1]).toMatchObject({
       name: 'OdontoHub+',
       monthly: 290,
       yearly: 2900,
-      line: 'Inteligência. O dia, resolvido.',
-      cta: 'Assinar OdontoHub+',
+      cta: 'Quero o OdontoHub+',
       featured: true,
     });
     expect(hubYearlyPerMonth(HUB_PLANS[0])).toBe(158);
@@ -54,11 +53,10 @@ describe('Hub catalog', () => {
     expect(blob).not.toMatch(/grátis para sempre/i);
     expect(blob).not.toMatch(/sem cartão/i);
     expect(blob.toLowerCase()).not.toContain('academy');
-    expect(HUB_HEADLINE).toBe('Escolha o seu plano.');
-    expect(HUB_FROM_LINE).toMatch(/primeiro mês/i);
-    expect(HUB_FROM_LINE).toMatch(/Nada é cobrado agora/);
+    expect(HUB_HEADLINE).toBe('1 mês incluso');
+    expect(HUB_FROM_LINE).toMatch(/pacientes por perto/i);
     expect(HUB_LEGAL_FOOTER).toMatch(/primeiro mês/i);
-    expect(HUB_LEGAL_FOOTER).toMatch(/Nada é cobrado/);
+    expect(HUB_LEGAL_FOOTER).toMatch(/nada é cobrado agora/i);
     expect(HUB_LEGAL_FOOTER).toMatch(/Não trabalhamos com reembolso/);
     expect(HUB_NO_REFUND_LINE).toMatch(/Não trabalhamos com reembolso/);
     expect(HUB_LEGAL_FOOTER).not.toMatch(/renovação é automática/);
@@ -71,6 +69,11 @@ describe('Hub catalog', () => {
     expect(hubChargeAfterTrialLine(HUB_PLANS[0], 'yearly')).toBe(
       'Primeiro mês incluso. Depois, R$ 158/mês, cobrado anualmente.',
     );
+    expect(hubHeroFootnote('monthly')).toBe(
+      '1 mês incluso. Nada é cobrado agora; depois, R$ 190/mês.',
+    );
+    expect(hubHeroFootnote('yearly')).toMatch(/Nada é cobrado agora/);
+    expect(hubHeroFootnote('yearly')).toMatch(/158/);
   });
 });
 

@@ -73,6 +73,7 @@ import { HubPlansScreen } from './components/HubPlans';
 import AdminEngagement from './components/AdminEngagement';
 import { SubscriptionCallback } from './components/SubscriptionCallback';
 import {
+  HUB_SKIP,
   PLANS_DISMISSED_STORAGE_KEY,
   clearShowPlansAfterSignup,
   clearStoredPlanQuery,
@@ -7466,14 +7467,14 @@ export default function App() {
       }}
     />
     {user && plansOpen && !onboardingFlowOpen && (
-      <div className="fixed inset-0 z-[120] overflow-y-auto bg-white">
+      <div className="fixed inset-0 z-[120] overflow-y-auto bg-black">
         <HubPlansScreen
           cycle={hubCycle}
           selectedSku={hubSku}
           busySku={hubCheckoutBusy}
           currentSku={hubAccess.subscribed ? hubAccess.sku : null}
           notice={null}
-          continueLabel="Agora não ›"
+          continueLabel={`${HUB_SKIP} ›`}
           onCycleChange={setHubCycle}
           onSubscribe={async (sku, cycle) => {
             setHubSku(sku);

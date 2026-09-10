@@ -25,14 +25,14 @@ export const HUB_PLANS: HubPlan[] = [
     name: 'OdontoHub',
     monthly: 190,
     yearly: 1900,
-    line: 'O sistema para o consultório.',
-    cta: 'Assinar OdontoHub',
+    line: 'Sua rotina organizada, do primeiro horário ao último paciente.',
+    cta: 'Começar com OdontoHub',
     featured: false,
     features: [
-      'Agenda e confirmações',
-      'Prontuário e fotos',
-      'Pacientes ilimitados',
-      'O dia, numa lista',
+      'Agenda e confirmações sem correria',
+      'Cada prontuário e foto à mão',
+      'Espaço para todos os seus pacientes',
+      'Seu dia inteiro em uma lista',
     ],
   },
   {
@@ -40,28 +40,40 @@ export const HUB_PLANS: HubPlan[] = [
     name: 'OdontoHub+',
     monthly: 290,
     yearly: 2900,
-    line: 'Inteligência. O dia, resolvido.',
-    cta: 'Assinar OdontoHub+',
+    line: 'Mais visão para antecipar o que sua clínica precisa.',
+    cta: 'Quero o OdontoHub+',
     featured: true,
     features: [
-      'Tudo no OdontoHub',
-      'A inteligência que antecipa',
-      'Encaixes e retornos',
-      'Previsão de caixa',
+      'Tudo do OdontoHub com mais visão',
+      'IA que antecipa o próximo passo',
+      'Encaixes e retornos antes que escapem',
+      'Seu caixa previsto antes das decisões',
     ],
   },
 ];
 
 export const HUB_FROM_MONTHLY = HUB_PLANS[0].monthly;
 
-export const HUB_HEADLINE = 'Escolha o seu plano.';
-export const HUB_FROM_LINE = 'O primeiro mês está incluso. Nada é cobrado agora.';
+export const HUB_HEADLINE = '1 mês incluso';
+export const HUB_FROM_LINE =
+  'Tenha pacientes por perto, o dia sob controle e mais tempo para cuidar.';
+export const HUB_HERO_CTA = 'Começar meu mês incluso';
+export const HUB_YEARLY_LINK = 'Veja o plano anual';
+export const HUB_PLUS_FOMO =
+  'Sem o Plus, encaixes, retornos e receita continuam escapando.';
+export const HUB_PLUS_CTA = HUB_PLANS[1].cta;
+export const HUB_SKIP = 'Deixar para depois';
+export const HUB_COMPARE_TITLE = 'O que sua clínica ganha com cada plano';
 export const HUB_NO_REFUND_LINE =
   'Não trabalhamos com reembolso. Valores pagos não são devolvidos.';
 export const HUB_LEGAL_FOOTER =
-  'O primeiro mês entra na primeira assinatura. Nada é cobrado nesse período. Depois, segue o valor do plano escolhido. Cancele quando quiser. Não trabalhamos com reembolso. OdontoHub+ inclui tudo o que está no OdontoHub.';
+  'Seu primeiro mês está incluso e nada é cobrado agora. Depois, o plano escolhido é cobrado; cancele quando quiser. Não trabalhamos com reembolso.';
 export const HUB_LEGAL_FOOTER_SUBSCRIBED =
   'Cancele quando quiser. Não trabalhamos com reembolso. OdontoHub+ inclui tudo o que está no OdontoHub.';
+export const HUB_YEARLY_SAVINGS = {
+  odontohub: 'Economize R$ 380 por ano.',
+  plus: 'Economize R$ 580 por ano.',
+} as const;
 
 export const HUB_TRIAL_DAYS = 30;
 export const HUB_CURRENCY = 'BRL';
@@ -125,6 +137,13 @@ export function hubChargeAfterTrialLine(plan: HubPlan, cycle: HubCycle): string 
     return `Primeiro mês incluso. Depois, ${hubYearlyPerMonthLine(plan)}`;
   }
   return `Primeiro mês incluso. Depois, R$ ${brl(plan.monthly)}/mês.`;
+}
+
+export function hubHeroFootnote(cycle: HubCycle): string {
+  if (cycle === 'yearly') {
+    return `1 mês incluso. Nada é cobrado agora; depois, R$ ${brl(hubYearlyPerMonth(HUB_PLANS[0]))}/mês, cobrado anualmente.`;
+  }
+  return `1 mês incluso. Nada é cobrado agora; depois, R$ ${brl(HUB_PLANS[0].monthly)}/mês.`;
 }
 
 export function toPublicPlanQuery(sku: HubSku, cycle: HubCycle): string {
