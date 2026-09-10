@@ -140,7 +140,8 @@ export function resolveHubAccess(input: {
   }
 
   const subscribed = paidStatus || canonical === 'plus' || canonical === 'odontohub';
-  const plusEnabled = sku === 'plus';
+  /** First month is the full product. Paid Hub does not keep Plus. */
+  const plusEnabled = sku === 'plus' || onTrialFromFree;
 
   return {
     sku,
@@ -153,8 +154,8 @@ export function resolveHubAccess(input: {
 }
 
 export function hasHubFeature(sku: HubSku | 'trial', feature: HubFeature): boolean {
-  const resolved: HubSku = sku === 'trial' ? 'odontohub' : sku;
-  if (PLUS_ONLY.has(feature)) return resolved === 'plus';
+  if (sku === 'trial') return true;
+  if (PLUS_ONLY.has(feature)) return sku === 'plus';
   return BASE_FEATURES.includes(feature) || PLUS_FEATURES.includes(feature);
 }
 
@@ -169,7 +170,7 @@ export function nextCycleAmount(sku: HubSku, cycle: HubCycle): number {
 
 export function migrationNotice(access: CanonicalHubAccess): string | null {
   if (access.migration === 'trial_from_free') {
-    return 'Você tem um mês para usar o OdontoHub. Nada é cobrado agora. Quando quiser, escolha um plano.';
+    return 'Neste mês você usa o OdontoHub+ inteiro. Nada é cobrado agora. Depois, escolha se continua com a inteligência ou só com o consultório.';
   }
   if (access.migration === 'essencial_to_odontohub') {
     return 'Você continua no OdontoHub. O valor atual vale até o fim deste ciclo. Depois, R$ 190 por mês ou R$ 1.900 por ano.';

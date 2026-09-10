@@ -54,8 +54,8 @@ describe('Hub catalog', () => {
     expect(blob).not.toMatch(/sem cartão/i);
     expect(blob.toLowerCase()).not.toContain('academy');
     expect(HUB_HEADLINE).toBe('1 mês incluso');
-    expect(HUB_FROM_LINE).toMatch(/pacientes por perto/i);
-    expect(HUB_LEGAL_FOOTER).toMatch(/primeiro mês/i);
+    expect(HUB_FROM_LINE).toMatch(/OdontoHub\+/);
+    expect(HUB_LEGAL_FOOTER).toMatch(/OdontoHub\+/);
     expect(HUB_LEGAL_FOOTER).toMatch(/nada é cobrado agora/i);
     expect(HUB_LEGAL_FOOTER).toMatch(/Não trabalhamos com reembolso/);
     expect(HUB_NO_REFUND_LINE).toMatch(/Não trabalhamos com reembolso/);
@@ -69,11 +69,10 @@ describe('Hub catalog', () => {
     expect(hubChargeAfterTrialLine(HUB_PLANS[0], 'yearly')).toBe(
       'Primeiro mês incluso. Depois, R$ 158/mês, cobrado anualmente.',
     );
-    expect(hubHeroFootnote('monthly')).toBe(
-      '1 mês incluso. Nada é cobrado agora; depois, R$ 190/mês.',
-    );
-    expect(hubHeroFootnote('yearly')).toMatch(/Nada é cobrado agora/);
-    expect(hubHeroFootnote('yearly')).toMatch(/158/);
+    expect(hubHeroFootnote('monthly')).toMatch(/OdontoHub\+/);
+    expect(hubHeroFootnote('monthly')).toMatch(/Nada é cobrado agora/);
+    expect(hubHeroFootnote('yearly')).toMatch(/OdontoHub a partir de R\$ 190/);
+    expect(hubHeroFootnote('yearly')).toMatch(/OdontoHub\+ a partir de R\$ 290/);
   });
 });
 

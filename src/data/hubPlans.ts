@@ -56,18 +56,18 @@ export const HUB_FROM_MONTHLY = HUB_PLANS[0].monthly;
 
 export const HUB_HEADLINE = '1 mês incluso';
 export const HUB_FROM_LINE =
-  'Tenha pacientes por perto, o dia sob controle e mais tempo para cuidar.';
+  'Neste mês você usa o OdontoHub+ inteiro. IA, encaixes, o dia resolvido.';
 export const HUB_HERO_CTA = 'Começar meu mês incluso';
-export const HUB_YEARLY_LINK = 'Veja o plano anual';
+export const HUB_YEARLY_LINK = 'Escolher o plano depois';
 export const HUB_PLUS_FOMO =
-  'Sem o Plus, encaixes, retornos e receita continuam escapando.';
+  'No fim do mês, sem o Plus a inteligência some. Encaixes e retornos voltam a escapar.';
 export const HUB_PLUS_CTA = HUB_PLANS[1].cta;
 export const HUB_SKIP = 'Deixar para depois';
-export const HUB_COMPARE_TITLE = 'O que sua clínica ganha com cada plano';
+export const HUB_COMPARE_TITLE = 'Depois do mês, o que você quer manter';
 export const HUB_NO_REFUND_LINE =
   'Não trabalhamos com reembolso. Valores pagos não são devolvidos.';
 export const HUB_LEGAL_FOOTER =
-  'Seu primeiro mês está incluso e nada é cobrado agora. Depois, o plano escolhido é cobrado; cancele quando quiser. Não trabalhamos com reembolso.';
+  'Neste mês o OdontoHub+ está incluso. Nada é cobrado agora. Depois, escolha OdontoHub ou OdontoHub+; cancele quando quiser. Não trabalhamos com reembolso.';
 export const HUB_LEGAL_FOOTER_SUBSCRIBED =
   'Cancele quando quiser. Não trabalhamos com reembolso. OdontoHub+ inclui tudo o que está no OdontoHub.';
 export const HUB_YEARLY_SAVINGS = {
@@ -139,11 +139,8 @@ export function hubChargeAfterTrialLine(plan: HubPlan, cycle: HubCycle): string 
   return `Primeiro mês incluso. Depois, R$ ${brl(plan.monthly)}/mês.`;
 }
 
-export function hubHeroFootnote(cycle: HubCycle): string {
-  if (cycle === 'yearly') {
-    return `1 mês incluso. Nada é cobrado agora; depois, R$ ${brl(hubYearlyPerMonth(HUB_PLANS[0]))}/mês, cobrado anualmente.`;
-  }
-  return `1 mês incluso. Nada é cobrado agora; depois, R$ ${brl(HUB_PLANS[0].monthly)}/mês.`;
+export function hubHeroFootnote(_cycle: HubCycle): string {
+  return 'Neste mês o OdontoHub+ está incluso. Nada é cobrado agora. Depois, OdontoHub a partir de R$ 190/mês ou OdontoHub+ a partir de R$ 290/mês.';
 }
 
 export function toPublicPlanQuery(sku: HubSku, cycle: HubCycle): string {

@@ -366,7 +366,10 @@ export function HubPlansScreen({
             <div className="mt-8 max-w-[400px] mx-auto">
               <button
                 type="button"
-                onClick={() => onSubscribe('odontohub', cycle)}
+                onClick={() => {
+                  if (onContinue) onContinue();
+                  else onSubscribe('odontohub', cycle);
+                }}
                 disabled={busySku === 'odontohub'}
                 className="w-full rounded-full bg-[#ccf53f] text-black text-[17px] font-semibold py-3.5 disabled:opacity-50"
               >

@@ -51,7 +51,7 @@ export const TermsPage = () => {
               O OdontoHub é oferecido em dois planos: {hub.name} (R$ {hub.monthly.toLocaleString('pt-BR')} por mês ou R$ {hub.yearly.toLocaleString('pt-BR')} por ano) e {plus.name} (R$ {plus.monthly.toLocaleString('pt-BR')} por mês ou R$ {plus.yearly.toLocaleString('pt-BR')} por ano). O {plus.name} inclui tudo o que está no {hub.name}.
             </p>
             <p>
-              A primeira assinatura inclui {HUB_TRIAL_DAYS} dias sem cobrança. Nada é cobrado nesse período. Depois do mês incluso, a cobrança segue o ciclo escolhido (mensal ou anual). Você pode cancelar a qualquer momento; o cancelamento interrompe a renovação e o acesso permanece até o fim do período já coberto.
+              A primeira assinatura inclui {HUB_TRIAL_DAYS} dias do OdontoHub+ completo (agenda, prontuário, IA, encaixes, retornos e previsão de caixa), sem cobrança. Nada é cobrado nesse período. Depois do mês incluso, você escolhe OdontoHub ou OdontoHub+ e a cobrança segue o ciclo escolhido. Você pode cancelar a qualquer momento; o cancelamento interrompe a renovação e o acesso permanece até o fim do período já coberto.
             </p>
             <p>
               A cobrança só começa depois que você escolhe um plano. Quem já assina continua no plano vigente até o fim do ciclo pago.
