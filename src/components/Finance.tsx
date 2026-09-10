@@ -237,7 +237,7 @@ const currency = (value: number) =>
 const TRANSACTIONS_PAGE_SIZE = 10;
 const OLDER_TRANSACTIONS_PREVIEW_COUNT = 4;
 
-export function Finance({
+function FinanceComponent({
   transactions,
   paymentPlans,
   installments,
@@ -3022,3 +3022,5 @@ export function Finance({
     </>
   );
 }
+
+export const Finance = React.memo(FinanceComponent);

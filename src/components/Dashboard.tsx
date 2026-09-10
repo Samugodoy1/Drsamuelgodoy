@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../config';
 import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, AlertCircle } from '../icons';
 import type { PortalActivity } from '../types/portal';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -200,7 +200,7 @@ function suggestionConflictsWithAppointments(suggestion: SchedulingSuggestion, a
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const Dashboard: React.FC<DashboardProps> = ({
+export const Dashboard: React.FC<DashboardProps> = React.memo(({
   user,
   patients = [],
   appointments = [],
@@ -247,8 +247,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const intelligenceFetchingRef = useRef(false);
   const skipRefreshKeyEffectRef = useRef(true);
 
+  const lastFetchAtRef = useRef(0);
+
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
+    const tick = () => {
+      if (document.visibilityState === 'visible') setNow(new Date());
+    };
+    const t = setInterval(tick, 60_000);
     return () => clearInterval(t);
   }, []);
 
@@ -265,7 +270,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return;
     }
     if (intelligenceFetchingRef.current) return;
+    if (Date.now() - lastFetchAtRef.current < 12000) return;
     intelligenceFetchingRef.current = true;
+    lastFetchAtRef.current = Date.now();
     try {
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = { 'Accept': 'application/json', 'x-product': product };
@@ -805,8 +812,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     );
   };
 
-  // ─── Render ─────────────────────────────────────────────────────────────
-
   // ─── Onboarding: welcome + guided setup ──────────────────────────────
   const hasPatients = patients.length > 0;
   const hasAppointments = totalAppointmentsCount > 0;
@@ -1143,6 +1148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
+    <MotionConfig reducedMotion="always">
     <div className="flex flex-col gap-10 pb-6 pt-6 px-1 sm:px-5 max-w-2xl mx-auto">
       {/* 1. HEADER + CONTEXTO PRÉ-HERO */}
       <div className="space-y-5">
@@ -1820,5 +1826,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
     </div>
+    </MotionConfig>
   );
-};
+});
