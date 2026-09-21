@@ -44,6 +44,8 @@ import {
   Mail,
   Download,
   LinkIcon,
+  Eye,
+  EyeOff,
 } from './icons';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { ClinicRail } from './components/ClinicRail';
@@ -241,6 +243,11 @@ interface Dentist {
   photo_url?: string;
   clinic_name?: string;
   clinic_address?: string;
+  clinic_city?: string;
+  clinic_state?: string;
+  clinic_neighborhood?: string;
+  care_visible?: boolean;
+  care_published?: boolean;
   accepted_terms?: boolean;
   accepted_terms_at?: string;
   accepted_privacy_policy?: boolean;
@@ -1242,6 +1249,9 @@ export default function App() {
     photo_url: source.photo_url,
     clinic_name: source.clinic_name,
     clinic_address: source.clinic_address,
+    clinic_city: source.clinic_city,
+    clinic_state: source.clinic_state,
+    clinic_neighborhood: source.clinic_neighborhood,
     password,
   });
 
@@ -1695,6 +1705,26 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error updating user status:', error);
+    }
+  };
+
+  const updateCareVisibility = async (userId: number, visible: boolean) => {
+    try {
+      const res = await apiFetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        product: ODONTOHUB_PRODUCT,
+        body: JSON.stringify({ product: ODONTOHUB_PRODUCT, care_visible: visible })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showNotification(data.error || 'Erro ao atualizar o OdontoHub Care', 'error');
+        return;
+      }
+      await fetchAdminUsers();
+      showNotification(visible ? 'Dentista recolocado no Care.' : 'Dentista removido do Care.');
+    } catch (error) {
+      console.error('Error updating Care visibility:', error);
+      showNotification('Erro ao atualizar o OdontoHub Care', 'error');
     }
   };
 
@@ -5666,7 +5696,9 @@ export default function App() {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                     <div>
                       <h3 className="text-xl md:text-2xl font-bold text-slate-900">Gestão de Dentistas</h3>
-                      <p className="text-slate-500 text-sm">Gerencie os profissionais da sua clínica</p>
+                      <p className="text-slate-500 text-sm">
+                        Gerencie o acesso ao sistema e a publicação no OdontoHub Care
+                      </p>
                     </div>
                     <button 
                       onClick={() => setIsDentistModalOpen(true)}
@@ -5710,6 +5742,7 @@ export default function App() {
                             <th className="px-6 py-4">Usuário</th>
                             <th className="px-6 py-4">E-mail</th>
                             <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Care</th>
                             <th className="px-6 py-4 text-right">Ações</th>
                           </tr>
                         </thead>
@@ -5744,6 +5777,21 @@ export default function App() {
                                   {u.status === 'active' ? 'Ativo' : 'Bloqueado'}
                                 </span>
                               </td>
+                              <td className="px-6 py-4">
+                                {u.role === 'ADMIN' ? (
+                                  <span className="text-xs text-slate-400">—</span>
+                                ) : (
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                    u.care_published
+                                      ? 'bg-sky-100 text-sky-700'
+                                      : u.care_visible
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-slate-100 text-slate-500'
+                                  }`}>
+                                    {u.care_published ? 'Publicado' : u.care_visible ? 'Aguardando acesso' : 'Removido'}
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 text-right">
                                 <div className="flex justify-end gap-2">
                                   <button 
@@ -5769,6 +5817,20 @@ export default function App() {
                                       className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-700 transition-colors"
                                     >
                                       Desativar
+                                    </button>
+                                  )}
+                                  {u.role !== 'ADMIN' && (
+                                    <button
+                                      onClick={() => updateCareVisibility(u.id, !u.care_visible)}
+                                      className={`p-1.5 rounded-lg transition-colors ${
+                                        u.care_visible
+                                          ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                          : 'bg-sky-600 text-white hover:bg-sky-700'
+                                      }`}
+                                      title={u.care_visible ? 'Remover do Care' : 'Recolocar no Care'}
+                                      aria-label={u.care_visible ? `Remover ${u.name} do Care` : `Recolocar ${u.name} no Care`}
+                                    >
+                                      {u.care_visible ? <EyeOff size={15} /> : <Eye size={15} />}
                                     </button>
                                   )}
                                 </div>
@@ -5809,6 +5871,17 @@ export default function App() {
                             </span>
                           </div>
                           <p className="text-xs text-slate-500">{u.email}</p>
+                          {u.role !== 'ADMIN' && (
+                            <p className={`text-[10px] font-bold uppercase ${
+                              u.care_published
+                                ? 'text-sky-700'
+                                : u.care_visible
+                                  ? 'text-amber-700'
+                                  : 'text-slate-500'
+                            }`}>
+                              Care: {u.care_published ? 'publicado' : u.care_visible ? 'aguardando acesso' : 'removido'}
+                            </p>
+                          )}
                           <div className="flex gap-2">
                             <button 
                               onClick={() => {
@@ -5833,6 +5906,18 @@ export default function App() {
                                 className="flex-1 py-2 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-700 transition-colors"
                               >
                                 Desativar
+                              </button>
+                            )}
+                            {u.role !== 'ADMIN' && (
+                              <button
+                                onClick={() => updateCareVisibility(u.id, !u.care_visible)}
+                                className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${
+                                  u.care_visible
+                                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    : 'bg-sky-600 text-white hover:bg-sky-700'
+                                }`}
+                              >
+                                {u.care_visible ? 'Remover do Care' : 'Recolocar no Care'}
                               </button>
                             )}
                           </div>
@@ -5979,7 +6064,7 @@ export default function App() {
                     </div>
 
                     {/* Clinic Section (dentist only) */}
-                    {user.role === 'DENTIST' && (profile.clinic_name || profile.clinic_address) && (
+                    {user.role === 'DENTIST' && (
                       <div className="bg-white rounded-[28px] p-6 space-y-4">
                         <h3 className="text-[13px] font-normal text-[#86868b]">Clínica</h3>
                         <div className="space-y-3">
@@ -6000,6 +6085,24 @@ export default function App() {
                                 <p className="text-sm text-slate-800 font-medium">{profile.clinic_address}</p>
                               </div>
                             </div>
+                          )}
+                          {(profile.clinic_city || profile.clinic_state) && (
+                            <div className="flex items-center gap-3">
+                              <MapPin size={16} className="text-slate-300 shrink-0" />
+                              <div>
+                                <p className="text-[11px] text-slate-400">Cidade</p>
+                                <p className="text-sm text-slate-800 font-medium">
+                                  {[profile.clinic_neighborhood, profile.clinic_city, profile.clinic_state]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          {!profile.clinic_name && !profile.clinic_address && !profile.clinic_city && (
+                            <p className="text-sm text-[#86868b]">
+                              Complete os dados da clínica para melhorar seu perfil no OdontoHub Care.
+                            </p>
                           )}
                         </div>
                       </div>
@@ -6088,6 +6191,30 @@ export default function App() {
                               onChange={(e) => updateProfileDraft({ clinic_address: e.target.value })}
                               className="ios-input w-full"
                               placeholder="Rua Exemplo, 123 - Centro" />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_96px] gap-4">
+                            <div>
+                              <label className="text-[11px] text-slate-400 mb-1.5 block">Cidade</label>
+                              <input type="text" value={profileDraft.clinic_city || ''}
+                                onChange={(e) => updateProfileDraft({ clinic_city: e.target.value })}
+                                className="ios-input w-full"
+                                placeholder="Taubaté" />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-400 mb-1.5 block">UF</label>
+                              <input type="text" value={profileDraft.clinic_state || ''}
+                                onChange={(e) => updateProfileDraft({ clinic_state: e.target.value.toUpperCase().slice(0, 2) })}
+                                className="ios-input w-full"
+                                maxLength={2}
+                                placeholder="SP" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-slate-400 mb-1.5 block">Bairro</label>
+                            <input type="text" value={profileDraft.clinic_neighborhood || ''}
+                              onChange={(e) => updateProfileDraft({ clinic_neighborhood: e.target.value })}
+                              className="ios-input w-full"
+                              placeholder="Centro" />
                           </div>
                         </div>
                       </div>
