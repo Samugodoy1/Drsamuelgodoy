@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ChevronDown, Check, Phone, ClipboardList, MessageCircle } from '../../icons';
+import { ArrowRight, Building2, ChevronDown, Check, ClipboardList, MapPin, MessageCircle, Phone, Shield } from '../../icons';
 
 // Welcome and closing screens use Apple black.
 const CORE_INK = '#000000';
@@ -21,7 +21,9 @@ interface OnboardingFlowProps {
   clearLocalDemo: () => void;
 }
 
-type Step = 'welcome' | 'home' | 'form' | 'portal' | 'done';
+type Step = 'welcome' | 'home' | 'form' | 'portal' | 'care' | 'done';
+
+const CARE_URL = 'https://care.odontohub.app.br';
 
 const easing = [0.16, 1, 0.3, 1] as const;
 
@@ -54,7 +56,45 @@ export function OnboardingFlow({
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
+  // Perfil público do OdontoHub Care
+  const [careBase, setCareBase] = useState<{ name: string; email: string; bio?: string; photo_url?: string } | null>(null);
+  const [careCro, setCareCro] = useState('');
+  const [careSpecialty, setCareSpecialty] = useState('');
+  const [carePhone, setCarePhone] = useState('');
+  const [careClinic, setCareClinic] = useState('');
+  const [careAddress, setCareAddress] = useState('');
+  const careReady = [careCro, careSpecialty, carePhone, careClinic, careAddress].every(value => value.trim().length > 0);
+
   const greetingName = firstName(userName);
+
+  useEffect(() => {
+    if (step !== 'care' || careBase) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/profile', { product: 'odontohub' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data || typeof data !== 'object') return;
+        setCareBase({
+          name: String(data.name || userName || '').trim(),
+          email: String(data.email || '').trim(),
+          bio: data.bio || undefined,
+          photo_url: data.photo_url || undefined,
+        });
+        setCareCro(data.cro || '');
+        setCareSpecialty(data.specialty || '');
+        setCarePhone(data.phone || '');
+        setCareClinic(data.clinic_name || '');
+        setCareAddress(data.clinic_address || '');
+      } catch {
+        // The form still works; save reports a missing account email if needed.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, careBase, apiFetch, userName]);
 
   // ── Etapa 0 → 1: seed demo, then reveal the real (now alive) home ──────────
   // The seed endpoint is idempotent and atomic: reopening the onboarding never
@@ -137,7 +177,48 @@ export function OnboardingFlow({
     }
   };
 
-  // ── Etapa 3 → home (completion was already persisted at patient creation) ───
+  // ── Etapa 4: perfil público para aparecer no OdontoHub Care ────────────────
+  const handleSaveCareProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!careReady) return;
+    const accountName = (careBase?.name || userName).trim();
+    const accountEmail = careBase?.email?.trim() || '';
+    if (!accountName || !accountEmail) {
+      setError('Não encontrei o e-mail da sua conta. Abra o perfil e complete por lá.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const res = await apiFetch('/api/profile', {
+        method: 'POST',
+        product: 'odontohub',
+        body: JSON.stringify({
+          name: accountName,
+          email: accountEmail,
+          phone: carePhone.trim(),
+          cro: careCro.trim(),
+          specialty: careSpecialty.trim(),
+          bio: careBase?.bio,
+          photo_url: careBase?.photo_url,
+          clinic_name: careClinic.trim(),
+          clinic_address: careAddress.trim(),
+          password: '',
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Não consegui salvar o perfil.');
+      }
+      setStep('done');
+    } catch (err: any) {
+      setError(err?.message || 'Não consegui salvar o perfil. Tente novamente.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Etapa 5 → home (completion was already persisted at patient creation) ───
   const handleFinish = () => {
     goToDashboard();
   };
@@ -429,7 +510,7 @@ export function OnboardingFlow({
               </div>
 
               <button
-                onClick={() => setStep('done')}
+                onClick={() => setStep('care')}
                 className="mt-7 w-full apple-btn"
               >
                 Entendi, continuar
@@ -439,7 +520,132 @@ export function OnboardingFlow({
           </motion.div>
         )}
 
-        {/* ── Etapa 4 — Fechamento ── */}
+        {/* ── Etapa 4 — OdontoHub Care: perfil público ── */}
+        {step === 'care' && (
+          <motion.div
+            key="care"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: easing }}
+            className="min-h-full flex items-center justify-center px-6 py-16 bg-[#f5f5f7]"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: easing }}
+              className="max-w-md w-full"
+            >
+              <div className="mb-8">
+                <p className="text-[13px] font-medium text-[#0071e3] mb-3">OdontoHub Care</p>
+                <h1 className="text-[26px] font-semibold text-slate-900 tracking-[-0.4px] leading-tight">
+                  Complete seu perfil para aparecer no Care.
+                </h1>
+                <p className="mt-2 text-[15px] text-slate-500 leading-relaxed">
+                  O Care é onde pacientes encontram dentistas. Sem CRO, especialidade, telefone e dados da clínica, seu nome não entra em{' '}
+                  <a
+                    href={CARE_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#0071e3]"
+                  >
+                    care.odontohub.app.br
+                  </a>.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveCareProfile} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[13px] font-medium text-slate-600 mb-2">CRO</label>
+                    <div className="relative">
+                      <Shield size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                      <input
+                        autoFocus
+                        required
+                        type="text"
+                        value={careCro}
+                        onChange={(e) => setCareCro(e.target.value)}
+                        placeholder="12345-SP"
+                        className="ios-input w-full h-[50px] pl-11 pr-4 text-[17px]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-slate-600 mb-2">Especialidade</label>
+                    <input
+                      required
+                      type="text"
+                      value={careSpecialty}
+                      onChange={(e) => setCareSpecialty(e.target.value)}
+                      placeholder="Ortodontia"
+                      className="ios-input w-full h-[50px] text-[17px]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-slate-600 mb-2">Telefone</label>
+                  <div className="relative">
+                    <Phone size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                    <input
+                      required
+                      type="tel"
+                      inputMode="tel"
+                      value={carePhone}
+                      onChange={(e) => setCarePhone(e.target.value)}
+                      placeholder="(11) 99999-9999"
+                      className="ios-input w-full h-[50px] pl-11 pr-4 text-[17px]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-slate-600 mb-2">Nome da clínica</label>
+                  <div className="relative">
+                    <Building2 size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                    <input
+                      required
+                      type="text"
+                      value={careClinic}
+                      onChange={(e) => setCareClinic(e.target.value)}
+                      placeholder="Clínica Sorriso"
+                      className="ios-input w-full h-[50px] pl-11 pr-4 text-[17px]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-slate-600 mb-2">Endereço</label>
+                  <div className="relative">
+                    <MapPin size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                    <input
+                      required
+                      type="text"
+                      value={careAddress}
+                      onChange={(e) => setCareAddress(e.target.value)}
+                      placeholder="Rua Exemplo, 123 — Centro"
+                      className="ios-input w-full h-[50px] pl-11 pr-4 text-[17px]"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[13px] text-slate-400 pt-1">
+                  Essas informações são as que o paciente vê no Care.
+                </p>
+
+                {error && <p className="text-[13px] text-rose-600">{error}</p>}
+
+                <button
+                  type="submit"
+                  disabled={busy || !careReady}
+                  className="w-full apple-btn disabled:opacity-50 mt-2"
+                >
+                  {busy ? 'Salvando…' : 'Salvar e aparecer no Care'}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* ── Etapa 5 — Fechamento ── */}
         {step === 'done' && (
           <motion.div
             key="done"
@@ -473,7 +679,10 @@ export function OnboardingFlow({
                 transition={{ delay: 0.26, duration: 0.5, ease: easing }}
                 className="mt-4 text-[16px] text-white/75 leading-relaxed"
               >
-                A partir de agora, o OdontoHub cuida da agenda e do que costuma escapar.
+                A partir de agora, o OdontoHub cuida da agenda e do que costuma escapar. Seu perfil completo já pode aparecer no{' '}
+                <a href={CARE_URL} target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">
+                  OdontoHub Care
+                </a>.
               </motion.p>
               <motion.button
                 initial={{ opacity: 0, y: 12 }}
