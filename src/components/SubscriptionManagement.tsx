@@ -128,16 +128,33 @@ export function SubscriptionManagement({
   }, [apiFetch, product]);
 
   const fetchPlans = useCallback(async () => {
-    try {
-      const fullUrl = `${API_URL}/api/subscriptions/plans`;
-      const res = await fetch(fullUrl);
-      if (res.ok) {
+    const fullUrl = `${API_URL}/api/subscriptions/plans?product=${encodeURIComponent(product)}`;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 8_000);
+      try {
+        const res = await fetch(fullUrl, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        setPlans(data.filter((p: SubscriptionPlan) => p.product === product));
+        const productPlans = Array.isArray(data)
+          ? data.filter((plan: SubscriptionPlan) => plan.product === product)
+          : [];
+        if (productPlans.length === 0) {
+          throw new Error('Catálogo vazio');
+        }
+        setPlans(productPlans);
+        setError(null);
+        return;
+      } catch (err) {
+        console.error(`Error fetching plans (attempt ${attempt + 1}):`, err);
+        if (attempt === 0) {
+          await new Promise(resolve => window.setTimeout(resolve, 400));
+        }
+      } finally {
+        window.clearTimeout(timeout);
       }
-    } catch (err) {
-      console.error('Error fetching plans:', err);
     }
+    setError('Não foi possível carregar os planos. Tente novamente em instantes.');
   }, [product]);
 
   useEffect(() => {
