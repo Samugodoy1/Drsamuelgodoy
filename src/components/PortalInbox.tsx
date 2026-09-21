@@ -27,6 +27,7 @@ interface AppointmentRequest {
   preferred_time: string | null;
   notes: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  request_type?: 'NEW' | 'RESCHEDULE' | 'CANCEL' | 'CARE';
   created_at: string;
 }
 
@@ -183,6 +184,11 @@ export function PortalInbox({ apiFetch, onSchedulePatient, onOpenPatient, onData
                     <div className="min-w-0">
                       <p className="font-bold text-slate-800 text-sm">{req.patient_name}</p>
                       <p className="text-xs text-slate-400">{req.patient_phone}</p>
+                      {req.request_type === 'CARE' ? (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                          OdontoHub Care
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <StatusBadgeReq status={req.status} />

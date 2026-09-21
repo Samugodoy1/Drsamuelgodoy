@@ -5697,7 +5697,7 @@ export default function App() {
                     <div>
                       <h3 className="text-xl md:text-2xl font-bold text-slate-900">Gestão de Dentistas</h3>
                       <p className="text-slate-500 text-sm">
-                        Gerencie o acesso ao sistema e a publicação no OdontoHub Care
+                        Gerencie o acesso ao sistema e a publicação no OdontoHub Care. Só clínicas do OdontoHub com CRO ou cidade entram no Care — contas do Academy não.
                       </p>
                     </div>
                     <button 
@@ -6101,7 +6101,7 @@ export default function App() {
                           )}
                           {!profile.clinic_name && !profile.clinic_address && !profile.clinic_city && (
                             <p className="text-sm text-[#86868b]">
-                              Complete os dados da clínica para melhorar seu perfil no OdontoHub Care.
+                              Complete CRO e cidade da clínica para aparecer no OdontoHub Care.
                             </p>
                           )}
                         </div>
