@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from 'react';
+import { createPortal } from 'react-dom';
 import { Routes, Route, useParams, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import { API_URL } from './config';
 import {
@@ -4559,7 +4560,8 @@ export default function App() {
                             </div>
 
                             {/* Bottom Sheet for selected appointment in week view */}
-                            {weekSheetSelectedAppointment && (
+                            {weekSheetSelectedAppointment && createPortal(
+                              <>
                               <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -4567,14 +4569,16 @@ export default function App() {
                                 className="fixed inset-0 z-[999] bg-slate-900/40 backdrop-blur-sm"
                                 onClick={() => setWeekSheetSelectedAppointment(null)}
                               />
-                            )}
-                            {weekSheetSelectedAppointment && (
                               <motion.div
                                 initial={{ y: '100%' }}
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-[28px] max-h-[90vh] overflow-y-auto pb-32"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label="Detalhes do agendamento"
+                                onClick={(e) => e.stopPropagation()}
+                                className="fixed inset-x-0 bottom-0 z-[1000] w-full bg-white rounded-t-[28px] max-h-[90dvh] overflow-y-auto overscroll-contain shadow-[0_-12px_40px_rgba(15,23,42,0.14)] pb-[max(1.25rem,env(safe-area-inset-bottom))]"
                               >
                                 <div className="p-6 space-y-6">
                                   {/* Close button and header */}
@@ -4685,10 +4689,15 @@ export default function App() {
                                   </div>
                                 </div>
                               </motion.div>
+                              </>,
+                              document.body,
                             )}
 
-                            {/* Bottom Sheet for weekly suggestion */}
-                            {weekSuggestionSheet && (
+                            {/* Bottom Sheet for weekly suggestion.
+                                Portaled to body so the agenda card (overflow + radius + border)
+                                and the tab fade transform don't clip the side edges. */}
+                            {weekSuggestionSheet && createPortal(
+                              <>
                               <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -4696,14 +4705,16 @@ export default function App() {
                                 className="fixed inset-0 z-[999] bg-slate-900/40 backdrop-blur-sm"
                                 onClick={() => setWeekSuggestionSheet(null)}
                               />
-                            )}
-                            {weekSuggestionSheet && (
                               <motion.div
                                 initial={{ y: '100%' }}
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-[28px] max-h-[90vh] overflow-y-auto pb-24"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label="Sugestão de encaixe"
+                                onClick={(e) => e.stopPropagation()}
+                                className="fixed inset-x-0 bottom-0 z-[1000] w-full bg-white rounded-t-[28px] max-h-[90dvh] overflow-y-auto overscroll-contain shadow-[0_-12px_40px_rgba(15,23,42,0.14)] pb-[max(1.25rem,env(safe-area-inset-bottom))]"
                               >
                                 {/* Grab handle */}
                                 <div className="flex justify-center pt-3 pb-1">
@@ -4746,6 +4757,8 @@ export default function App() {
                                   </button>
                                 </div>
                               </motion.div>
+                              </>,
+                              document.body,
                             )}
                           </div>
                         );
@@ -4865,7 +4878,8 @@ export default function App() {
                             </div>
 
                             {/* Bottom Sheet for selected day */}
-                            {monthSheetSelectedDay && (
+                            {monthSheetSelectedDay && createPortal(
+                              <>
                               <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -4873,14 +4887,16 @@ export default function App() {
                                 className="fixed inset-0 z-[999] bg-slate-900/40 backdrop-blur-sm"
                                 onClick={() => setMonthSheetSelectedDay(null)}
                               />
-                            )}
-                            {monthSheetSelectedDay && (
                               <motion.div
                                 initial={{ y: '100%' }}
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                                className="fixed inset-x-0 bottom-0 z-[1000] bg-white rounded-t-[28px] max-h-[90vh] overflow-y-auto pb-32"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label="Agendamentos do dia"
+                                onClick={(e) => e.stopPropagation()}
+                                className="fixed inset-x-0 bottom-0 z-[1000] w-full bg-white rounded-t-[28px] max-h-[90dvh] overflow-y-auto overscroll-contain shadow-[0_-12px_40px_rgba(15,23,42,0.14)] pb-[max(1.25rem,env(safe-area-inset-bottom))]"
                               >
                                 {/* Grab handle */}
                                 <div className="flex justify-center pt-3 pb-1">
@@ -5020,6 +5036,8 @@ export default function App() {
                                   )}
                                 </div>
                               </motion.div>
+                              </>,
+                              document.body,
                             )}
 
                           </div>
