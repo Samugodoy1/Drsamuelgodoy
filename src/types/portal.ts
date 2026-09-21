@@ -1,6 +1,6 @@
 // Tipos da atividade iniciada pelo paciente via portal (GET /api/portal/activity)
 
-export type PortalRequestType = 'NEW' | 'RESCHEDULE' | 'CANCEL';
+export type PortalRequestType = 'NEW' | 'RESCHEDULE' | 'CANCEL' | 'CARE';
 
 export interface PortalAppointmentRequest {
   id: number;

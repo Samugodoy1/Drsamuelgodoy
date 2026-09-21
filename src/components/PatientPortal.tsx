@@ -631,6 +631,7 @@ export function PatientPortal() {
   const requestTypeLabel = (t: string) => {
     if (t === 'RESCHEDULE') return 'Pedido para remarcar consulta';
     if (t === 'CANCEL') return 'Pedido para cancelar consulta';
+    if (t === 'CARE') return 'Pedido pelo OdontoHub Care';
     return 'Pedido de nova consulta';
   };
 
