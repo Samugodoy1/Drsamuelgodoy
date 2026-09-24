@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown } from '../icons';
 import { BRAZILIAN_CRO_STATES } from '../constants/croStates';
 
 type CroAccessFieldsProps = {
@@ -6,7 +7,7 @@ type CroAccessFieldsProps = {
   croNumber: string;
   onChange: (next: { croUf?: string; croNumber?: string }) => void;
   disabled?: boolean;
-  compact?: boolean;
+  hint?: boolean;
 };
 
 export function CroAccessFields({
@@ -14,49 +15,53 @@ export function CroAccessFields({
   croNumber,
   onChange,
   disabled = false,
-  compact = false,
+  hint = true,
 }: CroAccessFieldsProps) {
-  const labelClass = compact
-    ? 'text-[12px] font-medium text-[#86868b] mb-1.5 block'
-    : 'block text-[13px] font-medium text-[#4B5250] mb-2';
-  const fieldClass = compact
-    ? 'w-full h-[44px] px-3 bg-white border border-[#d2d2d7] rounded-[12px] text-[15px] text-[#1d1d1f] outline-none focus:border-[#0071e3]'
-    : 'w-full h-[48px] px-4 bg-white border border-[#DFE3E1] rounded-[12px] text-base text-[#0F1211] outline-none focus:border-[#2E6B53]';
-
   return (
-    <div className={compact ? 'space-y-3' : 'space-y-4'}>
+    <div className="space-y-5">
       <div>
-        <label className={labelClass}>CRO — conselho regional</label>
-        <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-2">
+        <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Conselho</label>
+        <div className="relative">
           <select
             required
             disabled={disabled}
             value={croUf}
             onChange={(e) => onChange({ croUf: e.target.value })}
-            className={fieldClass}
+            className="ios-input w-full h-[48px] text-[17px] appearance-none pr-10"
           >
             <option value="">UF</option>
             {BRAZILIAN_CRO_STATES.map((state) => (
               <option key={state.uf} value={state.uf}>
-                {state.uf}
+                {state.uf} · {state.label}
               </option>
             ))}
           </select>
-          <input
-            type="text"
-            inputMode="numeric"
-            required
-            disabled={disabled}
-            placeholder="Nº de inscrição"
-            value={croNumber}
-            onChange={(e) => onChange({ croNumber: e.target.value.replace(/\D/g, '') })}
-            className={fieldClass}
+          <ChevronDown
+            size={16}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#86868b]"
           />
         </div>
-        <p className={`${compact ? 'text-[11px] text-[#86868b]' : 'text-[12px] text-[#8B918E]'} mt-2 leading-relaxed`}>
-          Apenas cirurgiões-dentistas com CRO ativo podem acessar o OdontoHub e a demonstração.
-        </p>
       </div>
+
+      <div>
+        <label className="block text-[13px] font-medium text-[#6e6e73] mb-2">Número de inscrição</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          required
+          disabled={disabled}
+          placeholder="102441"
+          value={croNumber}
+          onChange={(e) => onChange({ croNumber: e.target.value.replace(/\D/g, '') })}
+          className="ios-input w-full h-[48px] text-[17px]"
+        />
+      </div>
+
+      {hint && (
+        <p className="text-[13px] text-[#86868b] leading-relaxed">
+          A clínica abre para cirurgião-dentista com inscrição no CRO.
+        </p>
+      )}
     </div>
   );
 }
