@@ -94,6 +94,9 @@ import {
 } from './data/hubPlans';
 import { migrationNotice, resolveHubAccess } from './utils/hubEntitlements';
 import GoogleSignInButton from './components/GoogleSignInButton';
+import { CroAccessFields } from './components/CroAccessFields';
+import { CroVerificationGate } from './components/CroVerificationGate';
+import { ExploreDemo } from './components/ExploreDemo';
 import { formatDate, isOverdue, getFreeSlots, getSuggestion, FreeSlot } from './utils/dateUtils';
 import {
   WEEK_HOUR_HEIGHT,
@@ -306,6 +309,8 @@ interface CurrentUser {
   onboarding_done?: boolean;
   welcome_seen?: boolean;
   record_opened?: boolean;
+  cro_verified_at?: string | null;
+  cro_required?: boolean;
 }
 
 const ODONTOHUB_PRODUCT: Product = 'odontohub';
@@ -741,6 +746,8 @@ export default function App() {
     email: '', 
     password: '',
     product: ODONTOHUB_PRODUCT,
+    croUf: '',
+    croNumber: '',
     acceptedTerms: false,
     acceptedPrivacyPolicy: false,
     acceptedResponsibility: false
@@ -748,6 +755,9 @@ export default function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [registerMessage, setRegisterMessage] = useState('');
+  const [croGateRequired, setCroGateRequired] = useState(false);
+  const [croGateError, setCroGateError] = useState('');
+  const [croGateBusy, setCroGateBusy] = useState(false);
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedPatientTab, setSelectedPatientTab] = useState<'evolucao' | 'imagens' | 'financeiro'>('evolucao');
@@ -1089,6 +1099,24 @@ export default function App() {
     refreshClinicalPatientRef.current = fn;
   }, []);
 
+  const userNeedsCroGate = useCallback((candidate: CurrentUser | null | undefined) => {
+    if (!candidate) return false;
+    if (candidate.role?.toUpperCase() === 'ADMIN') return false;
+    if (candidate.cro_verified_at) return false;
+    if (candidate.cro_required) return true;
+    return getCurrentProductRef.current() === ODONTOHUB_PRODUCT;
+  }, []);
+
+  const applyAuthenticatedUser = useCallback((nextUser: CurrentUser, token: string) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+    dataFetchedRef.current = true;
+    adminFetchedRef.current = false;
+    setUser(nextUser);
+    setCroGateRequired(userNeedsCroGate(nextUser));
+    setCroGateError('');
+  }, [userNeedsCroGate]);
+
   const showNotification = (message: string, type: 'success' | 'error' = 'success', celebration = false, onUndo?: () => void, actionLabel?: string, onAction?: () => void) => {
     if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
     setNotification({ message, type, celebration, onUndo, actionLabel, onAction });
@@ -1152,11 +1180,13 @@ export default function App() {
     
     if (savedUser && savedToken) {
       try {
-        const parsedUser = JSON.parse(savedUser);
+        const parsedUser = JSON.parse(savedUser) as CurrentUser;
         setUser(parsedUser);
-        if (parsedUser.role === 'DENTIST') {
-          // No filter needed
-        }
+        setCroGateRequired(
+          parsedUser.role?.toUpperCase() !== 'ADMIN' &&
+          !parsedUser.cro_verified_at &&
+          (parsedUser.cro_required === true || getCurrentProduct() === ODONTOHUB_PRODUCT)
+        );
       } catch (e) {
         console.error('Error parsing saved user:', e);
         localStorage.removeItem('user');
@@ -1210,15 +1240,18 @@ export default function App() {
           const newWelcome = data.welcome_seen;
           const newRecord = data.record_opened;
           const newProduct = data.current_product;
+          const newCroVerifiedAt = data.cro_verified_at || null;
           // Only create a new object if something actually changed
           if (
             JSON.stringify(prev.product_accesses) === JSON.stringify(newAccesses) &&
             prev.current_product === newProduct &&
             prev.onboarding_done === newOnboarding &&
             prev.welcome_seen === newWelcome &&
-            prev.record_opened === newRecord
+            prev.record_opened === newRecord &&
+            prev.cro_verified_at === newCroVerifiedAt
           ) {
             localStorage.setItem('user', JSON.stringify(prev));
+            setCroGateRequired(userNeedsCroGate(prev));
             return prev; // same reference — no re-render
           }
           const updated = {
@@ -1227,9 +1260,12 @@ export default function App() {
             current_product: newProduct,
             onboarding_done: newOnboarding,
             welcome_seen: newWelcome,
-            record_opened: newRecord
+            record_opened: newRecord,
+            cro_verified_at: newCroVerifiedAt,
+            cro_required: !newCroVerifiedAt && prev.role?.toUpperCase() !== 'ADMIN',
           };
           localStorage.setItem('user', JSON.stringify(updated));
+          setCroGateRequired(userNeedsCroGate(updated));
           return updated;
         });
       }
@@ -1741,11 +1777,7 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        dataFetchedRef.current = true; // prevent duplicate fetch from useEffect
-        adminFetchedRef.current = false;
-        setUser(data.user);
+        applyAuthenticatedUser(data.user, data.token);
         void refreshAppData(data.token);
         fetchProfile();
         if (data.user.role?.toUpperCase() === 'ADMIN') {
@@ -1775,11 +1807,7 @@ export default function App() {
       if (res.ok) {
         if (isRegistering) markShowPlansAfterSignup();
         else clearShowPlansAfterSignup();
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        dataFetchedRef.current = true;
-        adminFetchedRef.current = false;
-        setUser(data.user);
+        applyAuthenticatedUser(data.user, data.token);
         setIsRegistering(false);
         void refreshAppData(data.token);
         fetchProfile();
@@ -1796,6 +1824,41 @@ export default function App() {
     }
   };
 
+  const handleVerifyCro = async (croUf: string, croNumber: string) => {
+    setCroGateBusy(true);
+    setCroGateError('');
+    try {
+      const res = await apiFetch('/api/auth/verify-cro', {
+        method: 'POST',
+        product: ODONTOHUB_PRODUCT,
+        body: JSON.stringify({ croUf, croNumber, product: ODONTOHUB_PRODUCT }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCroGateError(data.error || 'Não foi possível validar o CRO.');
+        return;
+      }
+      setCroGateRequired(false);
+      setUser((prev) => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          cro_verified_at: data.cro_verified_at || new Date().toISOString(),
+          cro_required: false,
+        };
+        localStorage.setItem('user', JSON.stringify(updated));
+        return updated;
+      });
+      await fetchProfile();
+      await refreshAppData();
+      showNotification('CRO validado. Bem-vindo ao OdontoHub!', 'success');
+    } catch {
+      setCroGateError('Erro de conexão ao validar o CRO.');
+    } finally {
+      setCroGateBusy(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -1803,6 +1866,10 @@ export default function App() {
 
     if (!registerData.acceptedTerms || !registerData.acceptedPrivacyPolicy || !registerData.acceptedResponsibility) {
       setLoginError('Você deve aceitar todos os termos e declarações para continuar.');
+      return;
+    }
+    if (!registerData.croUf || !registerData.croNumber.trim()) {
+      setLoginError('Informe seu CRO (UF e número de inscrição) para criar a conta.');
       return;
     }
 
@@ -1830,11 +1897,7 @@ export default function App() {
         });
         const loginData = await loginRes.json();
         if (loginRes.ok) {
-          localStorage.setItem('token', loginData.token);
-          localStorage.setItem('user', JSON.stringify(loginData.user));
-          dataFetchedRef.current = true;
-          adminFetchedRef.current = false;
-          setUser(loginData.user);
+          applyAuthenticatedUser(loginData.user, loginData.token);
           setIsRegistering(false);
           setRegisterMessage('');
           void refreshAppData(loginData.token);
@@ -1855,6 +1918,8 @@ export default function App() {
     dataFetchedRef.current = false;
     adminFetchedRef.current = false;
     setUser(null);
+    setCroGateRequired(false);
+    setCroGateError('');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setActiveTab('dashboard');
@@ -2092,7 +2157,10 @@ export default function App() {
       try {
         const errorData = await response.clone().json();
         const message = errorData?.error || '';
-        if (message.includes('produto') || message.includes('Conta global')) {
+        if (errorData?.code === 'CRO_REQUIRED') {
+          setCroGateRequired(true);
+          setCroGateError(message);
+        } else if (message.includes('produto') || message.includes('Conta global')) {
           console.warn('Product access error details:', errorData);
           handleLogout();
         }
@@ -3267,6 +3335,7 @@ export default function App() {
     <Routes>
       {import.meta.env.DEV && <Route path="/dev/central" element={<ControlCenterPreview />} />}
       {import.meta.env.DEV && <Route path="/dev/ui" element={<UiPolishPreview />} />}
+      <Route path="/explorar" element={<ExploreDemo />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/portal/:token" element={<PatientPortal />} />
@@ -3428,6 +3497,15 @@ export default function App() {
                   />
                 </div>
 
+                {isRegistering && (
+                  <CroAccessFields
+                    croUf={registerData.croUf}
+                    croNumber={registerData.croNumber}
+                    compact
+                    onChange={(next) => setRegisterData({ ...registerData, ...next })}
+                  />
+                )}
+
                 {loginError && (
                   <motion.p
                     initial={{ opacity: 0, y: -2 }}
@@ -3534,6 +3612,12 @@ export default function App() {
                   <span className="text-[#d2d2d7]">·</span>
                   <Link to="/privacidade" className="text-[#2997ff]">Privacidade</Link>
                 </div>
+                {!isRegistering && (
+                  <p className="text-center text-[12px] text-[#86868b] pt-2">
+                    Quer conhecer antes?{' '}
+                    <Link to="/explorar" className="text-[#2997ff]">Demonstração com CRO válido</Link>
+                  </p>
+                )}
               </div>
             </motion.div>
           </div>
@@ -7746,6 +7830,15 @@ export default function App() {
       </div>
     )}
     </Suspense>
+    {user && croGateRequired && (
+      <CroVerificationGate
+        userName={user.name}
+        busy={croGateBusy}
+        error={croGateError}
+        onVerify={handleVerifyCro}
+        onLogout={handleLogout}
+      />
+    )}
   </>
   );
 }

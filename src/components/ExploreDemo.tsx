@@ -3,13 +3,21 @@ import { API_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, ArrowRight, Sparkles } from '../icons';
+import { CroAccessFields } from './CroAccessFields';
 
 export function ExploreDemo() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [croUf, setCroUf] = useState('');
+  const [croNumber, setCroNumber] = useState('');
 
   const handleExplore = async () => {
+    if (!croUf || !croNumber.trim()) {
+      setError('Informe seu CRO (UF e número) para liberar a demonstração.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     try {
@@ -17,7 +25,7 @@ export function ExploreDemo() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: API_URL ? 'include' as const : 'same-origin' as const,
-        body: JSON.stringify({})
+        body: JSON.stringify({ croUf, croNumber }),
       });
       
       const data = await res.json();
@@ -48,7 +56,6 @@ export function ExploreDemo() {
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-6 overflow-hidden relative">
-      {/* Background elements (subtle) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 right-20 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
         <div className="absolute bottom-40 left-10 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
@@ -60,7 +67,6 @@ export function ExploreDemo() {
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className="max-w-md w-full relative z-10"
       >
-        {/* Logo / Top accent */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -72,7 +78,6 @@ export function ExploreDemo() {
           </div>
         </motion.div>
 
-        {/* Main Heading */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -80,19 +85,18 @@ export function ExploreDemo() {
           className="mb-6 text-center space-y-3"
         >
           <h1 className="text-4xl font-semibold text-slate-900 tracking-[-0.8px]">
-            Explore com dados reais
+            Demonstração para dentistas
           </h1>
           <p className="text-lg text-slate-500 leading-relaxed">
-            Sem compromisso. Sem necessidade de cadastro. Simplesmente clique e conheça.
+            Valide seu CRO ativo para explorar o OdontoHub com dados fictícios, sem cadastro completo.
           </p>
         </motion.div>
 
-        {/* Feature highlights */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25, duration: 0.5 }}
-          className="space-y-3 mb-10"
+          className="space-y-3 mb-8"
         >
           {[
             { title: 'Prontuário digital', desc: 'Veja como fica um cadastro clínico completo' },
@@ -117,7 +121,16 @@ export function ExploreDemo() {
           ))}
         </motion.div>
 
-        {/* CTA Button */}
+        <CroAccessFields
+          croUf={croUf}
+          croNumber={croNumber}
+          disabled={isLoading}
+          onChange={(next) => {
+            if (next.croUf !== undefined) setCroUf(next.croUf);
+            if (next.croNumber !== undefined) setCroNumber(next.croNumber);
+          }}
+        />
+
         <motion.button
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -126,7 +139,7 @@ export function ExploreDemo() {
           whileTap={!isLoading ? { scale: 0.98 } : {}}
           onClick={handleExplore}
           disabled={isLoading}
-          className="w-full h-14 bg-primary hover:bg-primary/90 text-white text-base font-semibold rounded-[18px] shadow-[0_12px_32px_rgba(0,0,0,0.15)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          className="mt-6 w-full h-14 bg-primary hover:bg-primary/90 text-white text-base font-semibold rounded-[18px] shadow-[0_12px_32px_rgba(0,0,0,0.15)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <motion.div
@@ -136,13 +149,12 @@ export function ExploreDemo() {
             />
           ) : (
             <>
-              Explorar agora
+              Validar CRO e explorar
               <ArrowRight size={16} />
             </>
           )}
         </motion.button>
 
-        {/* Error message */}
         {error && (
           <motion.p
             initial={{ opacity: 0, y: -4 }}
@@ -153,17 +165,15 @@ export function ExploreDemo() {
           </motion.p>
         )}
 
-        {/* Disclaimer */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.55, duration: 0.4 }}
           className="text-center text-[12px] text-slate-400 mt-8 leading-relaxed"
         >
-          Ambiente de demonstração seguro · Dados totalmente fictícios · Sem impacto em terceiros
+          Acesso exclusivo para cirurgiões-dentistas · Consulta ao cadastro oficial do CRO · Dados fictícios na demo
         </motion.p>
 
-        {/* Back to login */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
