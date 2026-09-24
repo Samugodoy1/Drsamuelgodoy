@@ -3501,7 +3501,6 @@ export default function App() {
                   <CroAccessFields
                     croUf={registerData.croUf}
                     croNumber={registerData.croNumber}
-                    compact
                     onChange={(next) => setRegisterData({ ...registerData, ...next })}
                   />
                 )}

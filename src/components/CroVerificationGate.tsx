@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Shield } from '../icons';
 import { CroAccessFields } from './CroAccessFields';
 
 type CroVerificationGateProps = {
@@ -11,6 +10,8 @@ type CroVerificationGateProps = {
   onLogout: () => void;
 };
 
+const firstName = (full: string) => (full || '').trim().split(/\s+/)[0] || '';
+
 export function CroVerificationGate({
   userName,
   busy = false,
@@ -20,6 +21,7 @@ export function CroVerificationGate({
 }: CroVerificationGateProps) {
   const [croUf, setCroUf] = useState('');
   const [croNumber, setCroNumber] = useState('');
+  const greeting = firstName(userName);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -28,59 +30,66 @@ export function CroVerificationGate({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#f5f5f7]/95 backdrop-blur-sm flex items-center justify-center px-6">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md rounded-[24px] border border-[#d2d2d7] bg-white p-8 shadow-[0_24px_80px_rgba(0,0,0,0.12)]"
-      >
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0071e3]/10 text-[#0071e3]">
-            <Shield size={22} />
-          </div>
-          <div>
-            <h1 className="text-[22px] font-semibold text-[#1d1d1f] tracking-[-0.3px]">
-              Confirme seu CRO
-            </h1>
-            <p className="text-[14px] text-[#86868b]">
-              {userName ? `Olá, ${userName.split(' ')[0]}.` : 'Acesso exclusivo para dentistas.'}
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <CroAccessFields
-            compact
-            croUf={croUf}
-            croNumber={croNumber}
-            disabled={busy}
-            onChange={(next) => {
-              if (next.croUf !== undefined) setCroUf(next.croUf);
-              if (next.croNumber !== undefined) setCroNumber(next.croNumber);
-            }}
-          />
-
-          {error && (
-            <p className="text-[13px] text-red-500 leading-relaxed">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy || !croUf || !croNumber.trim()}
-            className="w-full h-[48px] rounded-[14px] bg-[#0071e3] text-white text-[15px] font-medium disabled:opacity-50"
-          >
-            {busy ? 'Validando CRO…' : 'Validar e continuar'}
-          </button>
-        </form>
-
-        <button
-          type="button"
-          onClick={onLogout}
-          className="mt-5 w-full text-center text-[13px] text-[#86868b] hover:text-[#1d1d1f]"
+    <div className="fixed inset-0 z-[200] overflow-y-auto bg-[#f5f5f7] font-sans antialiased">
+      <div className="flex min-h-screen items-center justify-center px-6 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-[400px]"
         >
-          Sair da conta
-        </button>
-      </motion.div>
+          <p className="mb-6 text-[12px] tracking-[0.08em] text-[#86868b]">OdontoHub</p>
+          <h1 className="apple-display-ink mb-3 text-[40px] sm:text-[44px]">Seu CRO.</h1>
+          <p className="apple-subhead mb-12 text-[17px]">
+            {greeting
+              ? `${greeting}, informe a UF e o número da inscrição.`
+              : 'Informe a UF e o número da inscrição.'}
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <CroAccessFields
+              hint={false}
+              croUf={croUf}
+              croNumber={croNumber}
+              disabled={busy}
+              onChange={(next) => {
+                if (next.croUf !== undefined) setCroUf(next.croUf);
+                if (next.croNumber !== undefined) setCroNumber(next.croNumber);
+              }}
+            />
+
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -2 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-[13px] text-[#ff3b30]"
+              >
+                {error}
+              </motion.p>
+            )}
+
+            <div className="pt-3">
+              <motion.button
+                type="submit"
+                disabled={busy || !croUf || !croNumber.trim()}
+                whileHover={busy ? undefined : { scale: 1.005 }}
+                whileTap={busy ? undefined : { scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
+                className="apple-btn w-full cursor-pointer border-0 disabled:opacity-40"
+              >
+                {busy ? 'Conferindo…' : 'Continuar'}
+              </motion.button>
+              <p className="mt-4 text-center text-[12px] text-[#86868b]">Inscrição conferida antes de abrir a clínica.</p>
+            </div>
+          </form>
+
+          <div className="mt-14 text-center">
+            <button type="button" onClick={onLogout} className="apple-link">
+              Sair da conta
+            </button>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
