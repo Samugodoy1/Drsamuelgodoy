@@ -38,6 +38,7 @@ import { DentitionIndicator, DentitionRevealHint } from './DentitionIndicator';
 import { Odontogram } from './Odontogram';
 import { OdontogramActiveSummary } from './OdontogramActiveSummary';
 import { ControleProtetico } from './ControleProtetico';
+import { PatientReminders } from './PatientReminders';
 import {
   DEFAULT_PROSTHETIC_STAGE_KEY,
   PROSTHETIC_NOTES_FIELD,
@@ -2138,6 +2139,14 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
 
         <div className={`grid grid-cols-1 gap-6 ${isFocusMode ? '' : 'xl:grid-cols-[1.7fr_1fr]'}`}>
           <div className="space-y-6">
+            <PatientReminders
+              patientId={patient.id}
+              apiFetch={apiFetch}
+              contextText={[
+                ...treatmentInProgress.map((item: any) => item?.procedure),
+                ...(patient?.evolution || []).slice(0, 4).map((item: any) => item?.procedure_performed || item?.notes),
+              ].filter(Boolean).join('\n')}
+            />
             <section
               ref={treatmentSectionRef}
               className="rounded-[28px] border border-slate-200/60 bg-white/95 p-5 sm:p-6 shadow-[0_10px_28px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-500 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)]"

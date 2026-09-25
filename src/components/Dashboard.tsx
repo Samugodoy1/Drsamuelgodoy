@@ -3,6 +3,7 @@ import { API_URL } from '../config';
 import { ClipboardList, MessageCircle, Calendar, CalendarPlus, ChevronRight, UserX, TrendingUp, X, UserPlus, ArrowRight, Check, Users, DollarSign, FileText, Stethoscope, Plus, AlertCircle } from '../icons';
 import type { PortalActivity } from '../types/portal';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
+import { ReminderInbox } from './PatientReminders';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1418,6 +1419,12 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({
             Consulta
           </motion.button>
       </div>}
+
+      <ReminderInbox
+        product={product}
+        openPatientRecord={openPatientRecord}
+        refreshKey={dataRefreshKey}
+      />
 
       {/* 3. RETORNOS VENCIDOS — prioridade máxima nas primeiras semanas */}
       {intelligence && intelligence.overdueReturns.length > 0 && (
