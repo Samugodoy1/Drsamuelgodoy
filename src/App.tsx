@@ -235,6 +235,106 @@ interface Installment {
   procedure?: string;
 }
 
+type CareCatalogStatus =
+  | 'published'
+  | 'removed'
+  | 'pending'
+  | 'academy'
+  | 'not_dentist'
+  | 'test'
+  | 'inactive';
+
+function careCatalogBadge(user: {
+  care_status?: CareCatalogStatus | string;
+  care_published?: boolean;
+  care_visible?: boolean;
+}) {
+  const status = (user.care_status as CareCatalogStatus | undefined)
+    ?? (user.care_published ? 'published' : user.care_visible === false ? 'removed' : 'pending');
+
+  switch (status) {
+    case 'published':
+      return {
+        label: 'No Care',
+        className: 'bg-sky-100 text-sky-700',
+        textClass: 'text-sky-700',
+        title: 'Este dentista aparece no OdontoHub Care.',
+      };
+    case 'removed':
+      return {
+        label: 'Removido',
+        className: 'bg-slate-100 text-slate-500',
+        textClass: 'text-slate-500',
+        title: 'Você removeu este dentista do Care. Use o olho para recolocar.',
+      };
+    case 'academy':
+      return {
+        label: 'Conta Academy',
+        className: 'bg-violet-100 text-violet-700',
+        textClass: 'text-violet-700',
+        title: 'Conta do Academy — não entra no Care.',
+      };
+    case 'not_dentist':
+      return {
+        label: 'Não é dentista',
+        className: 'bg-slate-100 text-slate-500',
+        textClass: 'text-slate-500',
+        title: 'Só contas de dentista do OdontoHub entram no Care.',
+      };
+    case 'test':
+      return {
+        label: 'Conta de teste',
+        className: 'bg-slate-100 text-slate-500',
+        textClass: 'text-slate-500',
+        title: 'Contas de teste ou onboarding não entram no Care.',
+      };
+    case 'inactive':
+      return {
+        label: 'Conta inativa',
+        className: 'bg-amber-100 text-amber-700',
+        textClass: 'text-amber-700',
+        title: 'A conta precisa estar ativa no OdontoHub para aparecer no Care.',
+      };
+    case 'pending':
+    default:
+      return {
+        label: 'Aguardando aprovação',
+        className: 'bg-amber-100 text-amber-700',
+        textClass: 'text-amber-700',
+        title: 'Aprove o acesso ao OdontoHub para este dentista entrar no Care.',
+      };
+  }
+}
+
+function CareStatusBadge({
+  user,
+  compact = false,
+}: {
+  user: {
+    care_status?: CareCatalogStatus | string;
+    care_published?: boolean;
+    care_visible?: boolean;
+  };
+  compact?: boolean;
+}) {
+  const care = careCatalogBadge(user);
+  if (compact) {
+    return (
+      <p className={`text-[10px] font-bold uppercase ${care.textClass}`} title={care.title}>
+        Care: {care.label}
+      </p>
+    );
+  }
+  return (
+    <span
+      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${care.className}`}
+      title={care.title}
+    >
+      {care.label}
+    </span>
+  );
+}
+
 interface Dentist {
   id: number;
   name: string;
@@ -252,6 +352,7 @@ interface Dentist {
   clinic_neighborhood?: string;
   care_visible?: boolean;
   care_published?: boolean;
+  care_status?: CareCatalogStatus;
   accepted_terms?: boolean;
   accepted_terms_at?: string;
   accepted_privacy_policy?: boolean;
@@ -5798,7 +5899,7 @@ export default function App() {
                     <div>
                       <h3 className="text-xl md:text-2xl font-bold text-slate-900">Gestão de Dentistas</h3>
                       <p className="text-slate-500 text-sm">
-                        Gerencie o acesso ao sistema e a publicação no OdontoHub Care. Só clínicas do OdontoHub com CRO ou cidade entram no Care — contas do Academy não.
+                        Gerencie o acesso ao sistema e a publicação no OdontoHub Care. Dentistas aprovados do OdontoHub entram no Care. Contas do Academy, de teste ou removidas por você não aparecem.
                       </p>
                     </div>
                     <button 
@@ -5882,15 +5983,7 @@ export default function App() {
                                 {u.role === 'ADMIN' ? (
                                   <span className="text-xs text-slate-400">—</span>
                                 ) : (
-                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                    u.care_published
-                                      ? 'bg-sky-100 text-sky-700'
-                                      : u.care_visible
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-slate-100 text-slate-500'
-                                  }`}>
-                                    {u.care_published ? 'Publicado' : u.care_visible ? 'Aguardando acesso' : 'Removido'}
-                                  </span>
+                                  <CareStatusBadge user={u} />
                                 )}
                               </td>
                               <td className="px-6 py-4 text-right">
@@ -5972,17 +6065,7 @@ export default function App() {
                             </span>
                           </div>
                           <p className="text-xs text-slate-500">{u.email}</p>
-                          {u.role !== 'ADMIN' && (
-                            <p className={`text-[10px] font-bold uppercase ${
-                              u.care_published
-                                ? 'text-sky-700'
-                                : u.care_visible
-                                  ? 'text-amber-700'
-                                  : 'text-slate-500'
-                            }`}>
-                              Care: {u.care_published ? 'publicado' : u.care_visible ? 'aguardando acesso' : 'removido'}
-                            </p>
-                          )}
+                          {u.role !== 'ADMIN' && <CareStatusBadge user={u} compact />}
                           <div className="flex gap-2">
                             <button 
                               onClick={() => {
