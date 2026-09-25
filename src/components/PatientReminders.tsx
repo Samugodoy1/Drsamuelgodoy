@@ -270,7 +270,7 @@ export const ReminderInbox: React.FC<{
       headers.Authorization = `Bearer ${token}`;
       headers['x-auth-token'] = token;
     }
-    const response = await fetch(`${API_URL}/api/reminders?within=14`, {
+    const response = await fetch(`${API_URL}/api/reminders?within=0`, {
       headers,
       credentials: API_URL ? 'include' : 'same-origin',
     });
@@ -284,7 +284,12 @@ export const ReminderInbox: React.FC<{
     void load();
   }, [product, refreshKey]);
 
-  if (reminders.length === 0 && !repeat) return null;
+  const dueNow = reminders.filter(reminder => {
+    const due = dateOnly(reminder.due_date);
+    return Boolean(due) && compareIso(due, today) <= 0;
+  });
+
+  if (dueNow.length === 0 && !repeat) return null;
 
   const act = async (reminder: PatientReminder, body: Record<string, unknown>) => {
     const token = localStorage.getItem('token');
@@ -337,41 +342,38 @@ export const ReminderInbox: React.FC<{
   };
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-baseline justify-between px-1">
-        <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">Lembretes</h3>
-        <span className="text-[13px] text-[#86868b]">{reminders.length}</span>
-      </div>
+    <section>
+      {dueNow.length > 0 && (
       <div className="rounded-[22px] bg-white">
-        {reminders.map(reminder => {
+        {dueNow.map(reminder => {
           const due = dateOnly(reminder.due_date);
           const late = Boolean(due) && compareIso(due, today) < 0;
           return (
-            <div key={reminder.id} className="flex items-center gap-3.5 px-5 py-3.5 border-b border-[#f2f2f7] last:border-b-0">
+            <div key={reminder.id} className="flex items-center gap-3 px-4 py-3 border-b border-[#f2f2f7] last:border-b-0">
               <button
                 type="button"
                 aria-label="Marcar como feito"
                 onClick={() => void act(reminder, { action: 'done' })}
-                className="h-5 w-5 rounded-full border border-[#c7c7cc] shrink-0"
+                className="h-[18px] w-[18px] rounded-full border border-[#c7c7cc] shrink-0"
               />
               <button
                 type="button"
                 onClick={() => openPatientRecord(reminder.patient_id)}
                 className="min-w-0 flex-1 text-left"
               >
-                <p className="text-[17px] tracking-[-0.02em] text-[#1d1d1f] truncate">{reminder.patient_name}</p>
+                <p className="text-[15px] text-[#1d1d1f] truncate">{reminder.note}</p>
                 <p className="text-[13px] text-[#86868b] truncate">
-                  <span className={late ? 'text-[#ff3b30]' : ''}>{timingLabel(reminder, today)}</span>
-                  {' · '}
-                  {reminder.note}
+                  {reminder.patient_name}
+                  {late ? <span className="text-[#ff3b30]"> · {timingLabel(reminder, today)}</span> : null}
                 </p>
               </button>
             </div>
           );
         })}
       </div>
+      )}
       {repeat && (
-        <button type="button" onClick={() => void acceptRepeat()} className="px-1 text-[15px] text-[#0071e3]">
+        <button type="button" onClick={() => void acceptRepeat()} className="mt-2 px-1 text-[15px] text-[#0071e3]">
           {repeat.label}
         </button>
       )}
