@@ -2144,7 +2144,7 @@ export const PatientClinical: React.FC<PatientClinicalProps> = ({
               apiFetch={apiFetch}
               contextText={[
                 ...treatmentInProgress.map((item: any) => item?.procedure),
-                ...(patient?.evolution || []).slice(0, 4).map((item: any) => item?.procedure_performed || item?.notes),
+                ...(Array.isArray(patient?.evolution) ? patient.evolution : []).slice(0, 4).map((item: any) => item?.procedure_performed || item?.notes),
               ].filter(Boolean).join('\n')}
             />
             <section

@@ -129,11 +129,13 @@ export function formatCadence(count: number, unit: CadenceUnit): string {
 }
 
 export function formatWhenLabel(dueDate: string, today: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate || '')) return 'em breve';
   if (dueDate === today) return 'hoje';
   if (dueDate === addDaysIso(today, 1)) return 'amanhã';
   const { year, month, day } = parseIsoDate(dueDate);
-  const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
-    .format(new Date(Date.UTC(year, month - 1, day)));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) return 'em breve';
+  const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' }).format(date);
   return `${day} de ${monthName} de ${year}`;
 }
 

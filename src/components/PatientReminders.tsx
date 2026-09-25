@@ -35,15 +35,17 @@ const snoozeChoices = [
   { days: 30, label: '1 mês' },
 ];
 
+function dateOnly(value: unknown): string {
+  const match = String(value ?? '').match(/\d{4}-\d{2}-\d{2}/);
+  return match?.[0] || '';
+}
+
 function timingLabel(reminder: PatientReminder, today: string) {
-  if (reminder.timing === 'today') return 'Hoje';
-  if (reminder.timing === 'overdue') return formatWhenLabel(reminder.due_date, today);
-  if (reminder.due_date === today) return 'Hoje';
-  const tomorrow = new Date(`${today}T12:00:00Z`);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  const tomorrowIso = tomorrow.toISOString().slice(0, 10);
-  if (reminder.due_date === tomorrowIso) return 'Amanhã';
-  return formatWhenLabel(reminder.due_date, today);
+  const due = dateOnly(reminder.due_date);
+  if (!due) return 'Em breve';
+  if (due === today || reminder.timing === 'today') return 'Hoje';
+  const label = formatWhenLabel(due, today);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 async function readError(response: Response) {
@@ -130,14 +132,12 @@ export const PatientReminders: React.FC<{
   };
 
   return (
-    <section className="rounded-[28px] border border-slate-200/60 bg-white p-5 sm:p-6 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-[22px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">Lembrar</h3>
-        <p className="text-[13px] text-[#86868b]">No dia, aparece no início</p>
-      </div>
+    <section className="rounded-[22px] bg-white px-5 py-5 sm:px-6">
+      <h3 className="text-[22px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">Lembretes</h3>
+      <p className="mt-0.5 text-[13px] text-[#86868b]">No dia, aparece no início.</p>
 
       <form
-        className="mt-4"
+        className="mt-5"
         onSubmit={(event) => {
           event.preventDefault();
           void createFrom(text);
@@ -150,34 +150,33 @@ export const PatientReminders: React.FC<{
             setError('');
           }}
           placeholder="Daqui a 6 meses, ver como está a prótese"
-          className="w-full bg-[#f5f5f7] rounded-[16px] px-4 py-3.5 text-[16px] text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:bg-white focus:shadow-[0_0_0_4px_rgba(0,113,227,0.16)]"
+          className="w-full bg-transparent text-[17px] tracking-[-0.02em] text-[#1d1d1f] placeholder:text-[#aeaeb2] outline-none"
         />
         {preview?.ok && (
-          <p className="mt-3 px-1 text-[15px] text-[#1d1d1f]">
-            <span className="text-[#0071e3]">{formatWhenLabel(preview.dueDate, today)}</span>
-            <span className="text-[#86868b]"> · {preview.note}</span>
+          <p className="mt-2 text-[13px] text-[#86868b]">
+            {formatWhenLabel(preview.dueDate, today)} · {preview.note}
           </p>
         )}
-        {error && <p className="mt-3 px-1 text-[13px] text-[#ff3b30]">{error}</p>}
+        {error && <p className="mt-2 text-[13px] text-[#ff3b30]">{error}</p>}
         {preview?.ok && (
           <button
             type="submit"
             disabled={saving}
-            className="mt-3 px-4 py-2 rounded-full bg-[#0071e3] text-white text-[14px] disabled:opacity-50"
+            className="mt-3 text-[15px] text-[#0071e3] disabled:opacity-40"
           >
-            {saving ? 'Salvando' : 'Lembrar'}
+            {saving ? 'Salvando' : 'Adicionar'}
           </button>
         )}
       </form>
 
       {!text.trim() && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
           {suggestions.map(suggestion => (
             <button
               key={suggestion.id}
               type="button"
               onClick={() => void createFrom(suggestion.text)}
-              className="px-3 py-1.5 rounded-full bg-[#f5f5f7] text-[13px] text-[#1d1d1f] hover:bg-[#e8e8ed]"
+              className="text-[14px] text-[#0071e3]"
             >
               {suggestion.label}
             </button>
@@ -189,62 +188,66 @@ export const PatientReminders: React.FC<{
         <button
           type="button"
           onClick={() => void createFrom(repeat.text)}
-          className="mt-4 text-[14px] text-[#0071e3]"
+          className="mt-4 block text-[15px] text-[#0071e3]"
         >
           {repeat.label}
         </button>
       )}
 
       {reminders.length > 0 && (
-        <ul className="mt-5 divide-y divide-[#f5f5f7]">
-          {reminders.map(reminder => (
-            <li key={reminder.id} className="py-3 flex items-start gap-3">
-              <button
-                type="button"
-                aria-label="Marcar como feito"
-                onClick={() => void act(reminder.id, { action: 'done' })}
-                className="mt-0.5 h-[22px] w-[22px] rounded-full border border-[#d2d2d7] shrink-0 hover:border-[#0071e3]"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-[16px] text-[#1d1d1f] leading-snug">{reminder.note}</p>
-                <p className={`text-[13px] mt-0.5 ${compareIso(reminder.due_date, today) < 0 ? 'text-[#ff3b30]' : 'text-[#86868b]'}`}>
-                  {timingLabel(reminder, today)}
-                </p>
-                {snoozeId === reminder.id && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {snoozeChoices.map(choice => (
-                      <button
-                        key={choice.days}
-                        type="button"
-                        onClick={() => void act(reminder.id, { action: 'snooze', days: choice.days })}
-                        className="px-3 py-1 rounded-full bg-[#f5f5f7] text-[12px] text-[#1d1d1f]"
-                      >
-                        {choice.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setSnoozeId(current => current === reminder.id ? null : reminder.id)}
-                className="text-[13px] text-[#86868b]"
-              >
-                Adiar
-              </button>
-              <button
-                type="button"
-                aria-label="Apagar lembrete"
-                onClick={async () => {
-                  const response = await apiFetch(`/api/reminders/${reminder.id}`, { method: 'DELETE' });
-                  if (response.ok) await load();
-                }}
-                className="text-[#86868b] hover:text-[#1d1d1f]"
-              >
-                <X size={14} />
-              </button>
-            </li>
-          ))}
+        <ul className="mt-5 border-t border-[#f2f2f7]">
+          {reminders.map(reminder => {
+            const due = dateOnly(reminder.due_date);
+            const late = Boolean(due) && compareIso(due, today) < 0;
+            return (
+              <li key={reminder.id} className="flex items-start gap-3 py-3.5 border-b border-[#f2f2f7] last:border-b-0">
+                <button
+                  type="button"
+                  aria-label="Marcar como feito"
+                  onClick={() => void act(reminder.id, { action: 'done' })}
+                  className="mt-0.5 h-5 w-5 rounded-full border border-[#c7c7cc] shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[17px] tracking-[-0.02em] text-[#1d1d1f] leading-snug">{reminder.note}</p>
+                  <p className={`text-[13px] mt-0.5 ${late ? 'text-[#ff3b30]' : 'text-[#86868b]'}`}>
+                    {timingLabel(reminder, today)}
+                  </p>
+                  {snoozeId === reminder.id && (
+                    <div className="mt-2 flex flex-wrap gap-x-4">
+                      {snoozeChoices.map(choice => (
+                        <button
+                          key={choice.days}
+                          type="button"
+                          onClick={() => void act(reminder.id, { action: 'snooze', days: choice.days })}
+                          className="text-[13px] text-[#0071e3]"
+                        >
+                          {choice.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSnoozeId(current => current === reminder.id ? null : reminder.id)}
+                  className="text-[13px] text-[#86868b]"
+                >
+                  Adiar
+                </button>
+                <button
+                  type="button"
+                  aria-label="Apagar lembrete"
+                  onClick={async () => {
+                    const response = await apiFetch(`/api/reminders/${reminder.id}`, { method: 'DELETE' });
+                    if (response.ok) await load();
+                  }}
+                  className="mt-0.5 text-[#c7c7cc] hover:text-[#86868b]"
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
@@ -334,39 +337,41 @@ export const ReminderInbox: React.FC<{
   };
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between px-1">
-        <h3 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">Lembretes</h3>
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between px-1">
+        <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">Lembretes</h3>
         <span className="text-[13px] text-[#86868b]">{reminders.length}</span>
       </div>
-      <div className="rounded-[20px] overflow-hidden bg-white">
-        {reminders.map(reminder => (
-          <div key={reminder.id} className="flex items-center gap-4 px-5 py-4 border-b border-[#f5f5f7] last:border-b-0">
-            <button
-              type="button"
-              aria-label="Marcar como feito"
-              onClick={() => void act(reminder, { action: 'done' })}
-              className="h-[22px] w-[22px] rounded-full border border-[#d2d2d7] shrink-0 hover:border-[#0071e3]"
-            />
-            <button
-              type="button"
-              onClick={() => openPatientRecord(reminder.patient_id)}
-              className="min-w-0 flex-1 text-left"
-            >
-              <p className="text-[15px] font-semibold text-[#1d1d1f] truncate">{reminder.patient_name}</p>
-              <p className="text-[13px] text-[#86868b] truncate">
-                <span className={compareIso(reminder.due_date, today) < 0 ? 'text-[#ff3b30]' : ''}>
-                  {timingLabel(reminder, today)}
-                </span>
-                {' · '}
-                {reminder.note}
-              </p>
-            </button>
-          </div>
-        ))}
+      <div className="rounded-[22px] bg-white">
+        {reminders.map(reminder => {
+          const due = dateOnly(reminder.due_date);
+          const late = Boolean(due) && compareIso(due, today) < 0;
+          return (
+            <div key={reminder.id} className="flex items-center gap-3.5 px-5 py-3.5 border-b border-[#f2f2f7] last:border-b-0">
+              <button
+                type="button"
+                aria-label="Marcar como feito"
+                onClick={() => void act(reminder, { action: 'done' })}
+                className="h-5 w-5 rounded-full border border-[#c7c7cc] shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => openPatientRecord(reminder.patient_id)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <p className="text-[17px] tracking-[-0.02em] text-[#1d1d1f] truncate">{reminder.patient_name}</p>
+                <p className="text-[13px] text-[#86868b] truncate">
+                  <span className={late ? 'text-[#ff3b30]' : ''}>{timingLabel(reminder, today)}</span>
+                  {' · '}
+                  {reminder.note}
+                </p>
+              </button>
+            </div>
+          );
+        })}
       </div>
       {repeat && (
-        <button type="button" onClick={() => void acceptRepeat()} className="px-1 text-[14px] text-[#0071e3]">
+        <button type="button" onClick={() => void acceptRepeat()} className="px-1 text-[15px] text-[#0071e3]">
           {repeat.label}
         </button>
       )}
