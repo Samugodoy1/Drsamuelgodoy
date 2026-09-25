@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonthsIso, parseReminder, suggestReminders } from './patientReminders';
+import { addMonthsIso, formatWhenLabel, parseReminder, suggestReminders } from './patientReminders';
 
 const TODAY = '2026-09-25';
 
@@ -35,6 +35,10 @@ describe('lembretes do paciente', () => {
   it('rejeita frase sem prazo e data passada', () => {
     expect(parseReminder('lembrar disso', TODAY).ok).toBe(false);
     expect(parseReminder('dia 01/01/2020 ver o paciente', TODAY).ok).toBe(false);
+  });
+
+  it('não quebra quando a data não é um dia ISO', () => {
+    expect(formatWhenLabel('Fri Sep 25', TODAY)).toBe('em breve');
   });
 
   it('sugere a prótese quando o prontuário fala dela', () => {
